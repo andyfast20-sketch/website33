@@ -234,6 +234,17 @@
             margin-bottom: 15px;
         }
 
+        .service-card .service-image {
+            width: 100%;
+            max-width: 160px;
+            height: auto;
+            border-radius: 12px;
+            display: block;
+            margin: 0 auto 20px;
+            box-shadow: var(--shadow);
+            object-fit: cover;
+        }
+
         /* About Section */
         .about {
             background-color: var(--background);
@@ -650,9 +661,7 @@
             </div>
             <div class="services-grid">
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-leaf"></i>
-                    </div>
+                    <img class="service-image" src="https://image.pollinations.ai/prompt/ultra%20realistic%20commercial%20lawn%20mower%20on%20lush%20green%20lawn%2C%20sunny%20morning%2C%20professional%20photograph?width=800&height=600&seed=215" alt="Lawn mower on a freshly cut lawn">
                     <h3>Lawn Mowing</h3>
                     <p>Professional lawn mowing with precision equipment for a perfectly manicured finish.</p>
                 </div>
