@@ -148,8 +148,8 @@
 
         /* Hero Section */
         .hero {
-            height: 100vh;
-            background: linear-gradient(rgba(15, 30, 15, 0.35), rgba(15, 30, 15, 0.45)), url('https://image.pollinations.ai/prompt/ultra%20realistic%20lush%20residential%20garden%20with%20freshly%20mowed%20lawn%2C%20flowering%20beds%20and%20sunlight?width=1600&height=900&seed=42') no-repeat center center/cover;
+            min-height: 85vh;
+            background: linear-gradient(rgba(12, 25, 12, 0.45), rgba(12, 25, 12, 0.55)), url('https://image.pollinations.ai/prompt/ultra%20realistic%20small%20backyard%20garden%20with%20a%20man%20mowing%20the%20lawn%20from%20behind%2C%20cozy%20garden%20beds%2C%20sunlit%20afternoon%2C%20photograph?width=1600&height=900&seed=77') no-repeat center center/cover;
             display: flex;
             align-items: center;
             text-align: center;
