@@ -150,6 +150,7 @@
         .hero {
             height: 100vh;
             background: linear-gradient(rgba(15, 30, 15, 0.25), rgba(15, 30, 15, 0.45)), url('https://images.pexels.com/photos/1301856/man-in-blue-denim-pants-mowing-lawn-1301856.jpeg?auto=compress&cs=tinysrgb&w=2100&h=1400&dpr=1') no-repeat center center/cover;
+            background: linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)), url('https://images.pexels.com/photos/4240628/pexels-photo-4240628.jpeg?auto=compress&cs=tinysrgb&w=2070&h=1380&dpr=1') no-repeat center center/cover;
             display: flex;
             align-items: center;
             text-align: center;
