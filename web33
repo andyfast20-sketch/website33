@@ -671,9 +671,7 @@
                     <p>Precision hedge trimming and shaping tailored to each plant, encouraging dense, healthy growth all year.</p>
                 </div>
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-seedling"></i>
-                    </div>
+                    <img class="service-image" src="https://image.pollinations.ai/prompt/ultra%20realistic%20gardener%20kneeling%20while%20weeding%20flower%20bed%2C%20view%20from%20behind%20showing%20back%20of%20head%2C%20sunny%20garden%2C%20photograph?width=800&height=600&seed=512" alt="Gardener weeding a flower bed with only the back of their head visible">
                     <h3>Weed Control</h3>
                     <p>Effective weed management to keep your garden looking pristine.</p>
                 </div>
