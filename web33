@@ -666,11 +666,9 @@
                     <p>Professional lawn mowing with precision equipment for a perfectly manicured finish.</p>
                 </div>
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-tree"></i>
-                    </div>
+                    <img class="service-image" src="https://image.pollinations.ai/prompt/professional%20gardener%20trimming%20hedge%20with%20electric%20trimmer%2C%20lush%20garden%2C%20sunny%20day%2C%20professional%20photograph?width=800&height=600&seed=482" alt="Professional gardener trimming a green hedge with an electric trimmer">
                     <h3>Hedge Trimming</h3>
-                    <p>Expert hedge trimming to maintain shape and promote healthy growth.</p>
+                    <p>Precision hedge trimming and shaping tailored to each plant, encouraging dense, healthy growth all year.</p>
                 </div>
                 <div class="service-card">
                     <div class="service-icon">
