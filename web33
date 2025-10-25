@@ -7,19 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #2e7d32;
-            --primary-light: #4caf50;
-            --primary-dark: #1b5e20;
-            --secondary: #ff9800;
-            --text: #333333;
-            --text-light: #666666;
-            --background: #f9f9f9;
-            --white: #ffffff;
-            --shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -29,8 +16,8 @@
         body {
             font-family: 'Montserrat', sans-serif;
             line-height: 1.6;
-            color: var(--text);
-            background-color: var(--background);
+            color: #333333;
+            background-color: #f9f9f9;
             overflow-x: hidden;
         }
 
@@ -55,26 +42,26 @@
         .btn {
             display: inline-block;
             padding: 12px 30px;
-            background-color: var(--primary);
-            color: var(--white);
+            background-color: #2e7d32;
+            color: #ffffff;
             border: none;
             border-radius: 30px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             text-decoration: none;
         }
 
         .btn:hover {
-            background-color: var(--primary-dark);
+            background-color: #1b5e20;
             transform: translateY(-3px);
-            box-shadow: var(--shadow);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
 
         .btn-secondary {
-            background-color: var(--secondary);
+            background-color: #ff9800;
         }
 
         .btn-secondary:hover {
@@ -90,12 +77,12 @@
             z-index: 1000;
             background-color: rgba(255, 255, 255, 0.95);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         header.scrolled {
             padding: 10px 0;
-            background-color: var(--white);
+            background-color: #ffffff;
         }
 
         .header-container {
@@ -109,12 +96,12 @@
             font-family: 'Playfair Display', serif;
             font-size: 28px;
             font-weight: 700;
-            color: var(--primary);
+            color: #2e7d32;
             text-decoration: none;
         }
 
         .logo span {
-            color: var(--secondary);
+            color: #ff9800;
         }
 
         nav ul {
@@ -127,14 +114,14 @@
         }
 
         nav ul li a {
-            color: var(--text);
+            color: #333333;
             text-decoration: none;
             font-weight: 500;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         nav ul li a:hover {
-            color: var(--primary);
+            color: #2e7d32;
         }
 
         .mobile-menu-btn {
@@ -142,7 +129,7 @@
             background: none;
             border: none;
             font-size: 24px;
-            color: var(--primary);
+            color: #2e7d32;
             cursor: pointer;
         }
 
@@ -153,7 +140,7 @@
             display: flex;
             align-items: center;
             text-align: center;
-            color: var(--white);
+            color: #ffffff;
         }
 
         .hero-content {
@@ -177,7 +164,7 @@
 
         /* Services Section */
         .services {
-            background-color: var(--white);
+            background-color: #ffffff;
         }
 
         .section-title {
@@ -187,7 +174,7 @@
 
         .section-title h2 {
             font-size: 2.5rem;
-            color: var(--primary);
+            color: #2e7d32;
             position: relative;
             display: inline-block;
         }
@@ -200,7 +187,7 @@
             transform: translateX(-50%);
             width: 80px;
             height: 3px;
-            background-color: var(--secondary);
+            background-color: #ff9800;
         }
 
         .services-grid {
@@ -210,11 +197,11 @@
         }
 
         .service-card {
-            background-color: var(--white);
+            background-color: #ffffff;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
             text-align: center;
             padding: 30px;
         }
@@ -225,7 +212,7 @@
 
         .service-icon {
             font-size: 50px;
-            color: var(--primary);
+            color: #2e7d32;
             margin-bottom: 20px;
         }
 
@@ -241,13 +228,13 @@
             border-radius: 12px;
             display: block;
             margin: 0 auto 20px;
-            box-shadow: var(--shadow);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             object-fit: cover;
         }
 
         /* About Section */
         .about {
-            background-color: var(--background);
+            background-color: #f9f9f9;
         }
 
         .about-content {
@@ -264,14 +251,14 @@
             flex: 1;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: var(--shadow);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
 
         .about-image img {
             width: 100%;
             height: auto;
             display: block;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .about-image:hover img {
@@ -280,7 +267,7 @@
 
         /* Pricing Section */
         .pricing {
-            background-color: var(--white);
+            background-color: #ffffff;
         }
 
         .pricing-grid {
@@ -290,19 +277,19 @@
         }
 
         .pricing-card {
-            background-color: var(--white);
+            background-color: #ffffff;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: var(--shadow);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             text-align: center;
             padding: 40px 30px;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             position: relative;
         }
 
         .pricing-card.featured {
             transform: scale(1.05);
-            border: 2px solid var(--primary);
+            border: 2px solid #2e7d32;
         }
 
         .pricing-card.featured::before {
@@ -310,8 +297,8 @@
             position: absolute;
             top: 0;
             right: 0;
-            background-color: var(--primary);
-            color: var(--white);
+            background-color: #2e7d32;
+            color: #ffffff;
             padding: 5px 15px;
             font-size: 0.8rem;
             font-weight: 600;
@@ -329,13 +316,13 @@
         .price {
             font-size: 3rem;
             font-weight: 700;
-            color: var(--primary);
+            color: #2e7d32;
             margin: 20px 0;
         }
 
         .price span {
             font-size: 1rem;
-            color: var(--text-light);
+            color: #666666;
         }
 
         .pricing-features {
@@ -354,7 +341,7 @@
 
         /* Testimonials Section */
         .testimonials {
-            background-color: var(--background);
+            background-color: #f9f9f9;
         }
 
         .testimonials-slider {
@@ -364,10 +351,10 @@
         }
 
         .testimonial {
-            background-color: var(--white);
+            background-color: #ffffff;
             border-radius: 10px;
             padding: 40px;
-            box-shadow: var(--shadow);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             text-align: center;
             display: none;
         }
@@ -390,7 +377,7 @@
 
         .testimonial-author {
             font-weight: 600;
-            color: var(--primary);
+            color: #2e7d32;
         }
 
         .testimonial-nav {
@@ -406,16 +393,16 @@
             background-color: #ddd;
             margin: 0 5px;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .testimonial-dot.active {
-            background-color: var(--primary);
+            background-color: #2e7d32;
         }
 
         /* Contact Section */
         .contact {
-            background-color: var(--white);
+            background-color: #ffffff;
         }
 
         .contact-content {
@@ -439,7 +426,7 @@
 
         .contact-icon {
             font-size: 24px;
-            color: var(--primary);
+            color: #2e7d32;
             margin-right: 15px;
             margin-top: 5px;
         }
@@ -454,11 +441,11 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-family: 'Montserrat', sans-serif;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .form-control:focus {
-            border-color: var(--primary);
+            border-color: #2e7d32;
             outline: none;
         }
 
@@ -469,8 +456,8 @@
 
         /* Footer */
         footer {
-            background-color: var(--primary-dark);
-            color: var(--white);
+            background-color: #1b5e20;
+            color: #ffffff;
             padding: 60px 0 30px;
         }
 
@@ -495,7 +482,7 @@
             left: 0;
             width: 40px;
             height: 2px;
-            background-color: var(--secondary);
+            background-color: #ff9800;
         }
 
         .footer-links {
@@ -509,11 +496,11 @@
         .footer-links a {
             color: #ccc;
             text-decoration: none;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .footer-links a:hover {
-            color: var(--white);
+            color: #ffffff;
             padding-left: 5px;
         }
 
@@ -531,12 +518,12 @@
             height: 40px;
             background-color: rgba(255, 255, 255, 0.1);
             border-radius: 50%;
-            color: var(--white);
-            transition: var(--transition);
+            color: #ffffff;
+            transition: all 0.3s ease;
         }
 
         .social-links a:hover {
-            background-color: var(--secondary);
+            background-color: #ff9800;
             transform: translateY(-3px);
         }
 
@@ -581,8 +568,8 @@
                 top: 80px;
                 left: -100%;
                 width: 100%;
-                background-color: var(--white);
-                transition: var(--transition);
+                background-color: #ffffff;
+                transition: all 0.3s ease;
                 box-shadow: 0 10px 10px rgba(0, 0, 0, 0.1);
             }
             
@@ -671,9 +658,7 @@
                     <p>Precision hedge trimming and shaping tailored to each plant, encouraging dense, healthy growth all year.</p>
                 </div>
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-seedling"></i>
-                    </div>
+                    <img class="service-image" src="https://image.pollinations.ai/prompt/ultra%20realistic%20gardener%20kneeling%20while%20weeding%20flower%20bed%2C%20view%20from%20behind%20showing%20back%20of%20head%2C%20sunny%20garden%2C%20photograph?width=800&height=600&seed=512" alt="Gardener weeding a flower bed with only the back of their head visible">
                     <h3>Weed Control</h3>
                     <p>Effective weed management to keep your garden looking pristine.</p>
                 </div>
