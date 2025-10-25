@@ -149,7 +149,7 @@
         /* Hero Section */
         .hero {
             height: 100vh;
-            background: linear-gradient(rgba(15, 30, 15, 0.35), rgba(15, 30, 15, 0.45)), url('https://images.pexels.com/photos/164240/pexels-photo-164240.jpeg?auto=compress&cs=tinysrgb&w=2100&h=1400&dpr=1') no-repeat center center/cover;
+            background: linear-gradient(rgba(15, 30, 15, 0.35), rgba(15, 30, 15, 0.45)), url('https://image.pollinations.ai/prompt/ultra%20realistic%20lush%20residential%20garden%20with%20freshly%20mowed%20lawn%2C%20flowering%20beds%20and%20sunlight?width=1600&height=900&seed=42') no-repeat center center/cover;
             display: flex;
             align-items: center;
             text-align: center;
