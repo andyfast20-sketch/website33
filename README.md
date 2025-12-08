@@ -1,3 +1,3 @@
-# Pay As You Mow Website
+# Local Telephone AI Agent
 
-This repository contains a static landing page for the "Pay As You Mow" landscaping service. To view the site, open `index.html` in any modern web browser; no additional build steps or runtimes are required.
+This repository hosts a local telephone-like AI agent. See `agent/README.md` for full usage instructions.

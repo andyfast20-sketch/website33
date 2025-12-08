@@ -1,0 +1,5 @@
+"""Conversation state definitions."""
+
+STATE_LISTENING = "LISTENING"
+STATE_THINKING = "THINKING"
+STATE_SPEAKING = "SPEAKING"
