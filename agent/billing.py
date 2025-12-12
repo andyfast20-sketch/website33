@@ -66,12 +66,19 @@ def build_billing_view(
     billing_config = config or BillingConfig.from_settings()
     call_charges = build_call_charges(records, billing_config)
     computed_total_used = sum(charge.charge for charge in call_charges)
+    total_duration_seconds = sum(charge.duration_seconds for charge in call_charges)
 
     return {
         "header": "💰 Billing & Usage",
         "summary": {
             "current_balance": current_balance,
             "total_used": total_used if total_used is not None else round(computed_total_used, 2),
+        },
+        "usage_totals": {
+            "call_count": len(call_charges),
+            "total_duration_seconds": total_duration_seconds,
+            "total_duration_minutes": round(total_duration_seconds / 60, 2),
+            "total_charges": round(computed_total_used, 2),
         },
         "pricing_cards": [
             {
@@ -98,6 +105,51 @@ def build_billing_view(
             for charge in call_charges
         ],
     }
+
+
+def build_account_billing_pages(
+    accounts: Iterable[dict], *, config: Optional[BillingConfig] = None
+) -> dict:
+    """Return a consolidated billing view for multiple accounts.
+
+    Each entry in ``accounts`` should provide:
+
+    - ``account_id``: unique identifier for the account
+    - ``records``: iterable of call dictionaries with ``duration_seconds`` and optional
+      ``id``/``caller``
+    - ``current_balance``: remaining credits for the account
+    - ``total_used``: optional override for total credits consumed
+
+    The helper keeps billing concerns isolated from presentation logic while
+    ensuring that calls are never cross-contaminated between accounts.
+    """
+
+    billing_config = config or BillingConfig.from_settings()
+
+    pages = []
+    seen_accounts = set()
+
+    for account in accounts:
+        account_id = account.get("account_id")
+        if not account_id:
+            raise ValueError("Each account entry requires an 'account_id'")
+        if account_id in seen_accounts:
+            raise ValueError(f"Duplicate account_id detected: {account_id}")
+
+        seen_accounts.add(account_id)
+        view = build_billing_view(
+            account.get("records", []),
+            current_balance=account.get("current_balance", 0.0),
+            total_used=account.get("total_used"),
+            config=billing_config,
+        )
+
+        # Make it clear to UIs which account a block belongs to without forcing
+        # them to re-label headers or introspect nested data.
+        view["account_id"] = account_id
+        pages.append(view)
+
+    return {"accounts": pages, "header": "💰 Billing & Usage"}
 
 
 def calculate_charge(duration_seconds: int, config: BillingConfig) -> float:
