@@ -1,13 +1,40 @@
 C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
   warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
-2025-12-12 18:38:23,832 - VonageAgent - INFO - ElevenLabs client initialized
-2025-12-12 18:38:23,882 - VonageAgent - INFO - Google Cloud TTS client initialized
-2025-12-12 18:38:24,245 - VonageAgent - INFO - Cartesia AI client initialized - Real-time voice streaming enabled
-2025-12-12 18:38:24,245 - VonageAgent - INFO - PlayHT TTS configured with API key
-INFO:     Started server process [33428]
+2025-12-12 21:46:13,646 - VonageAgent - INFO - ElevenLabs client initialized
+2025-12-12 21:46:13,700 - VonageAgent - INFO - Google Cloud TTS client initialized
+2025-12-12 21:46:14,063 - VonageAgent - INFO - Cartesia AI client initialized - Real-time voice streaming enabled
+2025-12-12 21:46:14,064 - VonageAgent - INFO - PlayHT TTS configured with API key
+INFO:     Started server process [34360]
 INFO:     Waiting for application startup.
-2025-12-12 18:38:24,305 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
-2025-12-12 18:38:24,305 - VonageAgent - INFO - \U0001f4de Answer URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/answer
-2025-12-12 18:38:24,305 - VonageAgent - INFO - \U0001f4cb Event URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/events
+2025-12-12 21:46:14,110 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
+2025-12-12 21:46:14,110 - VonageAgent - INFO - \U0001f4de Answer URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/answer
+2025-12-12 21:46:14,110 - VonageAgent - INFO - \U0001f4cb Event URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/events
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:5004 (Press CTRL+C to quit)
+
+======================================================================
+  VONAGE VOICE AGENT - Control Panel
+======================================================================
+
+  Web Interface: http://localhost:5004
+
+  Configure your AI agent through the web interface!
+
+  STEP 1: Start ngrok (in another terminal)
+  ngrok http 5004
+
+  STEP 2: Set Vonage webhooks in your Voice Application:
+
+  +-------------------------------------------------------------+
+  |  Answer URL:  https://YOUR_NGROK_URL/webhooks/answer        |
+  |  Event URL:   https://YOUR_NGROK_URL/webhooks/events        |
+  |  HTTP Method: POST (for both)                               |
+  +-------------------------------------------------------------+
+
+  STEP 3: Call your Vonage phone number!
+
+======================================================================
+
+Starting server on http://0.0.0.0:5004
+
+INFO:     127.0.0.1:58593 - "GET /api/active-calls HTTP/1.1" 200 OK
