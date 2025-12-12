@@ -1,0 +1,9 @@
+aiohttp
+fastapi
+sounddevice
+numpy
+requests
+deepgram-sdk
+openai
+whisper
+pyaudio

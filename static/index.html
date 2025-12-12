@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Phone Agent - Control Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 150px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .info-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .info-card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .example-box {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .call-log {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .call-log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .call-number {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .call-time {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .call-duration {
+            display: inline-block;
+            background: #e0e0e0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .call-summary {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+
+        .call-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-complete {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-complete:hover {
+            background: #218838;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .call-log.completed {
+            opacity: 0.6;
+            border-left-color: #28a745;
+        }
+
+        .no-calls {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .diagnostic-card {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .diagnostic-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .diagnostic-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-ok {
+            background: #28a745;
+        }
+
+        .status-error {
+            background: #dc3545;
+        }
+
+        .diagnostic-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-diagnostic {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Phone Agent</h1>
+        <p class="subtitle">Control Panel</p>
+        
+        <div class="status-badge status-running">● Server Running on Port 5004</div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('config')">⚙️ Configuration</button>
+            <button class="tab" onclick="switchTab('calls')">📞 Call History</button>
+            <button class="tab" onclick="switchTab('admin')">🛠️ Admin Tools</button>
+        </div>
+
+        <div id="configTab" class="tab-content active">
+            <div class="info-card">
+                <h3>📞 How It Works</h3>
+                <p>Configure how your AI agent answers phone calls. Set the agent's name and provide detailed instructions on how it should behave during conversations.</p>
+            </div>
+
+        <form id="configForm">
+            <div class="form-group">
+                <label for="agentName">Agent Name</label>
+                <input type="text" id="agentName" placeholder="e.g., Judie, Alex, Sarah" required>
+            </div>
+
+            <div class="form-group">
+                <label for="businessInfo">Business Information</label>
+                <textarea id="businessInfo" placeholder="Describe your business, services, pricing, hours, etc..." rows="4"></textarea>
+                <div class="example-box">
+                    <strong>Example:</strong> "Garden Pros - Professional gardening services. Lawn mowing £20/hour, hedge trimming £30/hour, full garden maintenance £50/visit. Open Mon-Sat 8am-6pm. Service area: Manchester and surrounding areas."
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="agentPersonality">Agent Personality</label>
+                <textarea id="agentPersonality" placeholder="Describe how the agent should speak and behave..." rows="3"></textarea>
+                <div class="example-box">
+                    <strong>Example:</strong> "Friendly and professional. Use casual language but remain respectful. Be enthusiastic about helping customers. Keep responses brief and conversational."
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="agentInstructions">Additional Instructions</label>
+                <textarea id="agentInstructions" placeholder="Any other specific instructions for handling calls..." rows="3"></textarea>
+                <div class="example-box">
+                    <strong>Example:</strong> "Take messages if the owner isn't available. Offer to schedule appointments. Ask for contact details if needed."
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn-primary">💾 Save Configuration</button>
+                <button type="button" class="btn-secondary" onclick="loadConfig()">🔄 Reload</button>
+            </div>
+        </form>
+
+        <div id="message" class="message"></div>
+        </div>
+
+        <div id="callsTab" class="tab-content">
+            <div class="info-card">
+                <h3>📊 Recent Calls</h3>
+                <p>View call history with AI-generated summaries of what each caller wanted.</p>
+            </div>
+
+            <div id="callLogs"></div>
+        </div>
+
+        <div id="adminTab" class="tab-content">
+            <div class="info-card">
+                <h3>🛠️ Admin Tools</h3>
+                <p>Diagnose connection issues and restart services when needed.</p>
+            </div>
+
+            <div class="diagnostic-card">
+                <h3 style="margin-bottom: 15px;">🔍 System Status</h3>
+                <div class="diagnostic-item">
+                    <div>
+                        <span class="status-indicator status-ok"></span>
+                        <strong>Server Status</strong>
+                    </div>
+                    <span id="serverStatus">Running on Port 5004</span>
+                </div>
+                <div class="diagnostic-item">
+                    <div>
+                        <span class="status-indicator" id="ngrokIndicator"></span>
+                        <strong>ngrok Tunnel</strong>
+                    </div>
+                    <span id="ngrokStatus">Checking...</span>
+                </div>
+                <div class="diagnostic-item">
+                    <div>
+                        <span class="status-indicator" id="openaiIndicator"></span>
+                        <strong>OpenAI Connection</strong>
+                    </div>
+                    <span id="openaiStatus">Checking...</span>
+                </div>
+            </div>
+
+            <div class="diagnostic-actions">
+                <button class="btn-diagnostic btn-warning" onclick="testConnection()">🔄 Test Connection</button>
+                <button class="btn-diagnostic btn-warning" onclick="checkNgrok()">📡 Check ngrok</button>
+                <button class="btn-diagnostic btn-danger" onclick="restartServices()">🔁 Restart Services</button>
+                <button class="btn-diagnostic btn-warning" onclick="viewLogs()">📋 View Logs</button>
+            </div>
+
+            <div id="diagnosticMessage" class="message"></div>
+
+            <div class="info-card" style="margin-top: 20px;">
+                <h3>💡 Troubleshooting Tips</h3>
+                <ul style="margin-left: 20px; line-height: 1.8;">
+                    <li><strong>Engaged Tone:</strong> Usually means ngrok or server is down. Click "Test Connection"</li>
+                    <li><strong>No Response:</strong> Check if OpenAI API key is valid</li>
+                    <li><strong>After Changes:</strong> Restart services to apply updates</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load current configuration on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            loadCalls();
+            // Refresh calls every 30 seconds
+            setInterval(loadCalls, 30000);
+        });
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            // Load calls when switching to calls tab
+            if (tabName === 'calls') {
+                loadCalls();
+            }
+            // Load diagnostics when switching to admin tab
+            if (tabName === 'admin') {
+                runDiagnostics();
+            }
+        }
+
+        async function runDiagnostics() {
+            await checkNgrok();
+            await testConnection();
+        }
+
+        async function checkNgrok() {
+            try {
+                const response = await fetch('/api/admin/ngrok-status');
+                const data = await response.json();
+                
+                const indicator = document.getElementById('ngrokIndicator');
+                const status = document.getElementById('ngrokStatus');
+                
+                if (data.running) {
+                    indicator.className = 'status-indicator status-ok';
+                    status.textContent = `✅ ${data.url}`;
+                } else {
+                    indicator.className = 'status-indicator status-error';
+                    status.textContent = '❌ Not running - restart needed';
+                }
+            } catch (error) {
+                document.getElementById('ngrokStatus').textContent = '❌ Check failed';
+            }
+        }
+
+        async function testConnection() {
+            const indicator = document.getElementById('openaiIndicator');
+            const status = document.getElementById('openaiStatus');
+            
+            status.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/test-openai');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    indicator.className = 'status-indicator status-ok';
+                    status.textContent = '✅ Connected';
+                } else {
+                    indicator.className = 'status-indicator status-error';
+                    status.textContent = '❌ ' + data.message;
+                }
+            } catch (error) {
+                indicator.className = 'status-indicator status-error';
+                status.textContent = '❌ Connection failed';
+            }
+        }
+
+        async function restartServices() {
+            if (!confirm('Restart ngrok tunnel? This will temporarily disconnect active calls.')) {
+                return;
+            }
+            
+            showDiagnosticMessage('🔄 Restarting services...', 'success');
+            
+            try {
+                const response = await fetch('/api/admin/restart', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showDiagnosticMessage('✅ Services restarted! New URL: ' + data.url, 'success');
+                    setTimeout(runDiagnostics, 3000);
+                } else {
+                    showDiagnosticMessage('❌ Restart failed: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showDiagnosticMessage('❌ Failed to restart: ' + error.message, 'error');
+            }
+        }
+
+        async function viewLogs() {
+            try {
+                const response = await fetch('/api/admin/logs');
+                const data = await response.json();
+                
+                alert('Recent Logs:\n\n' + data.logs.join('\n'));
+            } catch (error) {
+                showDiagnosticMessage('❌ Failed to load logs', 'error');
+            }
+        }
+
+        function showDiagnosticMessage(text, type) {
+            const messageDiv = document.getElementById('diagnosticMessage');
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        async function markCallComplete(callUuid) {
+            try {
+                const response = await fetch(`/api/calls/${callUuid}/complete`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    await loadCalls();
+                } else {
+                    alert('Failed to mark call as complete');
+                }
+            } catch (error) {
+                console.error('Error marking call complete:', error);
+                alert('Error marking call as complete');
+            }
+        }
+
+        async function deleteCall(callUuid) {
+            if (!confirm('Are you sure you want to delete this call?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/calls/${callUuid}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    await loadCalls();
+                } else {
+                    alert('Failed to delete call');
+                }
+            } catch (error) {
+                console.error('Error deleting call:', error);
+                alert('Error deleting call');
+            }
+        }
+
+        async function loadCalls() {
+            try {
+                const response = await fetch('/api/calls');
+                const data = await response.json();
+                
+                const callLogsDiv = document.getElementById('callLogs');
+                
+                if (data.calls.length === 0) {
+                    callLogsDiv.innerHTML = '<div class="no-calls">📞 No calls yet. When calls come in, they\'ll appear here with AI summaries.</div>';
+                    return;
+                }
+                
+                callLogsDiv.innerHTML = data.calls.map(call => {
+                    const startTime = new Date(call.start_time);
+                    const formattedTime = startTime.toLocaleString();
+                    const duration = call.duration ? `${call.duration}s` : 'N/A';
+                    const isCompleted = call.status === 'completed';
+                    const completedClass = isCompleted ? 'completed' : '';
+                    const completeBtn = isCompleted 
+                        ? '<button class="btn-small btn-complete" disabled>✓ Completed</button>'
+                        : `<button class="btn-small btn-complete" onclick="markCallComplete('${call.call_uuid}')">Mark Complete</button>`;
+                    
+                    return `
+                        <div class="call-log ${completedClass}" id="call-${call.call_uuid}">
+                            <div class="call-log-header">
+                                <div>
+                                    <span class="call-number">📱 ${call.caller_number}</span>
+                                    <span class="call-duration">${duration}</span>
+                                </div>
+                                <span class="call-time">📅 ${formattedTime}</span>
+                            </div>
+                            <div class="call-summary">
+                                ${call.summary || 'Generating summary...'}
+                            </div>
+                            <div class="call-actions">
+                                ${completeBtn}
+                                <button class="btn-small btn-delete" onclick="deleteCall('${call.call_uuid}')">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Failed to load calls:', error);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('agentName').value = config.AGENT_NAME;
+                document.getElementById('businessInfo').value = config.BUSINESS_INFO || '';
+                document.getElementById('agentPersonality').value = config.AGENT_PERSONALITY || '';
+                document.getElementById('agentInstructions').value = config.AGENT_INSTRUCTIONS;
+                
+                showMessage('Configuration loaded successfully', 'success');
+            } catch (error) {
+                showMessage('Failed to load configuration: ' + error.message, 'error');
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const agentName = document.getElementById('agentName').value;
+            const businessInfo = document.getElementById('businessInfo').value;
+            const agentPersonality = document.getElementById('agentPersonality').value;
+            const agentInstructions = document.getElementById('agentInstructions').value;
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        AGENT_NAME: agentName,
+                        BUSINESS_INFO: businessInfo,
+                        AGENT_PERSONALITY: agentPersonality,
+                        AGENT_INSTRUCTIONS: agentInstructions
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage('✅ Configuration saved! Changes will apply to new calls.', 'success');
+                } else {
+                    showMessage('❌ Failed to save: ' + result.detail, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Error saving configuration: ' + error.message, 'error');
+            }
+        });
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

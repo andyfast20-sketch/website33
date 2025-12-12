@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - System Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 25px;
+            color: white;
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .change {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            color: white;
+        }
+
+        .panel h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .accounts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .accounts-table thead {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .accounts-table th,
+        .accounts-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .accounts-table th {
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .accounts-table tbody tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        .accounts-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .badge-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .system-tools {
+            display: grid;
+            gap: 15px;
+        }
+
+        .tool-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tool-info h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .tool-info p {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .tool-action {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tool-action:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(5px);
+        }
+
+        .activity-feed {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .activity-item .time {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-bottom: 5px;
+        }
+
+        .activity-item .message {
+            font-size: 13px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            opacity: 0.6;
+        }
+
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .message.success {
+            background: #10b981;
+        }
+
+        .message.error {
+            background: #ef4444;
+        }
+
+        .message.info {
+            background: #3b82f6;
+        }
+
+        .message.warning {
+            background: #f59e0b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .detail-item label {
+            font-size: 12px;
+            opacity: 0.7;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .detail-item .value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: white;
+            opacity: 0.6;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            opacity: 1;
+            border-bottom-color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .search-bar {
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 14px;
+        }
+
+        .search-bar input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛡️ Super Admin Dashboard</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
+                <button class="btn btn-primary" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Accounts</h3>
+                <div class="value" id="totalAccounts">0</div>
+                <div class="change">Active users</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Calls Today</h3>
+                <div class="value" id="totalCalls">0</div>
+                <div class="change">Across all accounts</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Minutes Used</h3>
+                <div class="value" id="totalMinutes">0</div>
+                <div class="change">This month</div>
+            </div>
+            <div class="stat-card">
+                <h3>System Health</h3>
+                <div class="value" id="systemHealth">100%</div>
+                <div class="change" id="healthStatus">All systems operational</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-grid">
+            <!-- Accounts Table -->
+            <div class="panel">
+                <h2>📊 All Customer Accounts</h2>
+                <div class="search-bar">
+                    <input type="text" id="searchAccounts" placeholder="🔍 Search accounts by name, email, or phone..." onkeyup="filterAccounts()">
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="accounts-table">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Minutes</th>
+                                <th>Calls (Today)</th>
+                                <th>Last Active</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accountsTableBody">
+                            <tr>
+                                <td colspan="6" class="loading">Loading accounts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Global AI Instructions -->
+            <div class="panel">
+                <h2>🌐 Global AI Instructions</h2>
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">
+                    These instructions will be applied to ALL AI agents across ALL customer accounts. 
+                    Individual account settings will still apply, but these global instructions take priority.
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Global Instructions for All AI Agents</label>
+                    <textarea 
+                        id="globalInstructions" 
+                        rows="8" 
+                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; font-family: inherit; resize: vertical;"
+                        placeholder="Enter instructions that will apply to all AI agents. For example:&#10;- Always be polite and professional&#10;- Never share customer data&#10;- If you don't know something, say so honestly"
+                    ></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn btn-primary" onclick="saveGlobalInstructions()">
+                        💾 Save Global Instructions
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadGlobalInstructions()">
+                        🔄 Reload
+                    </button>
+                    <span id="globalInstructionsStatus" style="color: rgba(255,255,255,0.6); font-size: 14px;"></span>
+                </div>
+                <div id="globalInstructionsInfo" style="margin-top: 15px; padding: 12px; background: rgba(100,149,237,0.1); border-radius: 8px; border-left: 4px solid #6495ed; display: none;">
+                    <small style="color: rgba(255,255,255,0.8);">
+                        <strong>Last updated:</strong> <span id="globalLastUpdated">-</span><br>
+                        <strong>Updated by:</strong> <span id="globalUpdatedBy">-</span>
+                    </small>
+                </div>
+            </div>
+
+            <!-- System Tools -->
+            <div class="panel">
+                <h2>🔧 System Tools</h2>
+                <div class="system-tools">
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>🌐 ngrok Status</h4>
+                            <p>Check tunnel connection</p>
+                        </div>
+                        <button class="tool-action" onclick="checkNgrok()">Check</button>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>🔍 Run Diagnostics</h4>
+                            <p>System health check</p>
+                        </div>
+                        <button class="tool-action" onclick="runDiagnostics()">Run</button>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>📋 View Logs</h4>
+                            <p>Recent system logs</p>
+                        </div>
+                        <button class="tool-action" onclick="viewLogs()">View</button>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>🔄 Restart ngrok</h4>
+                            <p>Restart tunnel service</p>
+                        </div>
+                        <button class="tool-action" onclick="restartNgrok()">Restart</button>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>💾 Database Backup</h4>
+                            <p>Create system backup</p>
+                        </div>
+                        <button class="tool-action" onclick="createBackup()">Backup</button>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-info">
+                            <h4>📊 Export Reports</h4>
+                            <p>Download usage data</p>
+                        </div>
+                        <button class="tool-action" onclick="exportReports()">Export</button>
+                    </div>
+                </div>
+
+                <h2 style="margin-top: 30px;">📡 Recent Activity</h2>
+                <div class="activity-feed" id="activityFeed">
+                    <div class="loading">Loading activity...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Details Modal -->
+    <div class="modal" id="accountModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Account Details</h2>
+                <button class="close-btn" onclick="closeAccountModal()">×</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchTab('calls')">Call History</button>
+                <button class="tab" onclick="switchTab('settings')">Settings</button>
+            </div>
+
+            <div id="overviewTab" class="tab-content active">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>User ID</label>
+                        <div class="value" id="modalUserId">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Account Name</label>
+                        <div class="value" id="modalUserName">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Minutes Remaining</label>
+                        <div class="value" id="modalMinutes">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Total Purchased</label>
+                        <div class="value" id="modalTotalMinutes">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Voice Setting</label>
+                        <div class="value" id="modalVoice">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>ElevenLabs</label>
+                        <div class="value" id="modalElevenlabs">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="callsTab" class="tab-content">
+                <div id="modalCallHistory" class="loading">Loading call history...</div>
+            </div>
+
+            <div id="settingsTab" class="tab-content">
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px;">
+                    <h3 style="margin-bottom: 15px;">Account Actions</h3>
+                    <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px;" onclick="addMinutes()">➕ Add Minutes</button>
+                    <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px;" onclick="resetAccount()">🔄 Reset Account</button>
+                    <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px; background: rgba(245, 158, 11, 0.3);" onclick="suspendAccount()">⏸️ Suspend Account</button>
+                    <button class="btn btn-secondary" style="margin-bottom: 10px; background: rgba(239, 68, 68, 0.3);" onclick="banAccount()">🚫 Ban Account</button>
+                    <button class="btn btn-secondary" style="margin-bottom: 10px; background: rgba(16, 185, 129, 0.3);" onclick="reactivateAccount()">✅ Reactivate Account</button>
+                </div>
+                <div id="accountStatusInfo" style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <h4 style="margin-bottom: 10px;">Account Status</h4>
+                    <div id="statusDisplay">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allAccounts = [];
+        let currentAccountId = null;
+
+        // Load dashboard on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            loadGlobalInstructions(); // Load global instructions
+            setInterval(refreshDashboard, 30000); // Auto-refresh every 30 seconds
+        });
+
+        async function loadDashboard() {
+            await Promise.all([
+                loadStats(),
+                loadAccounts(),
+                loadActivity()
+            ]);
+        }
+
+        async function refreshDashboard() {
+            showMessage('Refreshing dashboard...', 'info');
+            await loadDashboard();
+            await loadGlobalInstructions();
+            showMessage('Dashboard updated', 'success');
+        }
+
+        async function loadStats() {
+            try {
+                const [accountsRes, callsRes] = await Promise.all([
+                    fetch('/api/super-admin/stats'),
+                    fetch('/api/super-admin/calls-today')
+                ]);
+
+                const stats = await accountsRes.json();
+                const callStats = await callsRes.json();
+
+                document.getElementById('totalAccounts').textContent = stats.total_accounts || 0;
+                document.getElementById('totalCalls').textContent = callStats.total_calls || 0;
+                document.getElementById('totalMinutes').textContent = stats.total_minutes_used || 0;
+                document.getElementById('systemHealth').textContent = '100%';
+                document.getElementById('healthStatus').textContent = 'All systems operational';
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch('/api/super-admin/accounts');
+                allAccounts = await response.json();
+                
+                renderAccounts(allAccounts);
+            } catch (error) {
+                console.error('Failed to load accounts:', error);
+                document.getElementById('accountsTableBody').innerHTML = 
+                    '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6;">Failed to load accounts</td></tr>';
+            }
+        }
+
+        function renderAccounts(accounts) {
+            const tbody = document.getElementById('accountsTableBody');
+            
+            if (accounts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6;">No accounts found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = accounts.map(account => {
+                // Check account status first
+                const accountStatus = account.status || 'active';
+                let status, statusText;
+                
+                if (accountStatus === 'banned') {
+                    status = 'inactive';
+                    statusText = '🚫 Banned';
+                } else if (accountStatus === 'suspended') {
+                    status = 'warning';
+                    statusText = '⏸️ Suspended';
+                } else {
+                    // Check minutes for active accounts
+                    status = account.minutes_remaining > 10 ? 'active' : 
+                            account.minutes_remaining > 0 ? 'warning' : 'inactive';
+                    statusText = account.minutes_remaining > 10 ? 'Active' : 
+                                account.minutes_remaining > 0 ? 'Low Minutes' : 'No Minutes';
+                }
+                
+                return `
+                    <tr onclick="viewAccount(${account.user_id})">
+                        <td>
+                            <strong>${account.name}</strong><br>
+                            <small style="opacity: 0.7;">ID: ${account.user_id}</small>
+                        </td>
+                        <td>${account.minutes_remaining || 0} min</td>
+                        <td>${account.calls_today || 0}</td>
+                        <td>${account.last_call ? formatDate(account.last_call) : 'Never'}</td>
+                        <td><span class="badge badge-${status}">${statusText}</span></td>
+                        <td>
+                            <button class="tool-action" onclick="event.stopPropagation(); viewAccount(${account.user_id})">View</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterAccounts() {
+            const search = document.getElementById('searchAccounts').value.toLowerCase();
+            const filtered = allAccounts.filter(account => 
+                account.name.toLowerCase().includes(search) ||
+                account.user_id.toString().includes(search)
+            );
+            renderAccounts(filtered);
+        }
+
+        async function loadActivity() {
+            try {
+                const response = await fetch('/api/super-admin/activity');
+                const activity = await response.json();
+                
+                const feed = document.getElementById('activityFeed');
+                if (activity.length === 0) {
+                    feed.innerHTML = '<div class="loading">No recent activity</div>';
+                    return;
+                }
+
+                feed.innerHTML = activity.map(item => `
+                    <div class="activity-item">
+                        <div class="time">${formatDate(item.timestamp)}</div>
+                        <div class="message">${item.message}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load activity:', error);
+                document.getElementById('activityFeed').innerHTML = 
+                    '<div class="loading">Failed to load activity</div>';
+            }
+        }
+
+        async function viewAccount(userId) {
+            currentAccountId = userId;
+            try {
+                const response = await fetch(`/api/super-admin/account/${userId}`);
+                const account = await response.json();
+
+                document.getElementById('modalUserId').textContent = account.user_id;
+                document.getElementById('modalUserName').textContent = account.name;
+                document.getElementById('modalMinutes').textContent = `${account.minutes_remaining || 0} minutes`;
+                document.getElementById('modalTotalMinutes').textContent = `${account.total_minutes_purchased || 0} minutes`;
+                document.getElementById('modalVoice').textContent = account.voice || 'shimmer';
+                document.getElementById('modalElevenlabs').textContent = account.use_elevenlabs ? '✅ Enabled' : '❌ Disabled';
+
+                // Display account status
+                const statusDisplay = document.getElementById('statusDisplay');
+                const status = account.status || 'active';
+                let statusHTML = `<strong>Status:</strong> <span class="badge badge-${status === 'active' ? 'active' : status === 'suspended' ? 'warning' : 'inactive'}">${status.toUpperCase()}</span>`;
+                
+                if (status === 'suspended' && account.suspension_message) {
+                    statusHTML += `<br><br><strong>Suspension Message:</strong><br>${account.suspension_message}`;
+                    statusHTML += `<br><small style="opacity: 0.7;">Suspended at: ${formatDate(account.suspended_at)}</small>`;
+                    statusHTML += `<br><small style="opacity: 0.7;">Suspended by: ${account.suspended_by || 'Admin'}</small>`;
+                } else if (status === 'banned') {
+                    statusHTML += `<br><br><strong>Account Banned</strong>`;
+                    statusHTML += `<br><small style="opacity: 0.7;">Banned at: ${formatDate(account.suspended_at)}</small>`;
+                }
+                
+                statusDisplay.innerHTML = statusHTML;
+
+                document.getElementById('accountModal').classList.add('active');
+                switchTab('overview');
+            } catch (error) {
+                console.error('Failed to load account details:', error);
+                showMessage('Failed to load account details', 'error');
+            }
+        }
+
+        function closeAccountModal() {
+            document.getElementById('accountModal').classList.remove('active');
+            currentAccountId = null;
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+
+            // Load data if needed
+            if (tabName === 'calls' && currentAccountId) {
+                loadAccountCalls(currentAccountId);
+            }
+        }
+
+        async function loadAccountCalls(userId) {
+            try {
+                const response = await fetch(`/api/super-admin/account/${userId}/calls`);
+                const calls = await response.json();
+
+                const container = document.getElementById('modalCallHistory');
+                if (calls.length === 0) {
+                    container.innerHTML = '<div class="loading">No calls found</div>';
+                    return;
+                }
+
+                container.innerHTML = calls.map(call => `
+                    <div class="activity-item">
+                        <div class="time">${formatDate(call.start_time)}</div>
+                        <div class="message">
+                            📱 ${call.caller_number}<br>
+                            <small>Duration: ${call.duration || 0}s | ${call.summary || 'No summary'}</small>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load calls:', error);
+                document.getElementById('modalCallHistory').innerHTML = 
+                    '<div class="loading">Failed to load call history</div>';
+            }
+        }
+
+        // System Tools
+        async function checkNgrok() {
+            showMessage('Checking ngrok status...', 'info');
+            try {
+                const response = await fetch('/api/admin/ngrok-status');
+                const data = await response.json();
+                if (data.url) {
+                    showMessage(`✅ ngrok active: ${data.url}`, 'success');
+                } else {
+                    showMessage('⚠️ ngrok not running', 'warning');
+                }
+            } catch (error) {
+                showMessage('❌ Failed to check ngrok', 'error');
+            }
+        }
+
+        async function runDiagnostics() {
+            showMessage('Running diagnostics...', 'info');
+            try {
+                const response = await fetch('/api/admin/diagnostics', { method: 'POST' });
+                const data = await response.json();
+                const passed = data.tests.filter(t => t.passed).length;
+                showMessage(`Diagnostics complete: ${passed}/${data.tests.length} tests passed`, 'success');
+            } catch (error) {
+                showMessage('❌ Failed to run diagnostics', 'error');
+            }
+        }
+
+        async function viewLogs() {
+            showMessage('Viewing logs...', 'info');
+            try {
+                const response = await fetch('/api/admin/logs');
+                const data = await response.json();
+                alert('Logs:\n\n' + data.logs.join('\n'));
+            } catch (error) {
+                showMessage('❌ Failed to load logs', 'error');
+            }
+        }
+
+        async function restartNgrok() {
+            if (!confirm('Restart ngrok tunnel? This will briefly interrupt service.')) return;
+            showMessage('Restarting ngrok...', 'info');
+            try {
+                const response = await fetch('/api/admin/restart-ngrok', { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('✅ ngrok restarted successfully', 'success');
+                } else {
+                    showMessage('❌ Failed to restart ngrok', 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Failed to restart ngrok', 'error');
+            }
+        }
+
+        async function createBackup() {
+            showMessage('Creating backup...', 'info');
+            try {
+                const response = await fetch('/api/super-admin/backup', { method: 'POST' });
+                const data = await response.json();
+                showMessage('✅ Backup created successfully', 'success');
+            } catch (error) {
+                showMessage('❌ Failed to create backup', 'error');
+            }
+        }
+
+        async function exportReports() {
+            showMessage('Exporting reports...', 'info');
+            try {
+                window.open('/api/super-admin/export-reports', '_blank');
+                showMessage('✅ Reports exported', 'success');
+            } catch (error) {
+                showMessage('❌ Failed to export reports', 'error');
+            }
+        }
+
+        async function addMinutes() {
+            const minutes = prompt('How many minutes to add?');
+            if (!minutes || isNaN(minutes)) return;
+            
+            try {
+                const response = await fetch(`/api/super-admin/account/${currentAccountId}/add-minutes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minutes: parseInt(minutes) })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`✅ Added ${minutes} minutes`, 'success');
+                    viewAccount(currentAccountId); // Refresh
+                    loadAccounts(); // Refresh table
+                }
+            } catch (error) {
+                showMessage('❌ Failed to add minutes', 'error');
+            }
+        }
+
+        async function resetAccount() {
+            if (!confirm('Reset this account? This will clear all data.')) return;
+            
+            try {
+                const response = await fetch(`/api/super-admin/account/${currentAccountId}/reset`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('✅ Account reset', 'success');
+                    closeAccountModal();
+                    loadAccounts();
+                }
+            } catch (error) {
+                showMessage('❌ Failed to reset account', 'error');
+            }
+        }
+
+        async function suspendAccount() {
+            const message = prompt('Enter suspension message (user will see this when they login):');
+            if (!message) return;
+            
+            try {
+                const response = await fetch(`/api/super-admin/account/${currentAccountId}/suspend`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('⏸️ Account suspended', 'warning');
+                    viewAccount(currentAccountId);
+                    loadAccounts();
+                }
+            } catch (error) {
+                showMessage('❌ Failed to suspend account', 'error');
+            }
+        }
+
+        async function banAccount() {
+            if (!confirm('Ban this account permanently? User will not be able to login.')) return;
+            
+            try {
+                const response = await fetch(`/api/super-admin/account/${currentAccountId}/ban`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('🚫 Account banned', 'error');
+                    viewAccount(currentAccountId);
+                    loadAccounts();
+                }
+            } catch (error) {
+                showMessage('❌ Failed to ban account', 'error');
+            }
+        }
+
+        async function reactivateAccount() {
+            if (!confirm('Reactivate this account?')) return;
+            
+            try {
+                const response = await fetch(`/api/super-admin/account/${currentAccountId}/reactivate`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('✅ Account reactivated', 'success');
+                    viewAccount(currentAccountId);
+                    loadAccounts();
+                }
+            } catch (error) {
+                showMessage('❌ Failed to reactivate account', 'error');
+            }
+        }
+
+        // Global Instructions Management
+        async function loadGlobalInstructions() {
+            try {
+                const response = await fetch('/api/super-admin/global-instructions');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('globalInstructions').value = data.global_instructions || '';
+                    
+                    if (data.last_updated) {
+                        document.getElementById('globalLastUpdated').textContent = formatDate(data.last_updated);
+                        document.getElementById('globalUpdatedBy').textContent = data.updated_by || 'Unknown';
+                        document.getElementById('globalInstructionsInfo').style.display = 'block';
+                    } else {
+                        document.getElementById('globalInstructionsInfo').style.display = 'none';
+                    }
+                    
+                    document.getElementById('globalInstructionsStatus').textContent = '';
+                }
+            } catch (error) {
+                console.error('Failed to load global instructions:', error);
+                document.getElementById('globalInstructionsStatus').textContent = '❌ Failed to load';
+            }
+        }
+
+        async function saveGlobalInstructions() {
+            const instructions = document.getElementById('globalInstructions').value;
+            
+            if (!confirm('Update global instructions for ALL AI agents across ALL accounts?')) {
+                return;
+            }
+            
+            try {
+                document.getElementById('globalInstructionsStatus').textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/super-admin/global-instructions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        global_instructions: instructions,
+                        updated_by: 'admin'  // You can enhance this with actual admin username
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('✅ Global instructions updated successfully', 'success');
+                    document.getElementById('globalInstructionsStatus').textContent = '✅ Saved successfully';
+                    await loadGlobalInstructions(); // Reload to show updated timestamp
+                } else {
+                    showMessage('❌ Failed to save: ' + (data.error || 'Unknown error'), 'error');
+                    document.getElementById('globalInstructionsStatus').textContent = '❌ Failed to save';
+                }
+            } catch (error) {
+                console.error('Failed to save global instructions:', error);
+                showMessage('❌ Failed to save global instructions', 'error');
+                document.getElementById('globalInstructionsStatus').textContent = '❌ Error';
+            }
+        }
+
+        function logout() {
+            window.location.href = '/landing.html';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Never';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function showMessage(text, type) {
+            const existing = document.querySelector('.message');
+            if (existing) existing.remove();
+
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.textContent = text;
+            document.body.appendChild(msg);
+
+            setTimeout(() => msg.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

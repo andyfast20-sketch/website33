@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ - Julie AI Receptionist</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .navbar {
+            padding: 20px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-primary {
+            background: #fff;
+            color: #667eea;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .page-header h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            font-size: 20px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .faq-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .faq-item {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .faq-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .faq-question {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .faq-answer {
+            font-size: 18px;
+            line-height: 1.6;
+            opacity: 0.9;
+            color: #fff;
+        }
+
+        .cta-section {
+            text-align: center;
+            margin-top: 60px;
+            padding: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+        }
+
+        .cta-section h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .cta-section p {
+            font-size: 20px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .btn-large {
+            padding: 18px 50px;
+            font-size: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 36px;
+            }
+
+            .page-header p {
+                font-size: 18px;
+            }
+
+            .faq-section {
+                padding: 25px;
+            }
+
+            .faq-question {
+                font-size: 20px;
+            }
+
+            .faq-answer {
+                font-size: 16px;
+            }
+
+            .nav-links {
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">🤖 Julie AI</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/signin.html" class="btn btn-primary">Sign In</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Frequently Asked Questions</h1>
+            <p>Everything you need to know about Julie, your AI phone assistant</p>
+        </div>
+
+        <div class="faq-section">
+            <div class="faq-item">
+                <div class="faq-question">What is Julie?</div>
+                <div class="faq-answer">
+                    Julie is an intelligent AI phone assistant designed to handle your incoming calls whenever you're busy or unavailable. She engages in natural, human-like conversations with your callers and delivers comprehensive call summaries straight to your inbox.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">What's the pricing?</div>
+                <div class="faq-answer">
+                    We offer a risk-free 7-day trial at no cost. Following the trial period, the service is just £49 per month with unlimited calling minutes included—no hidden fees or usage limits.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Will I need to change my phone number?</div>
+                <div class="faq-answer">
+                    Not at all. You keep your existing business number. We'll provide you with simple call forwarding instructions to redirect calls to Julie when needed. You can switch it on or off whenever you like.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">How complicated is the setup process?</div>
+                <div class="faq-answer">
+                    Setup is remarkably simple and takes just a few minutes. Once you sign up, you'll customize Julie's greeting and responses through our user-friendly dashboard. Then activate call forwarding to your unique Julie number—that's it! No technical expertise required.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Can I choose when Julie takes calls?</div>
+                <div class="faq-answer">
+                    Absolutely. You have complete flexibility. Enable call forwarding to Julie during busy periods, after hours, or whenever you need her assistance. Turn it off anytime to handle calls yourself. You're always in control.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Does Julie actually sound like a real person?</div>
+                <div class="faq-answer">
+                    Absolutely. Julie's voice technology is so advanced that the vast majority of callers believe they're speaking with an actual receptionist. She's programmed to engage in authentic conversations, ask relevant questions, and respond naturally to various situations.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">What information do I receive after each call?</div>
+                <div class="faq-answer">
+                    After every call, you'll receive a detailed summary delivered via text message or email. This includes the caller's name and contact details, the purpose of their call, and any important information discussed. Additionally, you can access the complete call recording and written transcript through your account dashboard for future reference.
+                </div>
+            </div>
+        </div>
+
+        <div class="cta-section">
+            <h2>Ready to try Julie?</h2>
+            <p>Start your free 7-day trial today. No credit card required.</p>
+            <a href="/signup.html" class="btn btn-primary btn-large">Get Started Free</a>
+        </div>
+    </div>
+</body>
+</html>

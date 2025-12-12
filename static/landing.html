@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceAI - AI Phone Agent Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Animated gradient background */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating particles */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 20s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            25% { transform: translateY(-100px) translateX(50px); }
+            50% { transform: translateY(-200px) translateX(-50px); }
+            75% { transform: translateY(-100px) translateX(100px); }
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 20px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            font-size: 36px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .btn-link {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+
+        .btn-link:hover {
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .btn-admin {
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-admin:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 10;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 150px 50px 100px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 72px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            animation: fadeInUp 1s ease;
+            text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .subtitle {
+            font-size: 24px;
+            margin-bottom: 50px;
+            opacity: 0.95;
+            animation: fadeInUp 1s ease 0.2s both;
+            line-height: 1.6;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        .btn-primary {
+            padding: 18px 50px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-secondary {
+            padding: 18px 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-5px);
+        }
+
+        .features {
+            padding: 100px 50px;
+            background: #0a0a0a;
+            position: relative;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 80px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .feature-card p {
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .stats {
+            padding: 100px 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 60px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stat {
+            animation: fadeInUp 1s ease;
+        }
+
+        .stat-number {
+            font-size: 64px;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .pricing {
+            padding: 100px 50px;
+            background: #0a0a0a;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 50px;
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2);
+        }
+
+        .pricing-card.featured {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .plan-name {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .plan-price {
+            font-size: 56px;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+
+        .plan-price span {
+            font-size: 24px;
+            font-weight: 400;
+            opacity: 0.7;
+        }
+
+        .plan-features {
+            list-style: none;
+            padding: 30px 0;
+            text-align: left;
+        }
+
+        .plan-features li {
+            padding: 12px 0;
+            color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .plan-features li:before {
+            content: "✓";
+            color: #4ade80;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        footer {
+            padding: 60px 50px;
+            background: #000;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        footer p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 42px;
+            }
+
+            .subtitle {
+                font-size: 18px;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+
+            nav {
+                padding: 20px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">
+            <span class="logo-icon">🤖</span>
+            VoiceAI
+        </div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="#contact">Contact</a>
+            <a href="/signin.html" style="background: rgba(255,255,255,0.15); padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);">Sign In</a>
+            <a href="/signup.html" class="btn-admin">Sign Up</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="particles">
+            <div class="particle" style="width: 100px; height: 100px; left: 10%; top: 20%; animation-delay: 0s;"></div>
+            <div class="particle" style="width: 150px; height: 150px; left: 70%; top: 30%; animation-delay: 2s;"></div>
+            <div class="particle" style="width: 80px; height: 80px; left: 30%; top: 60%; animation-delay: 4s;"></div>
+            <div class="particle" style="width: 120px; height: 120px; left: 80%; top: 70%; animation-delay: 6s;"></div>
+        </div>
+        <div class="hero-content">
+            <h1>AI-Powered Phone<br>Agent Service</h1>
+            <p class="subtitle">Transform your customer service with intelligent voice AI.<br>Never miss a call. Answer 24/7. Scale infinitely.</p>
+            <div class="cta-buttons">
+                <a href="/admin" class="btn-primary">Get Started Free</a>
+                <a href="#features" class="btn-secondary">Learn More</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="stats-grid">
+            <div class="stat">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">Always Available</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">99.9%</div>
+                <div class="stat-label">Uptime Guaranteed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">< 1s</div>
+                <div class="stat-label">Response Time</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">∞</div>
+                <div class="stat-label">Concurrent Calls</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <h2 class="section-title">Powerful Features</h2>
+        <p class="section-subtitle">Everything you need to deliver exceptional phone support</p>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Smart Call Handling</h3>
+                <p>AI understands context, takes messages, books appointments, and answers questions naturally.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Multi-Language Support</h3>
+                <p>Communicate with customers in their preferred language automatically.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Call Analytics</h3>
+                <p>AI-generated summaries and insights from every conversation.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Enterprise Security</h3>
+                <p>Bank-level encryption and compliance with data protection regulations.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Instant Setup</h3>
+                <p>Configure your AI agent in minutes with our intuitive web interface.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Customizable Personality</h3>
+                <p>Tailor the AI's tone, voice, and behavior to match your brand.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="pricing">
+        <h2 class="section-title">Simple, Transparent Pricing</h2>
+        <p class="section-subtitle">No hidden fees. Cancel anytime.</p>
+        
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="plan-name">Starter</div>
+                <div class="plan-price">$49<span>/mo</span></div>
+                <ul class="plan-features">
+                    <li>1,000 minutes/month</li>
+                    <li>AI call summaries</li>
+                    <li>Email notifications</li>
+                    <li>Basic analytics</li>
+                    <li>24/7 support</li>
+                </ul>
+                <a href="/admin" class="btn-primary">Start Free Trial</a>
+            </div>
+
+            <div class="pricing-card featured">
+                <div class="plan-name">Professional</div>
+                <div class="plan-price">$149<span>/mo</span></div>
+                <ul class="plan-features">
+                    <li>5,000 minutes/month</li>
+                    <li>Advanced AI summaries</li>
+                    <li>SMS notifications</li>
+                    <li>Advanced analytics</li>
+                    <li>Custom personality</li>
+                    <li>Priority support</li>
+                </ul>
+                <a href="/admin" class="btn-primary">Start Free Trial</a>
+            </div>
+
+            <div class="pricing-card">
+                <div class="plan-name">Enterprise</div>
+                <div class="plan-price">Custom</div>
+                <ul class="plan-features">
+                    <li>Unlimited minutes</li>
+                    <li>Custom AI training</li>
+                    <li>Dedicated account manager</li>
+                    <li>Custom integrations</li>
+                    <li>SLA guarantee</li>
+                    <li>White-label option</li>
+                </ul>
+                <a href="/admin" class="btn-primary">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <footer id="contact">
+        <p>&copy; 2025 VoiceAI. All rights reserved. | support@voiceai.com</p>
+        <p style="margin-top: 10px; opacity: 0.5; font-size: 12px;">
+            <a href="/super-admin.html" style="color: rgba(255,255,255,0.3); text-decoration: none;">Admin Portal</a>
+        </p>
+    </footer>
+</body>
+</html>
