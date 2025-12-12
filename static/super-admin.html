@@ -480,8 +480,8 @@
                 <div class="change">Across all accounts</div>
             </div>
             <div class="stat-card">
-                <h3>Total Minutes Used</h3>
-                <div class="value" id="totalMinutes">0</div>
+                <h3>Total Credits Used</h3>
+                <div class="value" id="totalCredits">0</div>
                 <div class="change">This month</div>
             </div>
             <div class="stat-card">
@@ -504,7 +504,7 @@
                         <thead>
                             <tr>
                                 <th>Account</th>
-                                <th>Minutes</th>
+                                <th>Credits</th>
                                 <th>Calls (Today)</th>
                                 <th>Last Active</th>
                                 <th>Status</th>
@@ -634,12 +634,12 @@
                         <div class="value" id="modalUserName">-</div>
                     </div>
                     <div class="detail-item">
-                        <label>Minutes Remaining</label>
-                        <div class="value" id="modalMinutes">-</div>
+                        <label>Credits Remaining</label>
+                        <div class="value" id="modalCredits">-</div>
                     </div>
                     <div class="detail-item">
                         <label>Total Purchased</label>
-                        <div class="value" id="modalTotalMinutes">-</div>
+                        <div class="value" id="modalTotalCredits">-</div>
                     </div>
                     <div class="detail-item">
                         <label>Voice Setting</label>
@@ -659,7 +659,7 @@
             <div id="settingsTab" class="tab-content">
                 <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px;">
                     <h3 style="margin-bottom: 15px;">Account Actions</h3>
-                    <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px;" onclick="addMinutes()">➕ Add Minutes</button>
+                    <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px;" onclick="addCredits()">➕ Add Credits</button>
                     <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px;" onclick="resetAccount()">🔄 Reset Account</button>
                     <button class="btn btn-secondary" style="margin-right: 10px; margin-bottom: 10px; background: rgba(245, 158, 11, 0.3);" onclick="suspendAccount()">⏸️ Suspend Account</button>
                     <button class="btn btn-secondary" style="margin-bottom: 10px; background: rgba(239, 68, 68, 0.3);" onclick="banAccount()">🚫 Ban Account</button>
@@ -711,7 +711,7 @@
 
                 document.getElementById('totalAccounts').textContent = stats.total_accounts || 0;
                 document.getElementById('totalCalls').textContent = callStats.total_calls || 0;
-                document.getElementById('totalMinutes').textContent = stats.total_minutes_used || 0;
+                document.getElementById('totalCredits').textContent = stats.total_minutes_used || 0;
                 document.getElementById('systemHealth').textContent = '100%';
                 document.getElementById('healthStatus').textContent = 'All systems operational';
             } catch (error) {
@@ -752,11 +752,11 @@
                     status = 'warning';
                     statusText = '⏸️ Suspended';
                 } else {
-                    // Check minutes for active accounts
+                    // Check credits for active accounts
                     status = account.minutes_remaining > 10 ? 'active' : 
                             account.minutes_remaining > 0 ? 'warning' : 'inactive';
                     statusText = account.minutes_remaining > 10 ? 'Active' : 
-                                account.minutes_remaining > 0 ? 'Low Minutes' : 'No Minutes';
+                                account.minutes_remaining > 0 ? 'Low Credits' : 'No Credits';
                 }
                 
                 return `
@@ -818,8 +818,8 @@
 
                 document.getElementById('modalUserId').textContent = account.user_id;
                 document.getElementById('modalUserName').textContent = account.name;
-                document.getElementById('modalMinutes').textContent = `${account.minutes_remaining || 0} minutes`;
-                document.getElementById('modalTotalMinutes').textContent = `${account.total_minutes_purchased || 0} minutes`;
+                document.getElementById('modalCredits').textContent = `${account.minutes_remaining || 0} credits`;
+                document.getElementById('modalTotalCredits').textContent = `${account.total_minutes_purchased || 0} credits`;
                 document.getElementById('modalVoice').textContent = account.voice || 'shimmer';
                 document.getElementById('modalElevenlabs').textContent = account.use_elevenlabs ? '✅ Enabled' : '❌ Disabled';
 
@@ -970,24 +970,24 @@
             }
         }
 
-        async function addMinutes() {
-            const minutes = prompt('How many minutes to add?');
-            if (!minutes || isNaN(minutes)) return;
+        async function addCredits() {
+            const credits = prompt('How many credits to add?');
+            if (!credits || isNaN(credits)) return;
             
             try {
                 const response = await fetch(`/api/super-admin/account/${currentAccountId}/add-minutes`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ minutes: parseInt(minutes) })
+                    body: JSON.stringify({ minutes: parseInt(credits) })
                 });
                 const data = await response.json();
                 if (data.success) {
-                    showMessage(`✅ Added ${minutes} minutes`, 'success');
+                    showMessage(`✅ Added ${credits} credits`, 'success');
                     viewAccount(currentAccountId); // Refresh
                     loadAccounts(); // Refresh table
                 }
             } catch (error) {
-                showMessage('❌ Failed to add minutes', 'error');
+                showMessage('❌ Failed to add credits', 'error');
             }
         }
 

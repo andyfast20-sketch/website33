@@ -207,6 +207,18 @@ class ServerControlGUI:
         )
         self.manage_numbers_btn.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        # Open Admin Dashboard button
+        self.admin_dashboard_btn = tk.Button(
+            button_frame,
+            text="🌐 Open Admin Dashboard",
+            bg='#e67e22',
+            fg='white',
+            activebackground='#d35400',
+            command=self.open_admin_dashboard,
+            **button_style
+        )
+        self.admin_dashboard_btn.grid(row=6, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        
         # Log Frame
         log_label = tk.Label(
             main_frame,
@@ -466,19 +478,53 @@ class ServerControlGUI:
                             proc.kill()
                             killed = True
                             self.log(f"✅ Killed ngrok process (PID: {proc.info['pid']})")
-                        except:
-                            pass
+                        except Exception as kill_error:
+                            self.log(f"⚠️ Error killing process: {kill_error}")
                 
-                if not killed:
-                    self.log("⚠️ No ngrok process found running")
+                if killed:
+                    self.log("⏳ Waiting for ngrok to fully stop...")
+                    time.sleep(2)
                 else:
-                    time.sleep(1)
-                    self.log("💡 Ngrok stopped. Start it manually with: ngrok http 5004")
+                    self.log("⚠️ No ngrok process found running - will start fresh")
                 
-                self.update_indicators()
+                # Start ngrok
+                self.log("🚀 Starting ngrok on port 5004...")
+                ngrok_path = r"C:\ngrok\ngrok.exe"
                 
+                if not os.path.exists(ngrok_path):
+                    self.log(f"❌ ngrok.exe not found at {ngrok_path}")
+                    self.log("💡 Please install ngrok or update the path in the script")
+                    return
+                
+                try:
+                    # Use os.startfile to launch ngrok in a new window
+                    # This is more reliable than subprocess.Popen on Windows
+                    import subprocess
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    
+                    proc = subprocess.Popen(
+                        f'"{ngrok_path}" http 5004',
+                        shell=True,
+                        startupinfo=startupinfo
+                    )
+                    
+                    self.log(f"✅ Ngrok started successfully! (PID: {proc.pid})")
+                    self.log("💡 Visit http://localhost:4040 to see your ngrok URL")
+                    
+                    # Give it a moment to start
+                    time.sleep(2)
+                    self.update_indicators()
+                    
+                except Exception as start_error:
+                    self.log(f"❌ Failed to start ngrok: {start_error}")
+                    import traceback
+                    self.log(traceback.format_exc())
+                    
             except Exception as e:
                 self.log(f"❌ Error resetting ngrok: {e}")
+                import traceback
+                self.log(traceback.format_exc())
         
         threading.Thread(target=_reset, daemon=True).start()
     
@@ -673,6 +719,15 @@ class ServerControlGUI:
                 self.log(f"❌ Git pull failed: {result.stderr}")
         except Exception as e:
             self.log(f"❌ Error pulling from Git: {e}")
+    
+    def open_admin_dashboard(self):
+        """Open the admin dashboard in the default web browser"""
+        try:
+            url = f"http://localhost:{SERVER_PORT}/static/admin.html"
+            self.log(f"🌐 Opening admin dashboard at {url}")
+            webbrowser.open(url)
+        except Exception as e:
+            self.log(f"❌ Failed to open admin dashboard: {e}")
     
     def show_numbers_popup(self):
         """Show popup with owned Vonage numbers and their assignments"""

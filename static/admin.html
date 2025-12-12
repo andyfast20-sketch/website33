@@ -592,62 +592,99 @@
 
     <!-- Main Content Area -->
     <div style="margin-left: 280px; min-height: 100vh; background: #0f0f23;">
+        <!-- New Account Button (Top Right) -->
+        <div style="position: fixed; top: 20px; right: 30px; z-index: 500;">
+            <button onclick="startNewAccountSetup()" style="padding: 8px 16px; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border: none; border-radius: 20px; color: white; cursor: pointer; font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4); transition: all 0.3s; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                ✨ New Account
+            </button>
+        </div>
+
         <!-- Dashboard Tab -->
         <div id="dashboardTab" class="main-tab-content" style="display: block;">
             <!-- Header -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
-                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Dashboard</h1>
-                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">Welcome back! Here's what's happening today.</p>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 50px 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); position: relative; overflow: hidden;">
+                <!-- Animated background decoration -->
+                <div style="position: absolute; top: -50%; right: -5%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); border-radius: 50%; animation: float 6s ease-in-out infinite;"></div>
+                <div style="position: absolute; bottom: -30%; left: -5%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%); border-radius: 50%; animation: float 8s ease-in-out infinite reverse;"></div>
+                
+                <div style="position: relative; z-index: 1;">
+                    <h1 style="font-size: 42px; font-weight: 900; margin-bottom: 12px; text-shadow: 0 2px 20px rgba(0,0,0,0.2);">✨ Your Dashboard</h1>
+                    <p style="font-size: 16px; color: rgba(255,255,255,0.95); font-weight: 500;">Everything you need at a glance</p>
+                </div>
             </div>
 
-            <div style="padding: 40px 50px;">
-                <!-- Latest Calls Section -->
-                <div style="background: rgba(255,255,255,0.03); border-radius: 16px; padding: 30px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.05);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                        <h2 style="font-size: 22px; font-weight: 700; margin: 0;">Latest Calls</h2>
-                        <button onclick="switchMainTab('calls')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px 24px; border-radius: 10px; color: white; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                            View All Calls →
-                        </button>
+            <div style="padding: 35px 40px;">
+                <!-- Stats Grid - Compact 5-column layout -->
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 30px;">
+                    <!-- Your Phone Number Card -->
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3); transition: all 0.3s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 30px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 20px rgba(102, 126, 234, 0.3)'">
+                        <div style="position: absolute; top: -10px; right: -10px; font-size: 60px; opacity: 0.15;">📞</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Your Phone Number</div>
+                            <div style="font-size: 20px; font-weight: 800; color: white; margin-bottom: 8px;" id="statsPhoneNumber">--</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.6);">Customer calls here</div>
+                        </div>
                     </div>
-                    <div id="latestCallsList" style="display: flex; flex-direction: column; gap: 12px;">
-                        <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
-                            Loading calls...
+
+                    <!-- Account Manager Card -->
+                    <div style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3); transition: all 0.3s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 30px rgba(37, 211, 102, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 20px rgba(37, 211, 102, 0.3)'">
+                        <div style="position: absolute; top: -10px; right: -10px; font-size: 60px; opacity: 0.15;">💬</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Account Manager</div>
+                            <div style="font-size: 16px; font-weight: 800; color: white; margin-bottom: 10px;" id="statsAccountManager">Support Team</div>
+                            <a href="https://wa.me/447595289669" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.95); color: #128C7E; padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                <span>WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Calls Today Card -->
+                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 16px; padding: 20px; border: 2px solid rgba(102, 126, 234, 0.3); position: relative; overflow: hidden; transition: all 0.3s; cursor: pointer;" onclick="viewTodayCalls()" onmouseover="this.style.borderColor='rgba(102, 126, 234, 0.5)'; this.style.background='linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)'" onmouseout="this.style.borderColor='rgba(102, 126, 234, 0.3)'; this.style.background='linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'">
+                        <div style="position: absolute; top: -5px; right: -5px; font-size: 50px; opacity: 0.08;">📊</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Calls Today</div>
+                            <div style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 4px;" id="callsToday">0</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5);">Total calls received</div>
+                        </div>
+                    </div>
+
+                    <!-- Unread Appointments Card -->
+                    <div style="background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%); border-radius: 16px; padding: 20px; border: 2px solid rgba(255, 107, 107, 0.3); position: relative; overflow: hidden; transition: all 0.3s; cursor: pointer;" onclick="openCalendarModal()" onmouseover="this.style.borderColor='rgba(255, 107, 107, 0.6)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(238, 90, 111, 0.15) 100%)'" onmouseout="this.style.borderColor='rgba(255, 107, 107, 0.3)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%)'">
+                        <div style="position: absolute; top: -5px; right: -5px; font-size: 50px; opacity: 0.08;">📅</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">New Appointments</div>
+                            <div style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 4px;" id="unreadAppointmentsCard">0</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5);">Not yet viewed</div>
+                        </div>
+                    </div>
+
+                    <!-- Credits Card -->
+                    <div style="background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%); border-radius: 16px; padding: 20px; border: 2px solid rgba(255, 215, 0, 0.3); position: relative; overflow: hidden; transition: all 0.3s;" onmouseover="this.style.borderColor='rgba(255, 215, 0, 0.6)'; this.style.background='linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 165, 0, 0.15) 100%)'" onmouseout="this.style.borderColor='rgba(255, 215, 0, 0.3)'; this.style.background='linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%)'">
+                        <div style="position: absolute; top: -5px; right: -5px; font-size: 50px; opacity: 0.08;">💎</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Available Credits</div>
+                            <div style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 4px;" id="creditsRemaining">--</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5);">Call credits remaining</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Stats Grid -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(102, 126, 234, 0.3); transition: all 0.3s;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                            <div style="font-size: 28px;">📞</div>
-                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Your Phone Number</div>
+                <!-- Unread Appointments Alert -->
+                <div id="unreadAppointmentsAlert" style="display: none; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-radius: 16px; padding: 20px 25px; margin-bottom: 30px; box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3); animation: pulse 2s ease-in-out infinite;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="font-size: 32px;">📅</div>
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: white; margin-bottom: 4px;">
+                                    <span id="unreadAppointments">0</span> Unread Appointment<span id="unreadAppointmentsPlural">s</span>
+                                </div>
+                                <div style="font-size: 13px; color: rgba(255,255,255,0.9);">You have new appointments from AI calls that need your attention</div>
+                            </div>
                         </div>
-                        <div style="font-size: 24px; font-weight: 700; color: #667eea;" id="statsPhoneNumber">--</div>
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, rgba(102, 200, 234, 0.1) 0%, rgba(102, 234, 150, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(102, 200, 234, 0.3); transition: all 0.3s;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                            <div style="font-size: 28px;">👤</div>
-                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Account Manager</div>
-                        </div>
-                        <div style="font-size: 24px; font-weight: 700; color: #66c8ea;" id="statsAccountManager">--</div>
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, rgba(234, 102, 234, 0.1) 0%, rgba(162, 75, 234, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(234, 102, 234, 0.3); transition: all 0.3s;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                            <div style="font-size: 28px;">📊</div>
-                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Total Calls</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 700; color: #ea66ea;" id="callsToday">0</div>
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, rgba(234, 150, 102, 0.1) 0%, rgba(234, 102, 150, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(234, 150, 102, 0.3); transition: all 0.3s;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                            <div style="font-size: 28px;">⏱️</div>
-                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Total Minutes</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 700; color: #ea9666;" id="minutesRemaining">--</div>
+                        <button onclick="switchMainTab('calendar'); closeUnreadAlert();" style="background: rgba(255,255,255,0.95); color: #ff6b6b; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                            View Calendar →
+                        </button>
                     </div>
                 </div>
             </div>
@@ -655,7 +692,6 @@
 
         <!-- Calls Tab -->
         <div id="callsTab" class="main-tab-content" style="display: none;">
-
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
                 <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Call History</h1>
@@ -687,15 +723,10 @@
                             <input type="text" id="agentName" placeholder="e.g., Julie, Alex, Sarah" required>
                         </div>
                         <div class="form-group">
-                            <label for="phoneNumber">Your Phone Number (Select from Available)</label>
-                            <select id="phoneNumber" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
-                                <option value="">Loading available numbers...</option>
-                            </select>
-                            <button onclick="refreshAvailableNumbers()" type="button" style="margin-top: 10px; padding: 10px 20px; background: #3498db; border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
-                                🔄 Refresh Numbers
-                            </button>
+                            <label for="phoneNumber">Your Phone Number</label>
+                            <input type="text" id="phoneNumber" readonly style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: #667eea; font-size: 16px; font-weight: 600; cursor: not-allowed;" placeholder="Not assigned yet">
                             <div class="example-box">
-                                <strong>Note:</strong> Only shows Vonage numbers you own that are not assigned to other accounts. Purchase more numbers in the Phone Numbers tab.
+                                <strong>Note:</strong> Your phone number is assigned automatically. Contact your administrator if you need to change it.
                             </div>
                         </div>
                     </div>
@@ -820,38 +851,6 @@
                     </div>
 
                     <div class="form-section">
-                        <h3>⚡ Response Settings</h3>
-                        <div class="form-group">
-                            <label for="responseLatency">Response Speed (How fast the AI responds)</label>
-                            <select id="responseLatency" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
-                                <option value="100">Instant (100ms) - Very responsive</option>
-                                <option value="200">Very Fast (200ms) - Quick responses</option>
-                                <option value="300">Fast (300ms) - Balanced</option>
-                                <option value="500">Normal (500ms) - Patient</option>
-                                <option value="700">Slower (700ms) - More patient</option>
-                                <option value="1000">Very Slow (1000ms) - Very patient</option>
-                            </select>
-                            <div class="example-box">
-                                <strong>Tip:</strong> Lower values = faster responses but may cut off caller mid-sentence. Try 200-300ms for quick responses. Default is 500ms.
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" style="margin-top: 20px;">
-                            <button 
-                                onclick="analyzeResponseTimes()" 
-                                style="width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
-                                🔍 Analyze & Optimize Response Times
-                            </button>
-                            <div id="analysisResult" style="margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; display: none;">
-                                <div id="analysisContent"></div>
-                            </div>
-                            <div class="example-box" style="margin-top: 10px;">
-                                <strong>AI-Powered Optimization:</strong> This analyzes your recent calls and automatically adjusts settings for the best performance. The AI compares your response times to natural human conversation timing.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
                         <h3>🏢 Business Information</h3>
                         <div class="form-group">
                             <label for="businessInfo">Services, Pricing & Hours</label>
@@ -901,38 +900,16 @@
                 <div class="diagnostic-card">
                     <h3 style="margin-bottom: 20px; font-size: 22px;">📱 Phone Numbers</h3>
                     
-                    <div style="margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
-                        <h4 style="margin: 0 0 15px 0; font-size: 18px;">Search Available Numbers</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 15px; align-items: end;">
-                            <div>
-                                <label style="display: block; margin-bottom: 8px; font-size: 14px; opacity: 0.95;">Country</label>
-                                <select id="numberCountry" style="width: 100%; padding: 10px; border-radius: 8px; border: none; font-size: 14px;">
-                                    <option value="GB">🇬🇧 United Kingdom</option>
-                                    <option value="US">🇺🇸 United States</option>
-                                    <option value="CA">🇨🇦 Canada</option>
-                                    <option value="AU">🇦🇺 Australia</option>
-                                    <option value="FR">🇫🇷 France</option>
-                                    <option value="DE">🇩🇪 Germany</option>
-                                    <option value="ES">🇪🇸 Spain</option>
-                                    <option value="IT">🇮🇹 Italy</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 8px; font-size: 14px; opacity: 0.95;">Pattern (Optional)</label>
-                                <input type="text" id="numberPattern" placeholder="e.g., 44*7700 for UK numbers starting with 7700" style="width: 100%; padding: 10px; border-radius: 8px; border: none; font-size: 14px;">
-                            </div>
-                            <div>
-                                <button onclick="searchNumbers()" style="width: 100%; padding: 12px 24px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s;">
-                                    🔍 Search Numbers
-                                </button>
-                            </div>
+                    <div style="padding: 60px 40px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 16px; border: 2px dashed rgba(255,255,255,0.1);">
+                        <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">📞</div>
+                        <div style="font-size: 22px; color: rgba(255,255,255,0.8); margin-bottom: 12px; font-weight: 600;">Phone Number Management</div>
+                        <div style="font-size: 15px; color: rgba(255,255,255,0.5); margin-bottom: 25px; line-height: 1.6;">
+                            Phone numbers are managed by your administrator.<br>
+                            Contact your account manager to purchase or configure phone numbers.
                         </div>
-                    </div>
-
-                    <div id="numberResults" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-                        <div style="text-align: center; padding: 60px 20px; color: #999; grid-column: 1 / -1;">
-                            <div style="font-size: 48px; margin-bottom: 15px;">📞</div>
-                            <p style="font-size: 16px; margin: 0;">Search for available phone numbers to get started</p>
+                        <div style="display: inline-block; background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%); padding: 20px 30px; border-radius: 12px; border: 1px solid rgba(102, 126, 234, 0.3);">
+                            <div style="font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Assigned Number</div>
+                            <div style="font-size: 24px; color: #667eea; font-weight: 700;" id="assignedPhoneNumber">Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -1019,6 +996,12 @@
                 document.getElementById('userName').textContent = data.user_name || userName;
                 document.getElementById('userPhone').textContent = data.phone_number ? `📞 ${data.phone_number}` : '📞 No phone number set';
                 
+                // Update dashboard phone number box
+                const statsPhoneEl = document.getElementById('statsPhoneNumber');
+                if (statsPhoneEl && data.phone_number) {
+                    statsPhoneEl.textContent = data.phone_number;
+                }
+                
                 // Store user name for display
                 localStorage.setItem('user_name', data.user_name);
                 return true;
@@ -1071,7 +1054,8 @@
             // Load dashboard as default view
             loadDashboard();
             loadTodayStats();
-            loadMinutes();
+            loadCredits();
+            loadConfig(); // Load config to populate phone number and other settings
         });
 
         function switchMainTab(tabName) {
@@ -1346,22 +1330,22 @@
                 const statsData = await statsResponse.json();
                 
                 document.getElementById('callsToday').textContent = statsData.calls || '0';
-                document.getElementById('statsPhoneNumber').textContent = statsData.phone_number || 'Not set';
-                document.getElementById('statsAccountManager').textContent = statsData.agent_name || 'Julie';
+                document.getElementById('statsPhoneNumber').textContent = statsData.phone_number || 'Not assigned yet';
+                document.getElementById('statsAccountManager').textContent = statsData.agent_name || 'Support Team';
                 
-                // Load minutes
-                const minutesResponse = await fetch('/api/minutes', {
+                // Load credits
+                const creditsResponse = await fetch('/api/minutes', {
                     headers: getAuthHeaders()
                 });
-                const minutesData = await minutesResponse.json();
-                document.getElementById('minutesRemaining').textContent = minutesData.minutes || '--';
+                const creditsData = await creditsResponse.json();
+                document.getElementById('creditsRemaining').textContent = creditsData.minutes || '--';
                 
             } catch (error) {
                 console.error('Failed to load dashboard:', error);
             }
         }
 
-        async function loadCalls() {
+        async function loadCalls(filterToday = false) {
             try {
                 console.log('Loading calls...');
                 const response = await fetch('/api/calls', {
@@ -1374,23 +1358,38 @@
                 
                 const callHistoryContent = document.getElementById('callHistoryContent');
                 
-                if (!data.calls || data.calls.length === 0) {
+                let callsToDisplay = data.calls || [];
+                
+                // Filter to today's calls if requested
+                if (filterToday && callsToDisplay.length > 0) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    
+                    callsToDisplay = callsToDisplay.filter(call => {
+                        const callDate = new Date(call.start_time);
+                        return callDate >= today && callDate < tomorrow;
+                    });
+                }
+                
+                if (!callsToDisplay || callsToDisplay.length === 0) {
                     console.log('No calls found');
                     callHistoryContent.innerHTML = `
                         <div style="text-align: center; padding: 80px 20px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 2px dashed rgba(255,255,255,0.1);">
                             <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">📞</div>
-                            <div style="font-size: 20px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 600;">No calls yet</div>
-                            <div style="font-size: 14px; color: rgba(255,255,255,0.4);">When customers call, their conversations and AI summaries will appear here</div>
+                            <div style="font-size: 20px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 600;">${filterToday ? 'No calls today' : 'No calls yet'}</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.4);">${filterToday ? 'No customer calls have been received today' : 'When customers call, their conversations and AI summaries will appear here'}</div>
                         </div>
                     `;
                     return;
                 }
 
-                console.log(`Displaying ${data.calls.length} calls`);
+                console.log(`Displaying ${callsToDisplay.length} calls`);
                 
                 callHistoryContent.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 16px;">
-                        ${data.calls.map(call => {
+                        ${callsToDisplay.map(call => {
                             const startTime = new Date(call.start_time);
                             const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                             const duration = call.duration ? `${call.duration}s` : 'N/A';
@@ -1453,6 +1452,25 @@
                 document.getElementById('businessInfo').value = config.BUSINESS_INFO || '';
                 document.getElementById('agentPersonality').value = config.AGENT_PERSONALITY || '';
                 document.getElementById('agentInstructions').value = config.AGENT_INSTRUCTIONS;
+                
+                // Update assigned phone number in numbers tab
+                const assignedNumberEl = document.getElementById('assignedPhoneNumber');
+                if (assignedNumberEl) {
+                    assignedNumberEl.textContent = config.PHONE_NUMBER || 'Not assigned';
+                    assignedNumberEl.style.color = config.PHONE_NUMBER ? '#667eea' : 'rgba(255,255,255,0.4)';
+                }
+                
+                // Update phone number in dashboard stats
+                const statsPhoneEl = document.getElementById('statsPhoneNumber');
+                if (statsPhoneEl) {
+                    statsPhoneEl.textContent = config.PHONE_NUMBER || 'Not assigned yet';
+                }
+                
+                // Update header phone number
+                const headerPhoneEl = document.getElementById('userPhone');
+                if (headerPhoneEl && config.PHONE_NUMBER) {
+                    headerPhoneEl.textContent = `📞 ${config.PHONE_NUMBER}`;
+                }
                 
                 // Load voice provider preference and show correct section
                 await loadVoiceProviderPreference();
@@ -1532,6 +1550,338 @@
             showMessage('🔄 Refreshing available numbers...', 'info');
             await loadAvailableOwnedNumbers();
             showMessage('✅ Numbers refreshed', 'success');
+        }
+
+        async function autoAssignNumber() {
+            const resultDiv = document.getElementById('autoAssignResult');
+            const messageDiv = document.getElementById('autoAssignMessage');
+            
+            // Show loading state
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'rgba(52, 152, 219, 0.2)';
+            resultDiv.style.border = '1px solid rgba(52, 152, 219, 0.4)';
+            messageDiv.innerHTML = '<div style="text-align: center;"><span style="font-size: 24px;">🔄</span><br><span style="color: rgba(255,255,255,0.8);">Searching for available numbers...</span></div>';
+            
+            try {
+                // Fetch all owned numbers
+                const response = await fetch('/api/owned-numbers', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch numbers');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.numbers || data.numbers.length === 0) {
+                    // No numbers found
+                    resultDiv.style.background = 'rgba(231, 76, 60, 0.2)';
+                    resultDiv.style.border = '1px solid rgba(231, 76, 60, 0.4)';
+                    messageDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                            <div style="font-size: 18px; font-weight: 600; color: #e74c3c; margin-bottom: 8px;">No Numbers Available</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.7);">There are no Vonage numbers available to assign. Please contact your administrator to purchase numbers.</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Find first available number
+                const availableNumber = data.numbers.find(num => num.available);
+                
+                if (!availableNumber) {
+                    // All numbers are taken
+                    resultDiv.style.background = 'rgba(230, 126, 34, 0.2)';
+                    resultDiv.style.border = '1px solid rgba(230, 126, 34, 0.4)';
+                    messageDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
+                            <div style="font-size: 18px; font-weight: 600; color: #e67e22; margin-bottom: 8px;">All Numbers Assigned</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.7);">All ${data.numbers.length} available numbers are currently assigned to other users. Please contact your administrator.</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Assign the number to current user
+                const phoneNumberSelect = document.getElementById('phoneNumber');
+                phoneNumberSelect.value = availableNumber.number;
+                
+                // Show success message
+                resultDiv.style.background = 'rgba(46, 204, 113, 0.2)';
+                resultDiv.style.border = '1px solid rgba(46, 204, 113, 0.4)';
+                messageDiv.innerHTML = `
+                    <div style="text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">✅</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #2ecc71; margin-bottom: 8px;">Number Assigned!</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #667eea; margin: 15px 0; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">${availableNumber.number}</div>
+                        <div style="font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 15px;">Country: ${availableNumber.country} | Type: ${availableNumber.type}</div>
+                        <div style="font-size: 13px; color: rgba(255,255,255,0.6); padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border-left: 3px solid #f39c12;">
+                            <strong>⚠️ Important:</strong> Click "💾 Save Configuration" below to confirm this assignment.
+                        </div>
+                    </div>
+                `;
+                
+                // Auto-scroll to save button
+                setTimeout(() => {
+                    document.querySelector('.btn-primary').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 500);
+                
+            } catch (error) {
+                console.error('Auto-assign error:', error);
+                resultDiv.style.background = 'rgba(231, 76, 60, 0.2)';
+                resultDiv.style.border = '1px solid rgba(231, 76, 60, 0.4)';
+                messageDiv.innerHTML = `
+                    <div style="text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #e74c3c; margin-bottom: 8px;">Error</div>
+                        <div style="font-size: 14px; color: rgba(255,255,255,0.7);">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function startNewAccountSetup() {
+            const modal = document.getElementById('newAccountModal');
+            const progressSection = document.getElementById('progressSection');
+            const resultSection = document.getElementById('resultSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const resultContent = document.getElementById('resultContent');
+            
+            // Show modal
+            modal.style.display = 'flex';
+            progressSection.style.display = 'block';
+            resultSection.style.display = 'none';
+            progressBar.style.width = '0%';
+            
+            // Simulate progress with stages
+            const stages = [
+                { percent: 20, text: 'Connecting to Vonage...', duration: 500 },
+                { percent: 40, text: 'Fetching available numbers...', duration: 800 },
+                { percent: 60, text: 'Checking assignments...', duration: 600 },
+                { percent: 80, text: 'Finding best match...', duration: 700 },
+                { percent: 100, text: 'Finalizing...', duration: 500 }
+            ];
+            
+            // Animate progress bar
+            for (const stage of stages) {
+                await new Promise(resolve => {
+                    progressText.textContent = stage.text;
+                    setTimeout(() => {
+                        progressBar.style.width = stage.percent + '%';
+                        resolve();
+                    }, 100);
+                });
+                await new Promise(resolve => setTimeout(resolve, stage.duration));
+            }
+            
+            // Fetch actual number
+            try {
+                const response = await fetch('/api/owned-numbers', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch numbers');
+                }
+                
+                const data = await response.json();
+                
+                // Hide progress, show result
+                progressSection.style.display = 'none';
+                resultSection.style.display = 'block';
+                
+                if (!data.success || !data.numbers || data.numbers.length === 0) {
+                    // No numbers found
+                    resultContent.innerHTML = `
+                        <div style="text-align: center; animation: fadeIn 0.5s ease;">
+                            <div style="font-size: 80px; margin-bottom: 25px;">😔</div>
+                            <h2 style="font-size: 32px; font-weight: 800; color: #e74c3c; margin-bottom: 16px;">No Numbers Available</h2>
+                            <p style="font-size: 16px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 30px;">
+                                Unfortunately, there are no phone numbers available at this time.<br>
+                                Please contact your administrator to purchase Vonage numbers.
+                            </p>
+                            <button onclick="closeNewAccountModal()" style="padding: 14px 32px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 16px; font-weight: 700; box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4); transition: all 0.3s;">
+                                Close
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const availableNumber = data.numbers.find(num => num.available);
+                
+                if (!availableNumber) {
+                    // All numbers taken
+                    resultContent.innerHTML = `
+                        <div style="text-align: center; animation: fadeIn 0.5s ease;">
+                            <div style="font-size: 80px; margin-bottom: 25px;">📵</div>
+                            <h2 style="font-size: 32px; font-weight: 800; color: #e67e22; margin-bottom: 16px;">All Numbers Assigned</h2>
+                            <p style="font-size: 16px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 30px;">
+                                All ${data.numbers.length} available numbers are currently in use.<br>
+                                Please contact your administrator for assistance.
+                            </p>
+                            <button onclick="closeNewAccountModal()" style="padding: 14px 32px; background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 16px; font-weight: 700; box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4); transition: all 0.3s;">
+                                Close
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Success! Show beautiful result
+                resultContent.innerHTML = `
+                    <div style="text-align: center; animation: fadeIn 0.6s ease;">
+                        <div style="font-size: 80px; margin-bottom: 25px; animation: bounce 1s ease;">🎉</div>
+                        <h2 style="font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
+                            Your Number is Ready!
+                        </h2>
+                        
+                        <!-- Beautiful Number Display Box -->
+                        <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border: 2px solid rgba(102, 126, 234, 0.4); border-radius: 20px; padding: 35px; margin: 30px 0; box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3); position: relative; overflow: hidden;">
+                            <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%); animation: pulse 3s ease-in-out infinite;"></div>
+                            <div style="position: relative; z-index: 1;">
+                                <div style="font-size: 14px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px;">Your Phone Number</div>
+                                <div style="font-size: 48px; font-weight: 900; color: #667eea; letter-spacing: 2px; margin-bottom: 15px; text-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);">
+                                    ${availableNumber.number}
+                                </div>
+                                <div style="display: inline-flex; gap: 20px; margin-top: 10px;">
+                                    <div style="background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 8px;">
+                                        <span style="font-size: 12px; color: rgba(255,255,255,0.5);">Country:</span>
+                                        <span style="font-size: 14px; color: white; font-weight: 600; margin-left: 6px;">${availableNumber.country}</span>
+                                    </div>
+                                    <div style="background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 8px;">
+                                        <span style="font-size: 12px; color: rgba(255,255,255,0.5);">Type:</span>
+                                        <span style="font-size: 14px; color: white; font-weight: 600; margin-left: 6px;">${availableNumber.type}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p style="font-size: 15px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 25px;">
+                            This number has been assigned to your account.<br>
+                            Click continue to complete your setup.
+                        </p>
+                        
+                        <button onclick="completeNewAccountSetup('${availableNumber.number}')" style="padding: 16px 40px; background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 18px; font-weight: 700; box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4); transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px;" onmouseover="this.style.transform='translateY(-2px) scale(1.02)'" onmouseout="this.style.transform='translateY(0) scale(1)'">
+                            Continue →
+                        </button>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                progressSection.style.display = 'none';
+                resultSection.style.display = 'block';
+                resultContent.innerHTML = `
+                    <div style="text-align: center; animation: fadeIn 0.5s ease;">
+                        <div style="font-size: 80px; margin-bottom: 25px;">❌</div>
+                        <h2 style="font-size: 32px; font-weight: 800; color: #e74c3c; margin-bottom: 16px;">Setup Failed</h2>
+                        <p style="font-size: 16px; color: rgba(255,255,255,0.7); margin-bottom: 30px;">${error.message}</p>
+                        <button onclick="closeNewAccountModal()" style="padding: 14px 32px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 16px; font-weight: 700;">
+                            Close
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function closeNewAccountModal() {
+            document.getElementById('newAccountModal').style.display = 'none';
+        }
+
+        async function completeNewAccountSetup(phoneNumber) {
+            // Close modal first
+            closeNewAccountModal();
+            
+            // Show loading message
+            showMessage('💾 Saving your account configuration...', 'info');
+            
+            try {
+                // Get current values from form
+                const agentName = document.getElementById('agentName').value || 'Julie';
+                const voiceProvider = document.getElementById('voiceProvider').value || 'openai';
+                const agentVoice = document.getElementById('agentVoice').value || 'shimmer';
+                const businessInfo = document.getElementById('businessInfo').value || '';
+                const agentPersonality = document.getElementById('agentPersonality').value || '';
+                const agentInstructions = document.getElementById('agentInstructions').value || '';
+                
+                // Save voice provider first
+                const voiceResponse = await fetch('/api/update-voice-provider', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        user_id: parseInt(localStorage.getItem('user_id')),
+                        voice_provider: voiceProvider,
+                        openai_voice: agentVoice,
+                        elevenlabs_voice_id: 'EXAVITQu4vr4xnSDxMaL',
+                        cartesia_voice_id: 'a0e99841-438c-4a64-b679-ae501e7d6091',
+                        google_voice: 'en-GB-Neural2-A',
+                        playht_voice_id: 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                    })
+                });
+                
+                if (!voiceResponse.ok) {
+                    throw new Error('Failed to save voice settings');
+                }
+                
+                // Save main configuration with phone number
+                const configResponse = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        AGENT_NAME: agentName,
+                        PHONE_NUMBER: phoneNumber,
+                        VOICE: agentVoice,
+                        USE_ELEVENLABS: 0,
+                        ELEVENLABS_VOICE_ID: 'EXAVITQu4vr4xnSDxMaL',
+                        RESPONSE_LATENCY: 500,
+                        BUSINESS_INFO: businessInfo,
+                        AGENT_PERSONALITY: agentPersonality,
+                        AGENT_INSTRUCTIONS: agentInstructions
+                    })
+                });
+                
+                if (!configResponse.ok) {
+                    throw new Error('Failed to save configuration');
+                }
+                
+                // Update the UI
+                const phoneNumberInput = document.getElementById('phoneNumber');
+                if (phoneNumberInput) {
+                    phoneNumberInput.value = phoneNumber;
+                }
+                
+                // Update header with new phone number
+                document.getElementById('userPhone').textContent = `📞 ${phoneNumber}`;
+                
+                // Reload config to reflect changes
+                await loadConfig();
+                
+                // Switch to dashboard
+                switchMainTab('dashboard');
+                
+                // Show success message
+                showMessage('✅ Your account is ready! Phone number assigned and saved.', 'success');
+                
+                // Refresh dashboard to show new number
+                await loadDashboard();
+                
+            } catch (error) {
+                console.error('Error during account setup:', error);
+                showMessage('❌ Failed to complete setup. Please try again.', 'error');
+                // Switch to config tab so user can manually save if needed
+                switchMainTab('config');
+            }
         }
 
         // Load voice provider preference from database
@@ -2157,26 +2507,29 @@
             }, 5000);
         }
 
-        // Load minutes remaining
-        async function loadMinutes() {
+        // Load credits remaining
+        async function loadCredits() {
             try {
                 const response = await fetch('/api/minutes', {
                     headers: getAuthHeaders()
                 });
                 const data = await response.json();
-                const minutesEl = document.getElementById('minutesRemaining');
-                minutesEl.textContent = data.minutes_remaining;
+                const creditsEl = document.getElementById('creditsRemaining');
+                creditsEl.textContent = data.minutes_remaining;
                 
-                // Change color based on remaining minutes
+                // Change color based on remaining credits
                 if (data.minutes_remaining === 0) {
-                    minutesEl.style.color = '#ff6b6b';
+                    creditsEl.style.color = '#ff6b6b';
                 } else if (data.minutes_remaining < 10) {
-                    minutesEl.style.color = '#ffa500';
+                    creditsEl.style.color = '#ffa500';
                 } else {
-                    minutesEl.style.color = '#66c8ea';
+                    creditsEl.style.background = 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)';
+                    creditsEl.style.webkitBackgroundClip = 'text';
+                    creditsEl.style.webkitTextFillColor = 'transparent';
+                    creditsEl.style.backgroundClip = 'text';
                 }
             } catch (error) {
-                console.error('Error loading minutes:', error);
+                console.error('Error loading credits:', error);
             }
         }
 
@@ -2190,10 +2543,36 @@
                 
                 document.getElementById('callsToday').textContent = data.calls_today || 0;
                 document.getElementById('messagesToday').textContent = data.messages_today || 0;
-                document.getElementById('unreadAppointments').textContent = data.unread_appointments || 0;
+                
+                const unreadCount = data.unread_appointments || 0;
+                document.getElementById('unreadAppointments').textContent = unreadCount;
+                document.getElementById('unreadAppointmentsCard').textContent = unreadCount;
+                
+                // Show/hide unread appointments alert
+                const alertDiv = document.getElementById('unreadAppointmentsAlert');
+                const pluralSpan = document.getElementById('unreadAppointmentsPlural');
+                if (unreadCount > 0) {
+                    alertDiv.style.display = 'block';
+                    pluralSpan.textContent = unreadCount === 1 ? '' : 's';
+                } else {
+                    alertDiv.style.display = 'none';
+                }
             } catch (error) {
                 console.error('Error loading today stats:', error);
             }
+        }
+
+        // View today's calls
+        function viewTodayCalls() {
+            switchMainTab('calls');
+            loadCalls(true);
+        }
+                console.error('Error loading today stats:', error);
+            }
+        }
+        
+        function closeUnreadAlert() {
+            document.getElementById('unreadAppointmentsAlert').style.display = 'none';
         }
 
         // Navigate to appointment in calendar and highlight it
@@ -2311,19 +2690,19 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage(`✅ Successfully added 60 minutes! New balance: ${data.minutes_remaining} minutes`, 'success');
-                    await loadMinutes();
+                    showMessage(`✅ Successfully added 60 credits! New balance: ${data.minutes_remaining} credits`, 'success');
+                    await loadCredits();
                 } else {
-                    showMessage('❌ Error purchasing minutes: ' + data.error, 'error');
+                    showMessage('❌ Error purchasing credits: ' + data.error, 'error');
                 }
             } catch (error) {
-                showMessage('❌ Error purchasing minutes: ' + error.message, 'error');
+                showMessage('❌ Error purchasing credits: ' + error.message, 'error');
             }
         }
 
         // Load configuration on page load
         loadConfig();
-        loadMinutes();
+        loadCredits();
         loadTodayStats();
 
         // Auto-refresh every 10 seconds
@@ -2331,7 +2710,7 @@
             if (document.getElementById('callsTab').classList.contains('active')) {
                 loadCalls();
             }
-            loadMinutes();
+            loadCredits();
             loadTodayStats();
         }, 10000);
 
@@ -2760,6 +3139,64 @@
             }
         }
     </script>
+
+    <!-- New Account Setup Modal -->
+    <div id="newAccountModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; align-items: center; justify-content: center;">
+        <div style="max-width: 600px; width: 90%; background: linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(26, 26, 46, 0.98) 100%); border-radius: 24px; padding: 50px; border: 2px solid rgba(102, 126, 234, 0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); backdrop-filter: blur(20px);">
+            <!-- Progress Section -->
+            <div id="progressSection">
+                <div style="text-align: center; margin-bottom: 40px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">🔍</div>
+                    <h2 style="font-size: 28px; font-weight: 800; color: white; margin-bottom: 12px;">Setting Up Your Account</h2>
+                    <p style="font-size: 16px; color: rgba(255,255,255,0.7);">Finding your new number, please wait...</p>
+                </div>
+                
+                <!-- Progress Bar Container -->
+                <div style="background: rgba(0,0,0,0.4); border-radius: 12px; padding: 8px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div id="progressBar" style="height: 24px; background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f39c12 100%); border-radius: 8px; width: 0%; transition: width 0.3s ease; box-shadow: 0 0 20px rgba(102, 126, 234, 0.6); position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%); animation: shimmer 2s infinite;"></div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center;">
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.5); font-weight: 600;" id="progressText">Initializing...</div>
+                </div>
+            </div>
+            
+            <!-- Result Section (Hidden Initially) -->
+            <div id="resultSection" style="display: none;">
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-20px); }
+            60% { transform: translateY(-10px); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
+        }
+    </style>
 
     <!-- Calendar Modal -->
     <div id="calendarModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; overflow-y: auto;">
