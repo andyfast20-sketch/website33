@@ -195,6 +195,18 @@ class ServerControlGUI:
         )
         self.git_pull_btn.grid(row=4, column=1, padx=5, pady=5)
         
+        # Manage Numbers button
+        self.manage_numbers_btn = tk.Button(
+            button_frame,
+            text="📞 Manage Numbers",
+            bg='#8e44ad',
+            fg='white',
+            activebackground='#7d3c98',
+            command=self.show_numbers_popup,
+            **button_style
+        )
+        self.manage_numbers_btn.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        
         # Log Frame
         log_label = tk.Label(
             main_frame,
@@ -661,6 +673,187 @@ class ServerControlGUI:
                 self.log(f"❌ Git pull failed: {result.stderr}")
         except Exception as e:
             self.log(f"❌ Error pulling from Git: {e}")
+    
+    def show_numbers_popup(self):
+        """Show popup with owned Vonage numbers and their assignments"""
+        self.log("📞 Loading number assignments...")
+        
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("Vonage Number Management")
+        popup.geometry("700x500")
+        popup.resizable(True, True)
+        popup.configure(bg='#34495e')
+        
+        # Center popup on parent
+        popup.transient(self.root)
+        
+        # Title
+        title_label = tk.Label(
+            popup,
+            text="📞 Vonage Number Assignments",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#34495e',
+            fg='white'
+        )
+        title_label.pack(pady=(15, 10))
+        
+        # Loading label
+        loading_label = tk.Label(
+            popup,
+            text="Loading numbers from Vonage...",
+            font=('Segoe UI', 10),
+            bg='#34495e',
+            fg='#ecf0f1'
+        )
+        loading_label.pack(pady=20)
+        
+        # Fetch data in background
+        def fetch_numbers():
+            try:
+                response = requests.get(f"http://localhost:{SERVER_PORT}/api/owned-numbers", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    popup.after(0, lambda: display_numbers(data))
+                else:
+                    popup.after(0, lambda: show_error("Failed to fetch numbers from server"))
+            except Exception as e:
+                popup.after(0, lambda: show_error(f"Error: {str(e)}"))
+        
+        def display_numbers(data):
+            loading_label.destroy()
+            
+            if not data.get('success'):
+                show_error(data.get('error', 'Unknown error'))
+                return
+            
+            numbers = data.get('numbers', [])
+            
+            if len(numbers) == 0:
+                no_numbers_label = tk.Label(
+                    popup,
+                    text="❌ No Vonage numbers found.\n\nPurchase numbers from the Admin Dashboard.",
+                    font=('Segoe UI', 10),
+                    bg='#34495e',
+                    fg='#e74c3c',
+                    justify=tk.CENTER
+                )
+                no_numbers_label.pack(pady=30)
+            else:
+                # Create scrollable frame
+                canvas = tk.Canvas(popup, bg='#34495e', highlightthickness=0)
+                scrollbar = tk.Scrollbar(popup, orient="vertical", command=canvas.yview)
+                scrollable_frame = tk.Frame(canvas, bg='#34495e')
+                
+                scrollable_frame.bind(
+                    "<Configure>",
+                    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+                )
+                
+                canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+                canvas.configure(yscrollcommand=scrollbar.set)
+                
+                # Display numbers
+                available_count = sum(1 for n in numbers if n.get('available'))
+                
+                summary = tk.Label(
+                    scrollable_frame,
+                    text=f"Total Numbers: {len(numbers)}  |  Available: {available_count}  |  Assigned: {len(numbers) - available_count}",
+                    font=('Segoe UI', 9, 'bold'),
+                    bg='#2c3e50',
+                    fg='white',
+                    pady=8
+                )
+                summary.pack(fill=tk.X, padx=15, pady=(10, 15))
+                
+                for number in numbers:
+                    number_frame = tk.Frame(scrollable_frame, bg='#2c3e50', relief=tk.RAISED, bd=1)
+                    number_frame.pack(fill=tk.X, padx=15, pady=5)
+                    
+                    # Number display
+                    number_text = f"📞 {number.get('number')} ({number.get('country')})" if number.get('country') else f"📞 {number.get('number')}"
+                    number_label = tk.Label(
+                        number_frame,
+                        text=number_text,
+                        font=('Segoe UI', 10, 'bold'),
+                        bg='#2c3e50',
+                        fg='#3498db',
+                        anchor='w'
+                    )
+                    number_label.pack(side=tk.LEFT, padx=10, pady=8)
+                    
+                    # Assignment status
+                    if number.get('available'):
+                        status_label = tk.Label(
+                            number_frame,
+                            text="✅ AVAILABLE",
+                            font=('Segoe UI', 9, 'bold'),
+                            bg='#27ae60',
+                            fg='white',
+                            padx=10,
+                            pady=3
+                        )
+                        status_label.pack(side=tk.RIGHT, padx=10, pady=5)
+                    else:
+                        assigned_text = f"Assigned to: {number.get('assigned_to')}"
+                        status_label = tk.Label(
+                            number_frame,
+                            text=assigned_text,
+                            font=('Segoe UI', 9),
+                            bg='#2c3e50',
+                            fg='#ecf0f1',
+                            anchor='w'
+                        )
+                        status_label.pack(side=tk.RIGHT, padx=10, pady=8)
+                
+                canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
+            
+            # Close button
+            close_btn = tk.Button(
+                popup,
+                text="Close",
+                command=popup.destroy,
+                bg='#3498db',
+                fg='white',
+                font=('Segoe UI', 9, 'bold'),
+                cursor='hand2',
+                relief=tk.RAISED,
+                bd=2,
+                padx=20,
+                pady=5
+            )
+            close_btn.pack(pady=(0, 15))
+        
+        def show_error(error_msg):
+            loading_label.destroy()
+            error_label = tk.Label(
+                popup,
+                text=f"❌ {error_msg}",
+                font=('Segoe UI', 10),
+                bg='#34495e',
+                fg='#e74c3c',
+                wraplength=600
+            )
+            error_label.pack(pady=20)
+            
+            close_btn = tk.Button(
+                popup,
+                text="Close",
+                command=popup.destroy,
+                bg='#e74c3c',
+                fg='white',
+                font=('Segoe UI', 9, 'bold'),
+                cursor='hand2',
+                padx=20,
+                pady=5
+            )
+            close_btn.pack(pady=10)
+        
+        # Start fetching in background thread
+        import threading
+        thread = threading.Thread(target=fetch_numbers, daemon=True)
+        thread.start()
     
     def show_indicator_info(self, indicator_name):
         """Show popup with indicator information"""

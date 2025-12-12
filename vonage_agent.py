@@ -62,7 +62,7 @@ CONFIG = {
     # PlayHT TTS
     "PLAYHT_USER_ID": "le8RMVjnrhd1q1aWgXZMNZ2Mnx73",
     "PLAYHT_API_KEY": "ak-097229e3e3f3463c8fbd2a877f1ac785",
-    "USE_PLAYHT": False,  # Disabled - 403 error on API calls
+    "USE_PLAYHT": True,  # Re-enabled with updated API
     
     # Cartesia AI (real-time streaming, 100+ voices, low latency)
     "CARTESIA_API_KEY": "sk_car_5S1GHCuxH1zeN2UEY3Mz9u",
@@ -77,8 +77,8 @@ CONFIG = {
     # Vonage (optional - only needed for outbound calls)
     "VONAGE_APPLICATION_ID": os.getenv("VONAGE_APPLICATION_ID", ""),
     "VONAGE_PRIVATE_KEY_PATH": os.getenv("VONAGE_PRIVATE_KEY_PATH", "private.key"),
-    "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", "c52eca44"),
-    "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", "2kJTfULySGxCvRSHTB9dYhSBHmEvzrPMysfEsGvdU2f5kpswaJ"),
+    "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", "b5d8ed31"),
+    "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", "1D@X(NoflDKvv9Uy14"),
     
     # Server
     "HOST": "0.0.0.0",
@@ -691,6 +691,8 @@ class CallSession:
                 instructions_parts.append("- Keep responses natural and conversational (3-5 sentences)")
                 instructions_parts.append("- Be helpful and polite - never abrupt or curt")
                 instructions_parts.append("- Provide clear, complete answers without rambling")
+                instructions_parts.append("- NEVER include meta-commentary like 'Assistant:', 'mode:', or stage directions")
+                instructions_parts.append("- Speak ONLY as the receptionist - no prefixes, labels, or formatting")
                 instructions_parts.append("\nYou can book appointments using the book_appointment function when a caller requests one.")
                 instructions_parts.append("\nIf a time slot is already booked, the system will return alternative available times - offer these alternatives to the caller.")
                 
@@ -726,8 +728,8 @@ class CallSession:
                 voice_provider = getattr(self, 'voice_provider', 'openai')
                 
                 # Configure modalities based on voice provider
-                # If using Cartesia, ElevenLabs, or Google, we only need text from OpenAI (no audio)
-                if voice_provider in ['cartesia', 'elevenlabs', 'google']:
+                # If using Cartesia, ElevenLabs, Google, or PlayHT, we only need text from OpenAI (no audio)
+                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht']:
                     modalities = ["text"]  # Text only - external TTS will handle audio
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
                     # For external TTS: higher threshold to prevent false triggers/hallucinations
@@ -735,10 +737,10 @@ class CallSession:
                         "type": "server_vad",
                         "threshold": 0.7,  # Higher threshold to prevent picking up noise/echo
                         "prefix_padding_ms": 300,  # Standard padding
-                        "silence_duration_ms": max(response_latency, 700),  # Minimum 700ms to ensure clean turn-taking
+                        "silence_duration_ms": max(response_latency, 500),  # Minimum 500ms for faster responses
                         "create_response": True
                     }
-                    logger.info(f"[{self.call_uuid}] External TTS VAD: threshold=0.7, silence={max(response_latency, 700)}ms")
+                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} TTS VAD: threshold=0.7, silence={max(response_latency, 500)}ms")
                 else:
                     modalities = ["text", "audio"]  # OpenAI handles both text and audio
                     # For OpenAI voice: need lower threshold for better conversational flow
@@ -953,6 +955,8 @@ class CallSession:
                         await self._send_elevenlabs_audio(transcript)
                     elif voice_provider == 'google' and google_tts_client and transcript:
                         await self._send_google_tts_audio(transcript)
+                    elif voice_provider == 'playht' and playht_api_key and transcript:
+                        await self._send_playht_audio(transcript)
                     
                     # Reset buffer
                     self._text_response_buffer = ""
@@ -995,6 +999,13 @@ class CallSession:
                         success = await self._send_google_tts_audio(transcript)
                         if not success and hasattr(self, '_openai_audio_chunks'):
                             logger.warning(f"[{self.call_uuid}] Google TTS failed, falling back to OpenAI audio")
+                            for audio_chunk in self._openai_audio_chunks:
+                                await self._send_audio_to_vonage(audio_chunk)
+                        self._openai_audio_chunks = []
+                    elif voice_provider == 'playht' and playht_api_key and transcript:
+                        success = await self._send_playht_audio(transcript)
+                        if not success and hasattr(self, '_openai_audio_chunks'):
+                            logger.warning(f"[{self.call_uuid}] PlayHT failed, falling back to OpenAI audio")
                             for audio_chunk in self._openai_audio_chunks:
                                 await self._send_audio_to_vonage(audio_chunk)
                         self._openai_audio_chunks = []
@@ -1178,12 +1189,50 @@ class CallSession:
                 logger.error(f"[{self.call_uuid}] Google TTS client not initialized!")
                 return False
             
+            # Clean the text - remove stage directions, formatting, and unwanted markers
+            cleaned_text = text
+            
+            # Remove content in square brackets [like this]
+            import re
+            cleaned_text = re.sub(r'\[.*?\]', '', cleaned_text)
+            
+            # Remove content in parentheses that looks like stage directions
+            cleaned_text = re.sub(r'\([a-z\s]+\)', '', cleaned_text, flags=re.IGNORECASE)
+            
+            # Remove asterisks used for actions *like this*
+            cleaned_text = re.sub(r'\*.*?\*', '', cleaned_text)
+            
+            # Remove markdown formatting
+            cleaned_text = re.sub(r'\*\*|__|~~', '', cleaned_text)
+            
+            # Remove common LLM artifacts and meta-commentary
+            # Remove phrases like "Assistant:", "AI:", "wrong assistant content", etc.
+            cleaned_text = re.sub(r'^(Assistant|AI|Human|User|System):\s*', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'wrong\s+(assistant|content|response)', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'(assistant|AI)\s+(content|response|message)', '', cleaned_text, flags=re.IGNORECASE)
+            
+            # Remove "mode:" prefixes
+            cleaned_text = re.sub(r'mode:\s*\w+', '', cleaned_text, flags=re.IGNORECASE)
+            
+            # Remove multiple spaces and trim
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+            
+            # Remove any leading/trailing punctuation that might be left over
+            cleaned_text = cleaned_text.strip('.,;:- ')
+            
+            if cleaned_text != text:
+                logger.info(f"[{self.call_uuid}] Cleaned text from '{text[:100]}' to '{cleaned_text[:100]}'")
+            
+            if not cleaned_text:
+                logger.warning(f"[{self.call_uuid}] Text became empty after cleaning, skipping TTS")
+                return False
+            
             # Get user's selected Google voice (default to en-GB-Neural2-A if not set)
             voice_name = getattr(self, 'google_voice', 'en-GB-Neural2-A')
             logger.info(f"[{self.call_uuid}] Using Google voice: {voice_name}")
             
             # Set up synthesis input
-            synthesis_input = texttospeech.SynthesisInput(text=text)
+            synthesis_input = texttospeech.SynthesisInput(text=cleaned_text)
             
             # Set up voice parameters
             voice = texttospeech.VoiceSelectionParams(
@@ -1192,10 +1241,11 @@ class CallSession:
             )
             
             # Set up audio configuration (PCM 16kHz for Vonage)
+            # Increase speaking rate slightly for faster responses
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=texttospeech.AudioEncoding.LINEAR16,
                 sample_rate_hertz=16000,
-                speaking_rate=1.0,
+                speaking_rate=1.1,  # 10% faster for quicker responses
                 pitch=0.0
             )
             
@@ -1235,9 +1285,32 @@ class CallSession:
             return False
     
     async def _send_playht_audio(self, text: str) -> bool:
-        """Generate audio using PlayHT REST API and send to Vonage. Returns True on success."""
+        """Generate audio using PlayHT API v2 and send to Vonage. Returns True on success."""
         try:
-            logger.info(f"[{self.call_uuid}] Generating PlayHT audio for: {text[:50]}...")
+            logger.info(f"[{self.call_uuid}] 🎙️ Starting PlayHT audio generation for: {text[:50]}...")
+            
+            if not playht_api_key or not playht_user_id:
+                logger.error(f"[{self.call_uuid}] PlayHT credentials not configured!")
+                return False
+            
+            # Clean the text like we do for Google TTS
+            import re
+            cleaned_text = re.sub(r'\[.*?\]', '', text)
+            cleaned_text = re.sub(r'\([a-z\s]+\)', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'\*.*?\*', '', cleaned_text)
+            cleaned_text = re.sub(r'\*\*|__|~~', '', cleaned_text)
+            cleaned_text = re.sub(r'^(Assistant|AI|Human|User|System):\s*', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'wrong\s+(assistant|content|response)', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'mode:\s*\w+', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip().strip('.,;:- ')
+            
+            if not cleaned_text:
+                logger.warning(f"[{self.call_uuid}] Text became empty after cleaning, skipping TTS")
+                return False
+            
+            # Get user's selected PlayHT voice
+            voice_id = getattr(self, 'playht_voice_id', 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json')
+            logger.info(f"[{self.call_uuid}] Using PlayHT voice: {voice_id[:50]}...")
             
             import httpx
             
@@ -1245,39 +1318,60 @@ class CallSession:
             url = "https://api.play.ht/api/v2/tts"
             
             headers = {
-                "Authorization": playht_api_key,
-                "X-User-ID": playht_user_id,
+                "Authorization": f"Bearer {playht_api_key}",
+                "X-USER-ID": playht_user_id,
                 "Content-Type": "application/json",
                 "accept": "audio/mpeg"
             }
             
-            # Request payload - UK female voice (Charlotte)
+            # Request payload - using PlayHT 2.0 turbo for fastest response
             payload = {
-                "text": text,
-                "voice": "charlotte",
-                "quality": "draft",
+                "text": cleaned_text,
+                "voice": voice_id,
+                "quality": "draft",  # Faster generation
                 "output_format": "mp3",
-                "speed": 1.0
+                "speed": 1.05,  # Slightly faster for quicker responses
+                "sample_rate": 24000
             }
             
+            logger.info(f"[{self.call_uuid}] Calling PlayHT API...")
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, headers=headers, json=payload, timeout=15.0)
-                response.raise_for_status()
+                response = await client.post(url, headers=headers, json=payload, timeout=20.0)
+                
+                if response.status_code != 200:
+                    logger.error(f"[{self.call_uuid}] PlayHT API error: {response.status_code} - {response.text}")
+                    return False
+                
                 audio_data = response.content
             
-            # Send in chunks (Vonage expects small chunks for streaming)
-            chunk_size = 320  # 20ms at 16kHz = 320 bytes
-            for i in range(0, len(audio_data), chunk_size):
-                chunk = audio_data[i:i + chunk_size]
-                if self.vonage_ws and self.is_active:
-                    await self.vonage_ws.send_bytes(chunk)
-                    await asyncio.sleep(0.02)  # 20ms delay between chunks
+            logger.info(f"[{self.call_uuid}] PlayHT generated {len(audio_data)} bytes of audio")
             
-            logger.info(f"[{self.call_uuid}] PlayHT audio sent successfully")
+            if len(audio_data) == 0:
+                logger.error(f"[{self.call_uuid}] PlayHT returned empty audio!")
+                return False
+            
+            # Convert MP3 to PCM 16kHz for Vonage
+            from pydub import AudioSegment
+            from io import BytesIO
+            
+            audio = AudioSegment.from_mp3(BytesIO(audio_data))
+            audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+            pcm_data = audio.raw_data
+            
+            # Send all at once
+            if self.vonage_ws and self.is_active:
+                await self.vonage_ws.send_bytes(pcm_data)
+                logger.info(f"[{self.call_uuid}] ✅ PlayHT audio sent successfully ({len(pcm_data)} bytes)")
+            else:
+                logger.warning(f"[{self.call_uuid}] Vonage WS disconnected, cannot send audio")
+                return False
+            
             return True
             
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Error generating/sending PlayHT audio: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     async def _handle_book_appointment(self, call_id: str, arguments: dict):
@@ -1523,7 +1617,7 @@ class SessionManager:
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice
+                    SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice, playht_voice_id
                     FROM account_settings WHERE user_id = ?
                 ''', (user_id,))
                 row = cursor.fetchone()
@@ -1533,7 +1627,7 @@ class SessionManager:
                     session.user_voice = row[0] if row[0] else 'shimmer'
                     logger.info(f"[{call_uuid}] Loaded voice preference: {session.user_voice}")
                     
-                    # Voice provider (openai, elevenlabs, cartesia, google)
+                    # Voice provider (openai, elevenlabs, cartesia, google, playht)
                     session.voice_provider = row[3] if row[3] else 'openai'
                     logger.info(f"[{call_uuid}] Voice provider: {session.voice_provider}")
                     
@@ -1554,6 +1648,11 @@ class SessionManager:
                     session.google_voice = row[5] if row[5] else 'en-GB-Neural2-A'
                     if session.voice_provider == 'google':
                         logger.info(f"[{call_uuid}] Google voice: {session.google_voice}")
+                    
+                    # PlayHT voice
+                    session.playht_voice_id = row[6] if row[6] else 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                    if session.voice_provider == 'playht':
+                        logger.info(f"[{call_uuid}] PlayHT voice ID: {session.playht_voice_id}")
                 else:
                     session.user_voice = 'shimmer'
                     session.voice_provider = 'openai'
@@ -1561,16 +1660,19 @@ class SessionManager:
                     session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                     session.cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
                     session.google_voice = 'en-GB-Neural2-A'
+                    session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to load preferences: {e}")
                 session.user_voice = 'shimmer'
                 session.use_elevenlabs = False
                 session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                 session.google_voice = 'en-GB-Neural2-A'
+                session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
         else:
             session.user_voice = 'shimmer'
             session.use_elevenlabs = False
             session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
+            session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
         
         self._sessions[call_uuid] = session
         # Log call start with user_id
@@ -2309,6 +2411,75 @@ async def get_today_stats(authorization: Optional[str] = Header(None)):
         logger.error(f"Error getting today stats: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
+@app.get("/api/owned-numbers")
+async def get_owned_numbers(authorization: Optional[str] = Header(None)):
+    """Get all owned Vonage numbers and their account assignments"""
+    try:
+        import httpx
+        
+        api_key = CONFIG["VONAGE_API_KEY"]
+        api_secret = CONFIG["VONAGE_API_SECRET"]
+        
+        # Get all owned numbers from Vonage
+        url = "https://rest.nexmo.com/account/numbers"
+        params = {
+            "api_key": api_key,
+            "api_secret": api_secret
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10.0)
+            result = response.json()
+        
+        logger.info(f"Vonage API response status: {response.status_code}")
+        logger.info(f"Vonage API response: {result}")
+        
+        owned_numbers = []
+        if response.status_code == 200:
+            numbers = result.get("numbers", [])
+            logger.info(f"Found {len(numbers)} numbers from Vonage API")
+            
+            # Get account assignments from database
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT user_id, phone_number 
+                FROM account_settings 
+                WHERE phone_number IS NOT NULL AND phone_number != ''
+            ''')
+            assignments = {row[1]: row[0] for row in cursor.fetchall()}
+            
+            # Get user names for display
+            cursor.execute('SELECT id, name FROM users')
+            users = {row[0]: row[1] for row in cursor.fetchall()}
+            conn.close()
+            
+            for number in numbers:
+                msisdn = number.get("msisdn")
+                user_id = assignments.get(msisdn)
+                
+                owned_numbers.append({
+                    "number": msisdn,
+                    "country": number.get("country"),
+                    "type": number.get("type"),
+                    "assigned_to": users.get(user_id) if user_id else None,
+                    "user_id": user_id,
+                    "available": user_id is None
+                })
+        
+        return JSONResponse({
+            "success": True,
+            "numbers": owned_numbers,
+            "total": len(owned_numbers)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching owned numbers: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
 @app.get("/api/available-numbers")
 async def get_available_numbers(
     country: str = "GB",
@@ -2858,6 +3029,7 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
         elevenlabs_voice_id = body.get('elevenlabs_voice_id')
         cartesia_voice_id = body.get('cartesia_voice_id')
         google_voice = body.get('google_voice')
+        playht_voice_id = body.get('playht_voice_id')
         
         if not user_id:
             logger.error(f"update_voice_provider: No user_id - auth: {authorization}, body: {body}")
@@ -2873,9 +3045,10 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
                 voice = ?,
                 elevenlabs_voice_id = ?,
                 cartesia_voice_id = ?,
-                google_voice = ?
+                google_voice = ?,
+                playht_voice_id = ?
             WHERE user_id = ?
-        ''', (voice_provider, openai_voice, elevenlabs_voice_id, cartesia_voice_id, google_voice, user_id))
+        ''', (voice_provider, openai_voice, elevenlabs_voice_id, cartesia_voice_id, google_voice, playht_voice_id, user_id))
         
         conn.commit()
         conn.close()

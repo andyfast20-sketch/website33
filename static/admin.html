@@ -202,6 +202,22 @@
             50% { background-color: rgba(255, 220, 0, 0.4); box-shadow: 0 0 20px rgba(255, 220, 0, 0.6); }
         }
 
+        .sidebar-nav-btn:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: white !important;
+        }
+
+        .sidebar-nav-btn.active {
+            background: rgba(102, 126, 234, 0.2);
+            color: white !important;
+            border-left-color: #667eea !important;
+        }
+
+        .main-tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
         .form-section {
             background: rgba(255, 255, 255, 0.05);
             padding: 30px;
@@ -515,57 +531,154 @@
     </style>
 </head>
 <body>
-    <div class="admin-header">
-        <div class="header-content">
-            <div class="logo">
-                <span class="logo-icon">🤖</span>
-                VoiceAI Admin
+    <!-- Sidebar -->
+    <div style="position: fixed; left: 0; top: 0; bottom: 0; width: 280px; background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1e 100%); border-right: 1px solid rgba(102, 126, 234, 0.2); display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.3);">
+        <!-- Logo -->
+        <div style="padding: 30px 25px; border-bottom: 1px solid rgba(102, 126, 234, 0.2);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">🤖</div>
+                <div>
+                    <div style="font-size: 20px; font-weight: 800; color: white;">Hi Julie</div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 500;">AI Voice Assistant</div>
+                </div>
             </div>
-            <div class="user-info">
-                <div class="user-info-name" id="userName">Loading...</div>
-                <div class="user-info-phone" id="userPhone">Loading...</div>
+        </div>
+
+        <!-- Navigation -->
+        <div style="flex: 1; overflow-y: auto; padding: 20px 0;">
+            <div style="padding: 0 25px; margin-bottom: 15px;">
+                <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px;">Menu</div>
             </div>
-            <div class="header-actions">
-                <button onclick="logout()" class="btn btn-home" style="cursor: pointer;">Logout</button>
+            <button class="sidebar-nav-btn active" data-tab="dashboard" onclick="switchMainTab('dashboard')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: white; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">📊</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="sidebar-nav-btn" data-tab="calls" onclick="switchMainTab('calls')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">📞</span>
+                <span>Calls</span>
+            </button>
+            <button class="sidebar-nav-btn" data-tab="config" onclick="switchMainTab('config')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">⚙️</span>
+                <span>Configuration</span>
+            </button>
+            <button class="sidebar-nav-btn" data-tab="numbers" onclick="switchMainTab('numbers')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">📱</span>
+                <span>Phone Numbers</span>
+            </button>
+            <button class="sidebar-nav-btn" onclick="openCalendarModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">📅</span>
+                <span>Calendar</span>
+            </button>
+            <button class="sidebar-nav-btn" data-tab="admin" onclick="switchMainTab('admin')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">🛠️</span>
+                <span>System Tools</span>
+            </button>
+        </div>
+
+        <!-- User Profile -->
+        <div style="padding: 20px 25px; border-top: 1px solid rgba(102, 126, 234, 0.2);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">👤</div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="userName">Loading...</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="userPhone">Loading...</div>
+                </div>
             </div>
+            <button onclick="logout()" style="width: 100%; background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.4); padding: 10px; border-radius: 8px; color: white; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;">
+                🚪 Logout
+            </button>
         </div>
     </div>
 
-    <div class="main-container">
-        <div class="dashboard-grid">
-            <div class="stat-card">
-                <div class="stat-icon">📞</div>
-                <div class="stat-value" id="callsToday">0</div>
-                <div class="stat-label">Total Calls Today</div>
+    <!-- Main Content Area -->
+    <div style="margin-left: 280px; min-height: 100vh; background: #0f0f23;">
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab" class="main-tab-content" style="display: block;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Dashboard</h1>
+                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">Welcome back! Here's what's happening today.</p>
             </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, rgba(102,200,234,0.2), rgba(102,234,150,0.2)); border: 2px solid rgba(102,200,234,0.5);">
-                <div class="stat-icon">💳</div>
-                <div class="stat-value" id="minutesRemaining" style="color: #66c8ea;">--</div>
-                <div class="stat-label">Minutes Remaining</div>
-                <button onclick="buyMoreMinutes()" style="margin-top: 6px; width: 100%; background: linear-gradient(135deg, #66c8ea, #66ea96); border: none; padding: 5px 10px; border-radius: 5px; color: white; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.3s; box-shadow: 0 2px 6px rgba(102,200,234,0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 3px 10px rgba(102,200,234,0.5)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 6px rgba(102,200,234,0.3)'">💳 Buy</button>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">📅</div>
-                <div class="stat-value" id="unreadAppointments">0</div>
-                <div class="stat-label">Unread Appointments</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💬</div>
-                <div class="stat-value" id="messagesToday">0</div>
-                <div class="stat-label">Messages Today</div>
+
+            <div style="padding: 40px 50px;">
+                <!-- Latest Calls Section -->
+                <div style="background: rgba(255,255,255,0.03); border-radius: 16px; padding: 30px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                        <h2 style="font-size: 22px; font-weight: 700; margin: 0;">Latest Calls</h2>
+                        <button onclick="switchMainTab('calls')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px 24px; border-radius: 10px; color: white; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                            View All Calls →
+                        </button>
+                    </div>
+                    <div id="latestCallsList" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+                            Loading calls...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(102, 126, 234, 0.3); transition: all 0.3s;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                            <div style="font-size: 28px;">📞</div>
+                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Your Phone Number</div>
+                        </div>
+                        <div style="font-size: 24px; font-weight: 700; color: #667eea;" id="statsPhoneNumber">--</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, rgba(102, 200, 234, 0.1) 0%, rgba(102, 234, 150, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(102, 200, 234, 0.3); transition: all 0.3s;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                            <div style="font-size: 28px;">👤</div>
+                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Account Manager</div>
+                        </div>
+                        <div style="font-size: 24px; font-weight: 700; color: #66c8ea;" id="statsAccountManager">--</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, rgba(234, 102, 234, 0.1) 0%, rgba(162, 75, 234, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(234, 102, 234, 0.3); transition: all 0.3s;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                            <div style="font-size: 28px;">📊</div>
+                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Total Calls</div>
+                        </div>
+                        <div style="font-size: 32px; font-weight: 700; color: #ea66ea;" id="callsToday">0</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, rgba(234, 150, 102, 0.1) 0%, rgba(234, 102, 150, 0.1) 100%); border-radius: 16px; padding: 25px; border: 1px solid rgba(234, 150, 102, 0.3); transition: all 0.3s;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                            <div style="font-size: 28px;">⏱️</div>
+                            <div style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px;">Total Minutes</div>
+                        </div>
+                        <div style="font-size: 32px; font-weight: 700; color: #ea9666;" id="minutesRemaining">--</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="tabs-container">
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('config')">⚙️ Configuration</button>
-                <button class="tab" onclick="switchTab('calls')">📞 Call History</button>
-                <button class="tab" onclick="switchTab('numbers')">📱 Phone Numbers</button>
-                <button class="tab" onclick="openCalendarModal()">📅 Calendar</button>
-                <button class="tab" onclick="switchTab('admin')">🛠️ System Tools</button>
+        <!-- Calls Tab -->
+        <div id="callsTab" class="main-tab-content" style="display: none;">
+
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Call History</h1>
+                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">View and manage your call records.</p>
+            </div>
+            
+            <div id="callHistoryContent" style="padding: 40px 50px;">
+                <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+                    Loading calls...
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Tab -->
+        <div id="configTab" class="main-tab-content" style="display: none;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Configuration</h1>
+                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">Customize your AI voice assistant.</p>
             </div>
 
-            <div id="configTab" class="tab-content active">
+            <div style="padding: 40px 50px;">
+            <div id="configTabContent">
                 <form id="configForm">
                     <div class="form-section">
                         <h3>🤖 Agent Identity</h3>
@@ -574,10 +687,15 @@
                             <input type="text" id="agentName" placeholder="e.g., Julie, Alex, Sarah" required>
                         </div>
                         <div class="form-group">
-                            <label for="phoneNumber">Your Phone Number (Vonage Number)</label>
-                            <input type="tel" id="phoneNumber" placeholder="e.g., +1234567890">
+                            <label for="phoneNumber">Your Phone Number (Select from Available)</label>
+                            <select id="phoneNumber" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                <option value="">Loading available numbers...</option>
+                            </select>
+                            <button onclick="refreshAvailableNumbers()" type="button" style="margin-top: 10px; padding: 10px 20px; background: #3498db; border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
+                                🔄 Refresh Numbers
+                            </button>
                             <div class="example-box">
-                                <strong>Example:</strong> +1234567890 - This is the phone number customers will call. It will be displayed in the header.
+                                <strong>Note:</strong> Only shows Vonage numbers you own that are not assigned to other accounts. Purchase more numbers in the Phone Numbers tab.
                             </div>
                         </div>
                     </div>
@@ -590,12 +708,14 @@
                                 <option value="openai">OpenAI (6 voices, fastest)</option>
                                 <option value="google">Google Cloud (40+ UK voices, fast)</option>
                                 <option value="elevenlabs">ElevenLabs (Premium quality)</option>
+                                <option value="playht">Play.HT (Ultra-realistic, natural)</option>
                             </select>
                             <div class="example-box" style="margin-top: 10px;">
                                 <strong>🎭 Voice Providers:</strong><br>
                                 <strong>OpenAI:</strong> 6 high-quality voices, fastest response<br>
                                 <strong>Google Cloud:</strong> 40+ UK English voices, very fast<br>
-                                <strong>ElevenLabs:</strong> Premium natural voices, highest quality
+                                <strong>ElevenLabs:</strong> Premium natural voices, highest quality<br>
+                                <strong>Play.HT:</strong> Ultra-realistic conversational voices, indistinguishable from human
                             </div>
                         </div>
 
@@ -677,6 +797,23 @@
                                 </button>
                                 <div class="example-box">
                                     <strong>Premium Voices:</strong> ElevenLabs provides the highest quality, most natural-sounding voices. Click "Test Voice" to hear a sample.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PlayHT Voice Selection -->
+                        <div id="playhtVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="playhtVoice">Play.HT Voice</label>
+                                <select id="playhtVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <option value="s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json">Charlotte (UK Female - Warm & Professional)</option>
+                                    <option value="s3://voice-cloning-zero-shot/baf1d619-19e5-42fc-a8da-f530c0a6a8d5/original/manifest.json">Jennifer (US Female - Clear & Friendly)</option>
+                                    <option value="s3://voice-cloning-zero-shot/d82d246c-148b-457f-9668-37b789e61a3e/original/manifest.json">Matthew (US Male - Professional)</option>
+                                    <option value="s3://voice-cloning-zero-shot/e3827ec5-697a-4b7c-9704-1a23041bbc51/original/manifest.json">Ruby (UK Female - Energetic)</option>
+                                    <option value="s3://voice-cloning-zero-shot/034e929c-245d-4b68-b0a3-f5e3e9c8f3f3/original/manifest.json">Larry (US Male - Conversational)</option>
+                                </select>
+                                <div class="example-box">
+                                    <strong>Ultra-Realistic:</strong> Play.HT 2.0 voices are virtually indistinguishable from real humans, with natural inflections and emotions.
                                 </div>
                             </div>
                         </div>
@@ -931,26 +1068,52 @@
                 return; // Will redirect to signin
             }
             
-            // Load initial data
-            loadCalls();
+            // Load dashboard as default view
+            loadDashboard();
             loadTodayStats();
             loadMinutes();
         });
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        function switchMainTab(tabName) {
+            // Hide all main tabs
+            document.querySelectorAll('.main-tab-content').forEach(c => c.style.display = 'none');
             
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.add('active');
+            // Remove active class from all sidebar buttons
+            document.querySelectorAll('.sidebar-nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.color = 'rgba(255,255,255,0.6)';
+                btn.style.borderLeftColor = 'transparent';
+            });
             
+            // Show selected tab
+            const tabElement = document.getElementById(tabName + 'Tab');
+            if (tabElement) {
+                tabElement.style.display = 'block';
+            }
+            
+            // Activate sidebar button
+            const activeBtn = document.querySelector(`.sidebar-nav-btn[data-tab="${tabName}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.color = 'white';
+                activeBtn.style.borderLeftColor = '#667eea';
+            }
+            
+            // Load content for specific tabs
             if (tabName === 'calls') {
                 loadCalls();
+            } else if (tabName === 'dashboard') {
+                loadDashboard();
             } else if (tabName === 'admin') {
                 runDiagnostics();
-            } else if (tabName === 'numbers') {
-                // Numbers tab loaded - ready for search
+            } else if (tabName === 'config') {
+                // Config tab is already populated on page load
             }
+        }
+
+        function switchTab(tabName) {
+            // Legacy function - redirect to new sidebar navigation
+            switchMainTab(tabName);
         }
 
         function openCalendarModal() {
@@ -1130,6 +1293,74 @@
             }
         }
 
+        async function loadDashboard() {
+            try {
+                // Load latest calls (limit to 5)
+                const response = await fetch('/api/calls', {
+                    headers: getAuthHeaders()
+                });
+                const data = await response.json();
+                
+                const latestCallsList = document.getElementById('latestCallsList');
+                
+                if (!data.calls || data.calls.length === 0) {
+                    latestCallsList.innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 2px dashed rgba(255,255,255,0.1);">
+                            <div style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;">📞</div>
+                            <div style="font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">No calls yet</div>
+                            <div style="font-size: 13px; color: rgba(255,255,255,0.4);">When customers call, they'll appear here</div>
+                        </div>
+                    `;
+                } else {
+                    // Show latest 5 calls
+                    const latestCalls = data.calls.slice(0, 5);
+                    latestCallsList.innerHTML = latestCalls.map(call => {
+                        const startTime = new Date(call.start_time);
+                        const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                        const duration = call.duration ? `${call.duration}s` : '--';
+                        
+                        return `
+                            <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s; cursor: pointer;" 
+                                 onmouseover="this.style.background='rgba(255,255,255,0.06)'; this.style.borderColor='rgba(102,126,234,0.3)'" 
+                                 onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.06)'"
+                                 onclick="switchMainTab('calls')">
+                                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">📞</div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-size: 16px; font-weight: 700; color: white; margin-bottom: 4px;">${call.caller_number}</div>
+                                        <div style="font-size: 13px; color: rgba(255,255,255,0.5);">${formattedTime}</div>
+                                    </div>
+                                    <button onclick="event.stopPropagation(); switchMainTab('calls')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;">
+                                        Details
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                
+                // Update dashboard stats
+                const statsResponse = await fetch('/api/stats/today', {
+                    headers: getAuthHeaders()
+                });
+                const statsData = await statsResponse.json();
+                
+                document.getElementById('callsToday').textContent = statsData.calls || '0';
+                document.getElementById('statsPhoneNumber').textContent = statsData.phone_number || 'Not set';
+                document.getElementById('statsAccountManager').textContent = statsData.agent_name || 'Julie';
+                
+                // Load minutes
+                const minutesResponse = await fetch('/api/minutes', {
+                    headers: getAuthHeaders()
+                });
+                const minutesData = await minutesResponse.json();
+                document.getElementById('minutesRemaining').textContent = minutesData.minutes || '--';
+                
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+
         async function loadCalls() {
             try {
                 console.log('Loading calls...');
@@ -1141,47 +1372,63 @@
                 const data = await response.json();
                 console.log('Calls data:', data);
                 
-                const callLogsDiv = document.getElementById('callLogs');
+                const callHistoryContent = document.getElementById('callHistoryContent');
                 
                 if (!data.calls || data.calls.length === 0) {
                     console.log('No calls found');
-                    callLogsDiv.innerHTML = '<div class="no-calls">📞 No calls yet. When calls come in, they\'ll appear here with AI summaries.</div>';
+                    callHistoryContent.innerHTML = `
+                        <div style="text-align: center; padding: 80px 20px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 2px dashed rgba(255,255,255,0.1);">
+                            <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">📞</div>
+                            <div style="font-size: 20px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 600;">No calls yet</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.4);">When customers call, their conversations and AI summaries will appear here</div>
+                        </div>
+                    `;
                     return;
                 }
 
                 console.log(`Displaying ${data.calls.length} calls`);
                 
-                callLogsDiv.innerHTML = data.calls.map(call => {
-                    const startTime = new Date(call.start_time);
-                    const formattedTime = startTime.toLocaleString();
-                    const duration = call.duration ? `${call.duration}s` : 'N/A';
-                    const isCompleted = call.status === 'completed';
-                    const completedClass = isCompleted ? 'completed' : '';
-                    const completeBtn = isCompleted 
-                        ? '<button class="btn-small btn-complete" disabled>✓ Completed</button>'
-                        : `<button class="btn-small btn-complete" onclick="markCallComplete('${call.call_uuid}')">Mark Complete</button>`;
-                    const apptBadge = call.has_appointment ? `<span onclick="goToAppointment('${call.call_uuid}')" style="background: #ff4444; color: white; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 8px; display: inline-block; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#ff6666'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff4444'; this.style.transform='scale(1)'">📅 APPT</span>` : '';
-                    
-                    return `
-                        <div class="call-log ${completedClass}" id="call-${call.call_uuid}">
-                            <div class="call-log-header">
-                                <div class="call-number">
-                                    📱 ${call.caller_number}
-                                    ${apptBadge}
-                                    <span class="call-duration">${duration}</span>
+                callHistoryContent.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        ${data.calls.map(call => {
+                            const startTime = new Date(call.start_time);
+                            const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                            const duration = call.duration ? `${call.duration}s` : 'N/A';
+                            const isCompleted = call.status === 'completed';
+                            const apptBadge = call.has_appointment ? `<span style="background: #ff4444; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 10px; display: inline-block;">📅 APPOINTMENT</span>` : '';
+                            
+                            return `
+                                <div style="background: rgba(255,255,255,0.03); border-radius: 16px; padding: 25px; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s;" 
+                                     onmouseover="this.style.background='rgba(255,255,255,0.06)'; this.style.borderColor='rgba(102,126,234,0.3)'" 
+                                     onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.06)'">
+                                    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px;">
+                                        <div style="flex: 1;">
+                                            <div style="font-size: 18px; font-weight: 700; color: white; margin-bottom: 6px;">
+                                                📱 ${call.caller_number}
+                                                ${apptBadge}
+                                            </div>
+                                            <div style="font-size: 13px; color: rgba(255,255,255,0.5);">
+                                                📅 ${formattedTime} • ⏱️ ${duration}
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                                            ${isCompleted 
+                                                ? '<button disabled style="background: rgba(100,255,100,0.2); border: 1px solid rgba(100,255,100,0.4); padding: 8px 16px; border-radius: 8px; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600; cursor: not-allowed;">✓ Complete</button>'
+                                                : `<button onclick="markCallComplete('${call.call_uuid}')" style="background: linear-gradient(135deg, #66ea96 0%, #66c8ea 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Mark Complete</button>`
+                                            }
+                                            <button onclick="deleteCall('${call.call_uuid}')" style="background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.4); padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">🗑️ Delete</button>
+                                        </div>
+                                    </div>
+                                    <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border-left: 3px solid #667eea;">
+                                        <div style="font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6;">
+                                            ${call.summary || '<span style="color: rgba(255,255,255,0.4);">Generating AI summary...</span>'}
+                                        </div>
+                                    </div>
                                 </div>
-                                <span class="call-time">📅 ${formattedTime}</span>
-                            </div>
-                            <div class="call-summary">
-                                ${call.summary || 'Generating summary...'}
-                            </div>
-                            <div class="call-actions">
-                                ${completeBtn}
-                                <button class="btn-small btn-delete" onclick="deleteCall('${call.call_uuid}')">🗑️ Delete</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                            `;
+                        }).join('')}
+                    </div>
+                `;
                 
             } catch (error) {
                 console.error('Failed to load calls:', error);
@@ -1210,9 +1457,81 @@
                 // Load voice provider preference and show correct section
                 await loadVoiceProviderPreference();
                 
+                // Load available owned numbers for assignment
+                await loadAvailableOwnedNumbers();
+                
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
+        }
+
+        // Store voice selections in memory
+        const savedVoiceSelections = {
+            openai: null,
+            google: null,
+            elevenlabs: null,
+            playht: null,
+            provider: null
+        };
+
+        // Load available owned numbers for assignment
+        async function loadAvailableOwnedNumbers() {
+            try {
+                const response = await fetch('/api/owned-numbers', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to fetch owned numbers');
+                    return;
+                }
+                
+                const data = await response.json();
+                const phoneNumberSelect = document.getElementById('phoneNumber');
+                
+                // Clear existing options
+                phoneNumberSelect.innerHTML = '<option value="">-- Select a Number --</option>';
+                
+                if (data.success && data.numbers && data.numbers.length > 0) {
+                    // Get current assigned number
+                    const currentNumber = phoneNumberSelect.dataset.currentNumber || '';
+                    
+                    // Add available numbers
+                    let hasAvailable = false;
+                    data.numbers.forEach(number => {
+                        // Show available numbers OR the currently assigned number
+                        if (number.available || number.number === currentNumber) {
+                            const option = document.createElement('option');
+                            option.value = number.number;
+                            option.textContent = `${number.number} (${number.country || 'Unknown'})`;
+                            if (number.number === currentNumber) {
+                                option.textContent += ' - Currently Assigned';
+                                option.selected = true;
+                            }
+                            phoneNumberSelect.appendChild(option);
+                            hasAvailable = true;
+                        }
+                    });
+                    
+                    if (!hasAvailable && !currentNumber) {
+                        phoneNumberSelect.innerHTML = '<option value="">No available numbers - Purchase in Phone Numbers tab</option>';
+                    }
+                } else {
+                    phoneNumberSelect.innerHTML = '<option value="">No numbers found - Purchase in Phone Numbers tab</option>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading owned numbers:', error);
+                const phoneNumberSelect = document.getElementById('phoneNumber');
+                phoneNumberSelect.innerHTML = '<option value="">Error loading numbers</option>';
+            }
+        }
+
+        // Refresh available numbers
+        async function refreshAvailableNumbers() {
+            showMessage('🔄 Refreshing available numbers...', 'info');
+            await loadAvailableOwnedNumbers();
+            showMessage('✅ Numbers refreshed', 'success');
         }
 
         // Load voice provider preference from database
@@ -1226,35 +1545,40 @@
                 
                 const data = await response.json();
                 
-                // Set voice provider dropdown
-                const voiceProvider = data.VOICE_PROVIDER || 'openai';
-                document.getElementById('voiceProvider').value = voiceProvider;
+                // Store all voice selections in memory
+                savedVoiceSelections.provider = data.VOICE_PROVIDER || 'openai';
+                savedVoiceSelections.openai = data.VOICE || 'shimmer';
+                savedVoiceSelections.google = data.GOOGLE_VOICE || 'en-GB-Neural2-A';
+                savedVoiceSelections.elevenlabs = data.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+                savedVoiceSelections.playht = data.PLAYHT_VOICE_ID || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
                 
-                // Set voice selections
-                if (data.VOICE) {
-                    document.getElementById('agentVoice').value = data.VOICE;
-                }
-                if (data.ELEVENLABS_VOICE_ID) {
-                    document.getElementById('elevenLabsVoice').value = data.ELEVENLABS_VOICE_ID;
-                }
-                if (data.GOOGLE_VOICE) {
-                    document.getElementById('googleVoice').value = data.GOOGLE_VOICE;
-                }
-                const cartesiaSelect = document.getElementById('cartesiaVoice');
-                if (data.CARTESIA_VOICE_ID) {
-                    cartesiaSelect.dataset.selectedVoice = data.CARTESIA_VOICE_ID;
-                    cartesiaSelect.value = data.CARTESIA_VOICE_ID;
-                } else if (!cartesiaSelect.dataset.selectedVoice) {
-                    cartesiaSelect.dataset.selectedVoice = cartesiaSelect.value || '';
-                }
-
-                // Ensure we remember manual changes for future loads
-                if (!cartesiaSelect.dataset.listenerAttached) {
-                    cartesiaSelect.addEventListener('change', (event) => {
-                        event.target.dataset.selectedVoice = event.target.value;
-                    });
-                    cartesiaSelect.dataset.listenerAttached = 'true';
-                }
+                console.log('Loaded voice settings:', savedVoiceSelections);
+                
+                // Set voice provider dropdown
+                document.getElementById('voiceProvider').value = savedVoiceSelections.provider;
+                
+                // Set all voice dropdowns to their saved values
+                document.getElementById('agentVoice').value = savedVoiceSelections.openai;
+                document.getElementById('googleVoice').value = savedVoiceSelections.google;
+                document.getElementById('elevenLabsVoice').value = savedVoiceSelections.elevenlabs;
+                document.getElementById('playhtVoice').value = savedVoiceSelections.playht;
+                
+                // Add change listeners to remember manual selections
+                document.getElementById('agentVoice').addEventListener('change', (e) => {
+                    savedVoiceSelections.openai = e.target.value;
+                });
+                document.getElementById('googleVoice').addEventListener('change', (e) => {
+                    savedVoiceSelections.google = e.target.value;
+                });
+                document.getElementById('elevenLabsVoice').addEventListener('change', (e) => {
+                    savedVoiceSelections.elevenlabs = e.target.value;
+                });
+                document.getElementById('playhtVoice').addEventListener('change', (e) => {
+                    savedVoiceSelections.playht = e.target.value;
+                });
+                document.getElementById('voiceProvider').addEventListener('change', (e) => {
+                    savedVoiceSelections.provider = e.target.value;
+                });
                 
                 // Show correct voice section
                 await switchVoiceProvider();
@@ -1268,9 +1592,25 @@
         async function switchVoiceProvider() {
             const provider = document.getElementById('voiceProvider').value;
             
-            document.getElementById('openaiVoiceSection').style.display = provider === 'openai' ? 'block' : 'none';
-            document.getElementById('googleVoiceSection').style.display = provider === 'google' ? 'block' : 'none';
-            document.getElementById('elevenLabsVoiceSection').style.display = provider === 'elevenlabs' ? 'block' : 'none';
+            // Hide all sections first
+            document.getElementById('openaiVoiceSection').style.display = 'none';
+            document.getElementById('googleVoiceSection').style.display = 'none';
+            document.getElementById('elevenLabsVoiceSection').style.display = 'none';
+            document.getElementById('playhtVoiceSection').style.display = 'none';
+            
+            // Show the selected provider section
+            if (provider === 'openai') {
+                document.getElementById('openaiVoiceSection').style.display = 'block';
+            } else if (provider === 'google') {
+                document.getElementById('googleVoiceSection').style.display = 'block';
+            } else if (provider === 'elevenlabs') {
+                document.getElementById('elevenLabsVoiceSection').style.display = 'block';
+            } else if (provider === 'playht') {
+                document.getElementById('playhtVoiceSection').style.display = 'block';
+            }
+            
+            // Force a repaint to ensure dropdown is visible
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
 
         // Toggle ElevenLabs voice dropdown visibility (legacy function - no longer used)
@@ -1728,6 +2068,7 @@
             const elevenLabsVoiceId = document.getElementById('elevenLabsVoice')?.value || 'EXAVITQu4vr4xnSDxMaL';
             const cartesiaVoiceId = 'a0e99841-438c-4a64-b679-ae501e7d6091'; // Cartesia removed
             const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
+            const playhtVoiceId = document.getElementById('playhtVoice')?.value || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
             const responseLatency = parseInt(document.getElementById('responseLatency').value);
             const businessInfo = document.getElementById('businessInfo').value;
             const agentPersonality = document.getElementById('agentPersonality').value;
@@ -1735,6 +2076,7 @@
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
+            console.log('🔵 PlayHT voice selected:', playhtVoiceId);
             
             try {
                 showMessage('💾 Saving configuration...', 'info');
@@ -1750,7 +2092,8 @@
                         openai_voice: agentVoice,
                         elevenlabs_voice_id: elevenLabsVoiceId,
                         cartesia_voice_id: cartesiaVoiceId,
-                        google_voice: googleVoice
+                        google_voice: googleVoice,
+                        playht_voice_id: playhtVoiceId
                     })
                 });
                 

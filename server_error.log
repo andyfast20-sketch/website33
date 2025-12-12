@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "G:\website33-main\website33-main\start_server.py", line 142, in <module>
+    main()
+    ~~~~^^
+  File "G:\website33-main\website33-main\start_server.py", line 123, in main
+    print_header()
+    ~~~~~~~~~~~~^^
+  File "G:\website33-main\website33-main\start_server.py", line 18, in print_header
+    print("  \U0001f916 AI PHONE AGENT - Server Launcher")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f916' in position 2: character maps to <undefined>
