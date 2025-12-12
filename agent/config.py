@@ -26,5 +26,10 @@ class Settings:
     deepseek_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     elevenlabs_voice: str = os.getenv("ELEVENLABS_VOICE", "Bella")
 
+    # Billing values that mirror the Vonage Agent server control page.
+    vonage_per_minute_charge: float = float(os.getenv("VONAGE_PER_MINUTE_CHARGE", "0.05"))
+    vonage_connection_charge: float = float(os.getenv("VONAGE_CONNECTION_CHARGE", "0.0"))
+    vonage_rounding_increment_seconds: int = int(os.getenv("VONAGE_ROUNDING_INCREMENT_SECONDS", "60"))
+
 
 settings = Settings()
