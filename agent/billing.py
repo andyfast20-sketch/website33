@@ -50,6 +50,56 @@ class CallCharge:
         return round(self.duration_seconds / 60, 2)
 
 
+def build_billing_view(
+    records: Iterable[dict],
+    *,
+    current_balance: float,
+    total_used: Optional[float] = None,
+    config: Optional[BillingConfig] = None,
+) -> dict:
+    """Assemble a serializable payload for a billing screen.
+
+    The view model keeps UI rendering simple while ensuring the values on the
+    page align with the shared pricing logic in :func:`build_call_charges`.
+    """
+
+    billing_config = config or BillingConfig.from_settings()
+    call_charges = build_call_charges(records, billing_config)
+    computed_total_used = sum(charge.charge for charge in call_charges)
+
+    return {
+        "header": "💰 Billing & Usage",
+        "summary": {
+            "current_balance": current_balance,
+            "total_used": total_used if total_used is not None else round(computed_total_used, 2),
+        },
+        "pricing_cards": [
+            {
+                "label": "Calls",
+                "value": f"Connection fee {billing_config.connection_fee:.2f} credits",
+            },
+            {
+                "label": "Minutes",
+                "value": f"{billing_config.per_minute_rate:.2f} credits per minute",
+            },
+            {
+                "label": "Bookings",
+                "value": f"Rounded every {billing_config.rounding_increment_seconds} seconds",
+            },
+        ],
+        "usage_history": [
+            {
+                "call_id": charge.call_id,
+                "caller": charge.caller,
+                "duration_seconds": charge.duration_seconds,
+                "duration_minutes": charge.duration_minutes,
+                "charge": charge.charge,
+            }
+            for charge in call_charges
+        ],
+    }
+
+
 def calculate_charge(duration_seconds: int, config: BillingConfig) -> float:
     """Calculate the billable charge for a call duration.
 
