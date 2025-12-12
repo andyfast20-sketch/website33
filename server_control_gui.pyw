@@ -156,6 +156,22 @@ class ServerControlGUI:
         )
         self.web_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        self.ngrok_start_btn = tk.Button(
+            button_frame,
+            text="🚀 Start Ngrok",
+            bg='#27ae60',
+            fg='white',
+            activebackground='#229954',
+            command=self.start_ngrok,
+            font=('Segoe UI', 9, 'bold'),
+            width=12,
+            height=1,
+            relief=tk.RAISED,
+            bd=2,
+            cursor='hand2'
+        )
+        self.ngrok_start_btn.grid(row=3, column=0, padx=5, pady=5, sticky='ew')
+        
         self.ngrok_reset_btn = tk.Button(
             button_frame,
             text="🔄 Reset Ngrok",
@@ -170,7 +186,7 @@ class ServerControlGUI:
             bd=2,
             cursor='hand2'
         )
-        self.ngrok_reset_btn.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        self.ngrok_reset_btn.grid(row=3, column=1, padx=5, pady=5, sticky='ew')
         
         # Git buttons
         self.git_push_btn = tk.Button(
@@ -207,6 +223,18 @@ class ServerControlGUI:
         )
         self.manage_numbers_btn.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        # Billing Settings button
+        self.billing_btn = tk.Button(
+            button_frame,
+            text="💰 Billing Settings",
+            bg='#f39c12',
+            fg='white',
+            activebackground='#e67e22',
+            command=self.show_billing_settings,
+            **button_style
+        )
+        self.billing_btn.grid(row=6, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        
         # Open Admin Dashboard button
         self.admin_dashboard_btn = tk.Button(
             button_frame,
@@ -217,7 +245,7 @@ class ServerControlGUI:
             command=self.open_admin_dashboard,
             **button_style
         )
-        self.admin_dashboard_btn.grid(row=6, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        self.admin_dashboard_btn.grid(row=7, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
         # Log Frame
         log_label = tk.Label(
@@ -528,6 +556,55 @@ class ServerControlGUI:
         
         threading.Thread(target=_reset, daemon=True).start()
     
+    def start_ngrok(self):
+        """Start ngrok without killing existing processes"""
+        def _start():
+            try:
+                # Check if ngrok is already running
+                for proc in psutil.process_iter(['pid', 'name']):
+                    if 'ngrok' in proc.info['name'].lower():
+                        self.log(f"⚠️ Ngrok is already running (PID: {proc.info['pid']})")
+                        self.log("💡 Use Reset Ngrok to restart it")
+                        return
+                
+                self.log("🚀 Starting ngrok on port 5004...")
+                ngrok_path = r"C:\ngrok\ngrok.exe"
+                
+                if not os.path.exists(ngrok_path):
+                    self.log(f"❌ ngrok.exe not found at {ngrok_path}")
+                    self.log("💡 Please install ngrok or update the path in the script")
+                    return
+                
+                try:
+                    # Use shell=True for better compatibility
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    
+                    proc = subprocess.Popen(
+                        f'"{ngrok_path}" http 5004',
+                        shell=True,
+                        startupinfo=startupinfo
+                    )
+                    
+                    self.log(f"✅ Ngrok started successfully! (PID: {proc.pid})")
+                    self.log("💡 Visit http://localhost:4040 to see your ngrok URL")
+                    
+                    # Give it a moment to start
+                    time.sleep(2)
+                    self.update_indicators()
+                    
+                except Exception as start_error:
+                    self.log(f"❌ Failed to start ngrok: {start_error}")
+                    import traceback
+                    self.log(traceback.format_exc())
+                    
+            except Exception as e:
+                self.log(f"❌ Error starting ngrok: {e}")
+                import traceback
+                self.log(traceback.format_exc())
+        
+        threading.Thread(target=_start, daemon=True).start()
+    
     def start_server(self):
         """Start the server"""
         def _start():
@@ -837,10 +914,14 @@ class ServerControlGUI:
                     )
                     number_label.pack(side=tk.LEFT, padx=10, pady=8)
                     
+                    # Button container
+                    button_frame = tk.Frame(number_frame, bg='#2c3e50')
+                    button_frame.pack(side=tk.RIGHT, padx=10, pady=5)
+                    
                     # Assignment status
                     if number.get('available'):
                         status_label = tk.Label(
-                            number_frame,
+                            button_frame,
                             text="✅ AVAILABLE",
                             font=('Segoe UI', 9, 'bold'),
                             bg='#27ae60',
@@ -848,18 +929,67 @@ class ServerControlGUI:
                             padx=10,
                             pady=3
                         )
-                        status_label.pack(side=tk.RIGHT, padx=10, pady=5)
+                        status_label.pack(side=tk.LEFT, padx=(0, 10))
+                        
+                        # Make unavailable button
+                        toggle_btn = tk.Button(
+                            button_frame,
+                            text="🔒 Make Unavailable",
+                            command=lambda n=number: toggle_availability(n, popup),
+                            bg='#e74c3c',
+                            fg='white',
+                            font=('Segoe UI', 8, 'bold'),
+                            cursor='hand2',
+                            relief=tk.RAISED,
+                            bd=1,
+                            padx=8,
+                            pady=3
+                        )
+                        toggle_btn.pack(side=tk.LEFT)
                     else:
                         assigned_text = f"Assigned to: {number.get('assigned_to')}"
                         status_label = tk.Label(
-                            number_frame,
+                            button_frame,
                             text=assigned_text,
                             font=('Segoe UI', 9),
                             bg='#2c3e50',
                             fg='#ecf0f1',
                             anchor='w'
                         )
-                        status_label.pack(side=tk.RIGHT, padx=10, pady=8)
+                        status_label.pack(side=tk.LEFT, padx=(0, 10))
+                        
+                        # If assigned to a user, add deassign button
+                        if number.get('assigned_to') and number.get('user_id'):
+                            deassign_btn = tk.Button(
+                                button_frame,
+                                text="❌ Deassign",
+                                command=lambda n=number: deassign_number(n, popup),
+                                bg='#e67e22',
+                                fg='white',
+                                font=('Segoe UI', 8, 'bold'),
+                                cursor='hand2',
+                                relief=tk.RAISED,
+                                bd=1,
+                                padx=8,
+                                pady=3
+                            )
+                            deassign_btn.pack(side=tk.LEFT)
+                        else:
+                            # If not assigned to user (manually unavailable), allow making available
+                            toggle_btn = tk.Button(
+                                button_frame,
+                                text="🔓 Make Available",
+                                command=lambda n=number: toggle_availability(n, popup),
+                                bg='#27ae60',
+                                fg='white',
+                                font=('Segoe UI', 8, 'bold'),
+                                cursor='hand2',
+                                relief=tk.RAISED,
+                                bd=1,
+                                padx=8,
+                                pady=3
+                            )
+                            toggle_btn.pack(side=tk.LEFT)
                 
                 canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
                 scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
@@ -891,6 +1021,118 @@ class ServerControlGUI:
                 wraplength=600
             )
             error_label.pack(pady=20)
+        
+        def toggle_availability(number, window):
+            """Toggle availability status of a number"""
+            try:
+                phone_number = number.get('number')
+                current_status = number.get('available', False)
+                new_status = not current_status
+                
+                self.log(f"🔄 Toggling {phone_number} to {'available' if new_status else 'unavailable'}...")
+                
+                # Update in database
+                import sqlite3
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                db_path = os.path.join(script_dir, "call_logs.db")
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                # Create availability tracking table if doesn't exist
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS number_availability (
+                        phone_number TEXT PRIMARY KEY,
+                        is_available INTEGER DEFAULT 1,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                # Insert or update availability
+                cursor.execute('''
+                    INSERT INTO number_availability (phone_number, is_available, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(phone_number) DO UPDATE SET
+                        is_available = excluded.is_available,
+                        updated_at = excluded.updated_at
+                ''', (phone_number, 1 if new_status else 0))
+                
+                conn.commit()
+                conn.close()
+                
+                status_text = "available" if new_status else "unavailable"
+                self.log(f"✅ {phone_number} is now {status_text}")
+                
+                # Refresh the popup
+                window.destroy()
+                self.show_numbers_popup()
+                
+            except Exception as e:
+                self.log(f"❌ Error toggling number availability: {e}")
+                import tkinter.messagebox as messagebox
+                messagebox.showerror("Error", f"Failed to toggle number: {str(e)}")
+        
+        def deassign_number(number, window):
+            """Deassign a number from a user and make it available"""
+            try:
+                phone_number = number.get('number')
+                user_name = number.get('assigned_to')
+                
+                # Confirm deassignment
+                import tkinter.messagebox as messagebox
+                confirm = messagebox.askyesno(
+                    "Confirm Deassignment",
+                    f"Are you sure you want to deassign {phone_number} from {user_name}?\n\nThis will remove the number from their account and make it available for reassignment."
+                )
+                
+                if not confirm:
+                    return
+                
+                self.log(f"🔄 Deassigning {phone_number} from {user_name}...")
+                
+                # Update in database
+                import sqlite3
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                db_path = os.path.join(script_dir, "call_logs.db")
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                # Remove from account_settings
+                cursor.execute('''
+                    UPDATE account_settings 
+                    SET phone_number = NULL 
+                    WHERE phone_number = ?
+                ''', (phone_number,))
+                
+                # Make it available in availability table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS number_availability (
+                        phone_number TEXT PRIMARY KEY,
+                        is_available INTEGER DEFAULT 1,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                cursor.execute('''
+                    INSERT INTO number_availability (phone_number, is_available, updated_at)
+                    VALUES (?, 1, CURRENT_TIMESTAMP)
+                    ON CONFLICT(phone_number) DO UPDATE SET
+                        is_available = 1,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (phone_number,))
+                
+                conn.commit()
+                conn.close()
+                
+                self.log(f"✅ {phone_number} deassigned from {user_name} and is now available")
+                
+                # Refresh the popup
+                window.destroy()
+                self.show_numbers_popup()
+                
+            except Exception as e:
+                self.log(f"❌ Error deassigning number: {e}")
+                import tkinter.messagebox as messagebox
+                messagebox.showerror("Error", f"Failed to deassign number: {str(e)}")
             
             close_btn = tk.Button(
                 popup,
@@ -1052,6 +1294,257 @@ class ServerControlGUI:
             pady=5
         )
         close_btn.pack(pady=(0, 15))
+    
+    def show_billing_settings(self):
+        """Show billing configuration window"""
+        popup = tk.Toplevel(self.root)
+        popup.title("💰 Billing Settings")
+        popup.geometry("600x500")
+        popup.configure(bg='#2c3e50')
+        popup.resizable(False, False)
+        
+        # Center window
+        popup.update_idletasks()
+        x = (popup.winfo_screenwidth() // 2) - (600 // 2)
+        y = (popup.winfo_screenheight() // 2) - (500 // 2)
+        popup.geometry(f'600x500+{x}+{y}')
+        
+        # Title
+        title_label = tk.Label(
+            popup,
+            text="💰 Credit Billing Configuration",
+            font=('Segoe UI', 16, 'bold'),
+            bg='#2c3e50',
+            fg='#ecf0f1'
+        )
+        title_label.pack(pady=20)
+        
+        # Description
+        desc_label = tk.Label(
+            popup,
+            text="Set credit costs for various services. Users will be charged these amounts.",
+            font=('Segoe UI', 9),
+            bg='#2c3e50',
+            fg='#bdc3c7',
+            wraplength=550
+        )
+        desc_label.pack(pady=(0, 20))
+        
+        # Settings frame
+        settings_frame = tk.Frame(popup, bg='#34495e', relief=tk.RAISED, bd=2)
+        settings_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        
+        # Load current settings from database
+        try:
+            import sqlite3
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(script_dir, "call_logs.db")
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Create billing_config table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS billing_config (
+                    id INTEGER PRIMARY KEY,
+                    credits_per_connected_call REAL DEFAULT 5.0,
+                    credits_per_minute REAL DEFAULT 2.0,
+                    credits_per_calendar_booking REAL DEFAULT 10.0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Get current values or insert defaults
+            cursor.execute('SELECT * FROM billing_config WHERE id = 1')
+            config = cursor.fetchone()
+            if not config:
+                cursor.execute('''
+                    INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking)
+                    VALUES (1, 5.0, 2.0, 10.0)
+                ''')
+                conn.commit()
+                config = (1, 5.0, 2.0, 10.0, None)
+            
+            conn.close()
+            
+            current_call_credits = config[1]
+            current_minute_credits = config[2]
+            current_booking_credits = config[3]
+        except Exception as e:
+            self.log(f"⚠️ Error loading billing config: {e}")
+            current_call_credits = 5.0
+            current_minute_credits = 2.0
+            current_booking_credits = 10.0
+        
+        # Settings fields
+        fields = []
+        
+        # Connected Call Credits
+        call_frame = tk.Frame(settings_frame, bg='#34495e')
+        call_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            call_frame,
+            text="📞 Credits per Connected Call:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        call_entry = tk.Entry(call_frame, font=('Segoe UI', 10), width=10)
+        call_entry.insert(0, str(current_call_credits))
+        call_entry.pack(side=tk.LEFT)
+        fields.append(('call', call_entry))
+        
+        tk.Label(
+            call_frame,
+            text="(charged when call connects)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Per Minute Credits
+        minute_frame = tk.Frame(settings_frame, bg='#34495e')
+        minute_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            minute_frame,
+            text="⏱️ Credits per Minute of Call:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        minute_entry = tk.Entry(minute_frame, font=('Segoe UI', 10), width=10)
+        minute_entry.insert(0, str(current_minute_credits))
+        minute_entry.pack(side=tk.LEFT)
+        fields.append(('minute', minute_entry))
+        
+        tk.Label(
+            minute_frame,
+            text="(per minute of conversation)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Calendar Booking Credits
+        booking_frame = tk.Frame(settings_frame, bg='#34495e')
+        booking_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            booking_frame,
+            text="📅 Credits per Calendar Booking:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        booking_entry = tk.Entry(booking_frame, font=('Segoe UI', 10), width=10)
+        booking_entry.insert(0, str(current_booking_credits))
+        booking_entry.pack(side=tk.LEFT)
+        fields.append(('booking', booking_entry))
+        
+        tk.Label(
+            booking_frame,
+            text="(when AI books appointment)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Info box
+        info_frame = tk.Frame(settings_frame, bg='#2c3e50', relief=tk.SUNKEN, bd=1)
+        info_frame.pack(padx=20, pady=20, fill=tk.X)
+        
+        info_text = "ℹ️ Note: If a user has 0 or fewer credits, the AI agent will NOT offer to book calendar appointments."
+        tk.Label(
+            info_frame,
+            text=info_text,
+            font=('Segoe UI', 9),
+            bg='#2c3e50',
+            fg='#f39c12',
+            wraplength=520,
+            justify=tk.LEFT
+        ).pack(padx=10, pady=10)
+        
+        # Buttons frame
+        button_frame = tk.Frame(popup, bg='#2c3e50')
+        button_frame.pack(pady=20)
+        
+        def save_settings():
+            try:
+                call_credits = float(call_entry.get())
+                minute_credits = float(minute_entry.get())
+                booking_credits = float(booking_entry.get())
+                
+                # Validate
+                if call_credits < 0 or minute_credits < 0 or booking_credits < 0:
+                    self.log("❌ Credit values cannot be negative")
+                    return
+                
+                # Save to database
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                db_path = os.path.join(script_dir, "call_logs.db")
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    UPDATE billing_config 
+                    SET credits_per_connected_call = ?,
+                        credits_per_minute = ?,
+                        credits_per_calendar_booking = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                ''', (call_credits, minute_credits, booking_credits))
+                
+                conn.commit()
+                conn.close()
+                
+                self.log(f"✅ Billing settings saved:")
+                self.log(f"   📞 Connected call: {call_credits} credits")
+                self.log(f"   ⏱️ Per minute: {minute_credits} credits")
+                self.log(f"   📅 Calendar booking: {booking_credits} credits")
+                
+                popup.destroy()
+                
+            except ValueError:
+                self.log("❌ Invalid number format. Please enter valid numbers.")
+            except Exception as e:
+                self.log(f"❌ Error saving billing settings: {e}")
+        
+        save_btn = tk.Button(
+            button_frame,
+            text="💾 Save Settings",
+            command=save_settings,
+            bg='#27ae60',
+            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            cursor='hand2',
+            relief=tk.RAISED,
+            bd=2,
+            padx=30,
+            pady=8
+        )
+        save_btn.pack(side=tk.LEFT, padx=10)
+        
+        cancel_btn = tk.Button(
+            button_frame,
+            text="❌ Cancel",
+            command=popup.destroy,
+            bg='#e74c3c',
+            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            cursor='hand2',
+            relief=tk.RAISED,
+            bd=2,
+            padx=30,
+            pady=8
+        )
+        cancel_btn.pack(side=tk.LEFT, padx=10)
 
 if __name__ == "__main__":
     # Check dependencies

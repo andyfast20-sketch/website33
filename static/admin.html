@@ -569,6 +569,10 @@
                 <span style="font-size: 20px;">📅</span>
                 <span>Calendar</span>
             </button>
+            <button class="sidebar-nav-btn" data-tab="billing" onclick="switchMainTab('billing')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">💰</span>
+                <span>Billing</span>
+            </button>
             <button class="sidebar-nav-btn" data-tab="admin" onclick="switchMainTab('admin')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
                 <span style="font-size: 20px;">🛠️</span>
                 <span>System Tools</span>
@@ -694,8 +698,18 @@
         <div id="callsTab" class="main-tab-content" style="display: none;">
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
-                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Call History</h1>
-                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">View and manage your call records.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Call History</h1>
+                        <p style="font-size: 15px; color: rgba(255,255,255,0.9);">View and manage your call records.</p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="filterCalls('today')" id="filterToday" style="background: rgba(255,255,255,0.3); border: 2px solid white; padding: 10px 20px; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Today</button>
+                        <button onclick="filterCalls('7days')" id="filter7days" style="background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Last 7 Days</button>
+                        <button onclick="filterCalls('30days')" id="filter30days" style="background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Last Month</button>
+                        <button onclick="filterCalls('6months')" id="filter6months" style="background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Last 6 Months</button>
+                    </div>
+                </div>
             </div>
             
             <div id="callHistoryContent" style="padding: 40px 50px;">
@@ -883,6 +897,29 @@
                         </div>
                     </div>
 
+                    <div class="form-section" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(230, 126, 34, 0.1) 100%); border: 2px solid rgba(241, 196, 15, 0.3); border-radius: 12px; padding: 25px;">
+                        <h3 style="color: #f1c40f;">💰 Calendar Booking Credits</h3>
+                        <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                <span style="font-size: 24px;">📅</span>
+                                <div>
+                                    <div style="font-size: 16px; font-weight: 700; color: white; margin-bottom: 4px;">Calendar Booking Cost</div>
+                                    <div style="font-size: 14px; color: rgba(255,255,255,0.7);">Credits deducted when AI books an appointment</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 32px; font-weight: 900; color: #f1c40f; text-align: center; margin: 15px 0;" id="bookingCreditCost">--</div>
+                            <div style="font-size: 12px; color: rgba(255,255,255,0.5); text-align: center;">credits per booking</div>
+                        </div>
+                        <div class="example-box" style="background: rgba(231, 76, 60, 0.1); border-color: rgba(231, 76, 60, 0.3);">
+                            <strong>⚠️ Important:</strong> The AI agent will NOT offer to book appointments if your credit balance is 0 or negative. Ensure you have sufficient credits for calendar bookings to work.
+                        </div>
+                        <div style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
+                            <div style="font-size: 13px; color: rgba(255,255,255,0.8);">
+                                <strong>ℹ️ Note:</strong> Billing rates are set by your administrator in the Vonage Agent Server Control panel. Contact your admin to adjust pricing.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="button-group">
                         <button type="submit" class="btn-primary">💾 Save Configuration</button>
                         <button type="button" class="btn-secondary" onclick="loadConfig()">🔄 Reload</button>
@@ -914,6 +951,73 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Billing Tab -->
+            <div id="billingTab" class="main-tab-content" style="display: none;">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                    <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">💰 Billing & Usage</h1>
+                    <p style="font-size: 15px; color: rgba(255,255,255,0.9);">Track your credit usage and charges</p>
+                </div>
+                
+                <div style="padding: 40px 50px;">
+                    <!-- Current Balance -->
+                    <div style="background: linear-gradient(135deg, rgba(243, 156, 18, 0.1) 0%, rgba(230, 126, 34, 0.1) 100%); border: 2px solid rgba(243, 156, 18, 0.3); border-radius: 16px; padding: 30px; margin-bottom: 30px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px; font-weight: 600;">CURRENT BALANCE</div>
+                                <div style="font-size: 48px; font-weight: 900; color: #f39c12;" id="billingCurrentBalance">--</div>
+                                <div style="font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 4px;">Available Credits</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px; font-weight: 600;">TOTAL USED</div>
+                                <div style="font-size: 32px; font-weight: 700; color: rgba(255,255,255,0.8);" id="billingTotalUsed">--</div>
+                                <div style="font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 4px;">Credits This Month</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Information -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 30px; margin-bottom: 30px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px; color: white;">📋 Current Pricing</h2>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                            <div style="background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+                                <div style="font-size: 40px; margin-bottom: 10px;">📞</div>
+                                <div style="font-size: 28px; font-weight: 700; color: #667eea; margin-bottom: 8px;" id="pricePerCall">--</div>
+                                <div style="font-size: 13px; color: rgba(255,255,255,0.7);">Credits per connected call</div>
+                            </div>
+                            <div style="background: rgba(46, 204, 113, 0.1); border: 1px solid rgba(46, 204, 113, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+                                <div style="font-size: 40px; margin-bottom: 10px;">⏱️</div>
+                                <div style="font-size: 28px; font-weight: 700; color: #2ecc71; margin-bottom: 8px;" id="pricePerMinute">--</div>
+                                <div style="font-size: 13px; color: rgba(255,255,255,0.7);">Credits per minute</div>
+                            </div>
+                            <div style="background: rgba(241, 196, 15, 0.1); border: 1px solid rgba(241, 196, 15, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+                                <div style="font-size: 40px; margin-bottom: 10px;">📅</div>
+                                <div style="font-size: 28px; font-weight: 700; color: #f1c40f; margin-bottom: 8px;" id="pricePerBooking">--</div>
+                                <div style="font-size: 13px; color: rgba(255,255,255,0.7);">Credits per calendar booking</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Usage History -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 30px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px; color: white;">📊 Usage History</h2>
+                        <div id="billingHistoryContent">
+                            <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+                                Loading billing history...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- Calendar Tab -->
+        <div id="calendarTab" class="main-tab-content" style="display: none;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">📅 Calendar</h1>
+                <p style="font-size: 15px; color: rgba(255,255,255,0.9);">Calendar feature coming soon</p>
+            </div>
+        </div>
 
             <div id="adminTab" class="tab-content">
                 <div class="diagnostic-card">
@@ -1059,6 +1163,7 @@
         });
 
         function switchMainTab(tabName) {
+            console.log('Switching to tab:', tabName);
             // Hide all main tabs
             document.querySelectorAll('.main-tab-content').forEach(c => c.style.display = 'none');
             
@@ -1071,8 +1176,12 @@
             
             // Show selected tab
             const tabElement = document.getElementById(tabName + 'Tab');
+            console.log('Tab element:', tabElement);
             if (tabElement) {
                 tabElement.style.display = 'block';
+                console.log('Tab displayed');
+            } else {
+                console.error('Tab element not found:', tabName + 'Tab');
             }
             
             // Activate sidebar button
@@ -1085,9 +1194,12 @@
             
             // Load content for specific tabs
             if (tabName === 'calls') {
-                loadCalls();
+                loadCalls('today'); // Load with default 'today' filter
+                setActiveFilter('today'); // Set today button as active
             } else if (tabName === 'dashboard') {
                 loadDashboard();
+            } else if (tabName === 'billing') {
+                loadBillingHistory();
             } else if (tabName === 'admin') {
                 runDiagnostics();
             } else if (tabName === 'config') {
@@ -1279,75 +1391,17 @@
 
         async function loadDashboard() {
             try {
-                // Load latest calls (limit to 5)
-                const response = await fetch('/api/calls', {
-                    headers: getAuthHeaders()
-                });
-                const data = await response.json();
-                
-                const latestCallsList = document.getElementById('latestCallsList');
-                
-                if (!data.calls || data.calls.length === 0) {
-                    latestCallsList.innerHTML = `
-                        <div style="text-align: center; padding: 60px 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 2px dashed rgba(255,255,255,0.1);">
-                            <div style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;">📞</div>
-                            <div style="font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">No calls yet</div>
-                            <div style="font-size: 13px; color: rgba(255,255,255,0.4);">When customers call, they'll appear here</div>
-                        </div>
-                    `;
-                } else {
-                    // Show latest 5 calls
-                    const latestCalls = data.calls.slice(0, 5);
-                    latestCallsList.innerHTML = latestCalls.map(call => {
-                        const startTime = new Date(call.start_time);
-                        const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                        const duration = call.duration ? `${call.duration}s` : '--';
-                        
-                        return `
-                            <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s; cursor: pointer;" 
-                                 onmouseover="this.style.background='rgba(255,255,255,0.06)'; this.style.borderColor='rgba(102,126,234,0.3)'" 
-                                 onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.06)'"
-                                 onclick="switchMainTab('calls')">
-                                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">📞</div>
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div style="font-size: 16px; font-weight: 700; color: white; margin-bottom: 4px;">${call.caller_number}</div>
-                                        <div style="font-size: 13px; color: rgba(255,255,255,0.5);">${formattedTime}</div>
-                                    </div>
-                                    <button onclick="event.stopPropagation(); switchMainTab('calls')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;">
-                                        Details
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-                
-                // Update dashboard stats
-                const statsResponse = await fetch('/api/stats/today', {
-                    headers: getAuthHeaders()
-                });
-                const statsData = await statsResponse.json();
-                
-                document.getElementById('callsToday').textContent = statsData.calls || '0';
-                document.getElementById('statsPhoneNumber').textContent = statsData.phone_number || 'Not assigned yet';
-                document.getElementById('statsAccountManager').textContent = statsData.agent_name || 'Support Team';
-                
-                // Load credits
-                const creditsResponse = await fetch('/api/minutes', {
-                    headers: getAuthHeaders()
-                });
-                const creditsData = await creditsResponse.json();
-                document.getElementById('creditsRemaining').textContent = creditsData.minutes || '--';
-                
+                // Dashboard loads stats via loadTodayStats() and loadCredits()
+                // No additional loading needed here
+                console.log('Dashboard view activated');
             } catch (error) {
                 console.error('Failed to load dashboard:', error);
             }
         }
 
-        async function loadCalls(filterToday = false) {
+        async function loadCalls(filterPeriod = 'today') {
             try {
-                console.log('Loading calls...');
+                console.log('Loading calls with filter:', filterPeriod);
                 const response = await fetch('/api/calls', {
                     headers: getAuthHeaders()
                 });
@@ -1360,26 +1414,50 @@
                 
                 let callsToDisplay = data.calls || [];
                 
-                // Filter to today's calls if requested
-                if (filterToday && callsToDisplay.length > 0) {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const tomorrow = new Date(today);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
+                // Filter calls based on period
+                if (callsToDisplay.length > 0 && filterPeriod !== 'all') {
+                    const now = new Date();
+                    let startDate = new Date();
+                    
+                    switch(filterPeriod) {
+                        case 'today':
+                            startDate.setHours(0, 0, 0, 0);
+                            break;
+                        case '7days':
+                            startDate.setDate(now.getDate() - 7);
+                            startDate.setHours(0, 0, 0, 0);
+                            break;
+                        case '30days':
+                            startDate.setDate(now.getDate() - 30);
+                            startDate.setHours(0, 0, 0, 0);
+                            break;
+                        case '6months':
+                            startDate.setMonth(now.getMonth() - 6);
+                            startDate.setHours(0, 0, 0, 0);
+                            break;
+                    }
                     
                     callsToDisplay = callsToDisplay.filter(call => {
                         const callDate = new Date(call.start_time);
-                        return callDate >= today && callDate < tomorrow;
+                        return callDate >= startDate;
                     });
                 }
+                
+                const filterLabels = {
+                    'today': 'today',
+                    '7days': 'in the last 7 days',
+                    '30days': 'in the last month',
+                    '6months': 'in the last 6 months',
+                    'all': 'yet'
+                };
                 
                 if (!callsToDisplay || callsToDisplay.length === 0) {
                     console.log('No calls found');
                     callHistoryContent.innerHTML = `
                         <div style="text-align: center; padding: 80px 20px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 2px dashed rgba(255,255,255,0.1);">
                             <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">📞</div>
-                            <div style="font-size: 20px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 600;">${filterToday ? 'No calls today' : 'No calls yet'}</div>
-                            <div style="font-size: 14px; color: rgba(255,255,255,0.4);">${filterToday ? 'No customer calls have been received today' : 'When customers call, their conversations and AI summaries will appear here'}</div>
+                            <div style="font-size: 20px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 600;">No calls ${filterLabels[filterPeriod]}</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.4);">No customer calls have been received in this time period</div>
                         </div>
                     `;
                     return;
@@ -1478,6 +1556,9 @@
                 // Load available owned numbers for assignment
                 await loadAvailableOwnedNumbers();
                 
+                // Load billing config to show calendar booking cost
+                await loadBillingConfig();
+                
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
@@ -1491,6 +1572,132 @@
             playht: null,
             provider: null
         };
+
+        // Load billing configuration
+        async function loadBillingConfig() {
+            try {
+                const response = await fetch('/api/billing-config');
+                const config = await response.json();
+                
+                // Display calendar booking cost
+                const bookingCostEl = document.getElementById('bookingCreditCost');
+                if (bookingCostEl) {
+                    bookingCostEl.textContent = config.credits_per_calendar_booking || 10;
+                }
+                
+            } catch (error) {
+                console.error('Failed to load billing config:', error);
+            }
+        }
+
+        // Load billing history
+        async function loadBillingHistory() {
+            console.log('Loading billing history...');
+            try {
+                const response = await fetch('/api/billing-history', {
+                    headers: getAuthHeaders()
+                });
+                console.log('Billing API response status:', response.status);
+                const data = await response.json();
+                console.log('Billing data received:', data);
+                
+                // Update balance and totals
+                document.getElementById('billingCurrentBalance').textContent = data.current_balance || 0;
+                document.getElementById('billingTotalUsed').textContent = data.total_used || 0;
+                
+                // Update pricing
+                document.getElementById('pricePerCall').textContent = data.pricing.per_call || 5;
+                document.getElementById('pricePerMinute').textContent = data.pricing.per_minute || 2;
+                document.getElementById('pricePerBooking').textContent = data.pricing.per_booking || 10;
+                
+                console.log('Updated balance and pricing');
+                
+                // Display transactions
+                const historyContent = document.getElementById('billingHistoryContent');
+                console.log('History content element:', historyContent);
+                console.log('Transactions count:', data.transactions ? data.transactions.length : 0);
+                console.log('Transactions:', data.transactions);
+                
+                if (!historyContent) {
+                    console.error('ERROR: billingHistoryContent element not found!');
+                    return;
+                }
+                
+                if (!data.transactions || data.transactions.length === 0) {
+                    historyContent.innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div style="font-size: 48px; margin-bottom: 15px; opacity: 0.4;">📊</div>
+                            <div style="font-size: 18px; color: rgba(255,255,255,0.6);">No billing activity yet</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.4); margin-top: 8px;">Your usage and charges will appear here</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Create table
+                console.log('Creating transaction table...');
+                try {
+                    historyContent.innerHTML = `
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1);">
+                                    <th style="padding: 15px; text-align: left; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase;">Date</th>
+                                    <th style="padding: 15px; text-align: left; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase;">Type</th>
+                                    <th style="padding: 15px; text-align: left; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase;">Description</th>
+                                    <th style="padding: 15px; text-align: left; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase;">Duration</th>
+                                    <th style="padding: 15px; text-align: right; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase;">Credits</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.transactions.map(trans => {
+                                    const date = new Date(trans.date);
+                                    const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                    const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                    
+                                    const typeIcon = trans.type === 'call' ? '📞' : '📅';
+                                    const typeLabel = trans.type === 'call' ? 'Call' : 'Booking';
+                                    const typeColor = trans.type === 'call' ? '#667eea' : '#f1c40f';
+                                    
+                                    const duration = trans.duration ? `${Math.floor(trans.duration / 60)}m ${trans.duration % 60}s` : '-';
+                                    
+                                    return `
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                            <td style="padding: 18px; color: rgba(255,255,255,0.8); font-size: 14px;">
+                                                <div style="font-weight: 600;">${formattedDate}</div>
+                                                <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px;">${formattedTime}</div>
+                                            </td>
+                                            <td style="padding: 18px;">
+                                                <span style="background: ${typeColor}22; border: 1px solid ${typeColor}44; padding: 6px 12px; border-radius: 6px; color: ${typeColor}; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                                    ${typeIcon} ${typeLabel}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 18px; color: rgba(255,255,255,0.9); font-size: 14px;">${trans.description}</td>
+                                            <td style="padding: 18px; color: rgba(255,255,255,0.7); font-size: 14px;">${duration}</td>
+                                            <td style="padding: 18px; text-align: right; color: #e74c3c; font-size: 16px; font-weight: 700;">-${trans.credits}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                    console.log('Transaction table created successfully');
+                } catch (tableError) {
+                    console.error('Error creating transaction table:', tableError);
+                    historyContent.innerHTML = `<div style="color: red;">Error rendering transactions: ${tableError.message}</div>`;
+                }
+                
+            } catch (error) {
+                console.error('Failed to load billing history:', error);
+                document.getElementById('billingHistoryContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: rgba(231, 76, 60, 0.8);">
+                        <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                        <div style="font-size: 16px;">Failed to load billing history</div>
+                    </div>
+                `;
+            }
+        }
 
         // Load available owned numbers for assignment
         async function loadAvailableOwnedNumbers() {
@@ -1644,6 +1851,7 @@
         }
 
         async function startNewAccountSetup() {
+            console.log('Starting new account setup...');
             const modal = document.getElementById('newAccountModal');
             const progressSection = document.getElementById('progressSection');
             const resultSection = document.getElementById('resultSection');
@@ -1651,11 +1859,23 @@
             const progressText = document.getElementById('progressText');
             const resultContent = document.getElementById('resultContent');
             
+            console.log('Modal element:', modal);
+            
             // Show modal
             modal.style.display = 'flex';
             progressSection.style.display = 'block';
             resultSection.style.display = 'none';
             progressBar.style.width = '0%';
+            
+            console.log('Modal displayed');
+            console.log('Progress bar element:', progressBar);
+            console.log('Progress text element:', progressText);
+            
+            if (!progressBar || !progressText) {
+                console.error('ERROR: Progress elements not found!');
+                alert('Error: Progress bar elements not found. Please contact support.');
+                return;
+            }
             
             // Simulate progress with stages
             const stages = [
@@ -1666,29 +1886,42 @@
                 { percent: 100, text: 'Finalizing...', duration: 500 }
             ];
             
+            console.log('Starting progress animation...');
             // Animate progress bar
-            for (const stage of stages) {
-                await new Promise(resolve => {
-                    progressText.textContent = stage.text;
-                    setTimeout(() => {
-                        progressBar.style.width = stage.percent + '%';
-                        resolve();
-                    }, 100);
-                });
-                await new Promise(resolve => setTimeout(resolve, stage.duration));
+            try {
+                for (const stage of stages) {
+                    await new Promise(resolve => {
+                        progressText.textContent = stage.text;
+                        setTimeout(() => {
+                            progressBar.style.width = stage.percent + '%';
+                            resolve();
+                        }, 100);
+                    });
+                    await new Promise(resolve => setTimeout(resolve, stage.duration));
+                }
+            } catch (error) {
+                console.error('Error during progress animation:', error);
             }
+            
+            console.log('Progress animation complete');
             
             // Fetch actual number
             try {
+                console.log('Fetching owned numbers...');
                 const response = await fetch('/api/owned-numbers', {
                     headers: getAuthHeaders()
                 });
+                
+                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
                     throw new Error('Failed to fetch numbers');
                 }
                 
                 const data = await response.json();
+                console.log('Received data:', data);
+                console.log('Available numbers:', data.numbers.filter(num => num.available));
+                console.log('All numbers with availability:', data.numbers.map(num => ({ number: num.number, available: num.available })));
                 
                 // Hide progress, show result
                 progressSection.style.display = 'none';
@@ -2541,21 +2774,28 @@
                 });
                 const data = await response.json();
                 
-                document.getElementById('callsToday').textContent = data.calls_today || 0;
-                document.getElementById('messagesToday').textContent = data.messages_today || 0;
-                
-                const unreadCount = data.unread_appointments || 0;
-                document.getElementById('unreadAppointments').textContent = unreadCount;
-                document.getElementById('unreadAppointmentsCard').textContent = unreadCount;
-                
-                // Show/hide unread appointments alert
+                const callsTodayEl = document.getElementById('callsToday');
+                const messagesTodayEl = document.getElementById('messagesToday');
+                const unreadAppointmentsEl = document.getElementById('unreadAppointments');
+                const unreadAppointmentsCardEl = document.getElementById('unreadAppointmentsCard');
                 const alertDiv = document.getElementById('unreadAppointmentsAlert');
                 const pluralSpan = document.getElementById('unreadAppointmentsPlural');
-                if (unreadCount > 0) {
-                    alertDiv.style.display = 'block';
-                    pluralSpan.textContent = unreadCount === 1 ? '' : 's';
-                } else {
-                    alertDiv.style.display = 'none';
+                
+                if (callsTodayEl) callsTodayEl.textContent = data.calls_today || 0;
+                if (messagesTodayEl) messagesTodayEl.textContent = data.messages_today || 0;
+                
+                const unreadCount = data.unread_appointments || 0;
+                if (unreadAppointmentsEl) unreadAppointmentsEl.textContent = unreadCount;
+                if (unreadAppointmentsCardEl) unreadAppointmentsCardEl.textContent = unreadCount;
+                
+                // Show/hide unread appointments alert
+                if (alertDiv && pluralSpan) {
+                    if (unreadCount > 0) {
+                        alertDiv.style.display = 'block';
+                        pluralSpan.textContent = unreadCount === 1 ? '' : 's';
+                    } else {
+                        alertDiv.style.display = 'none';
+                    }
                 }
             } catch (error) {
                 console.error('Error loading today stats:', error);
@@ -2565,9 +2805,32 @@
         // View today's calls
         function viewTodayCalls() {
             switchMainTab('calls');
-            loadCalls(true);
+            loadCalls('today');
+            setActiveFilter('today');
         }
-                console.error('Error loading today stats:', error);
+        
+        // Filter calls by time period
+        function filterCalls(period) {
+            loadCalls(period);
+            setActiveFilter(period);
+        }
+        
+        // Set active filter button style
+        function setActiveFilter(period) {
+            // Reset all filter buttons
+            ['today', '7days', '30days', '6months'].forEach(p => {
+                const btn = document.getElementById('filter' + p.replace('days', 'days').replace('months', 'months'));
+                if (btn) {
+                    btn.style.background = 'rgba(255,255,255,0.1)';
+                    btn.style.borderColor = 'rgba(255,255,255,0.3)';
+                }
+            });
+            
+            // Highlight active filter
+            const activeBtn = document.getElementById('filter' + period.replace('days', 'days').replace('months', 'months'));
+            if (activeBtn) {
+                activeBtn.style.background = 'rgba(255,255,255,0.3)';
+                activeBtn.style.borderColor = 'white';
             }
         }
         
@@ -3270,8 +3533,8 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer style="background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%); padding: 30px 20px; margin-top: 50px; border-top: 3px solid rgba(102, 126, 234, 0.3);">
+    <!-- Footer - Hidden on admin dashboard -->
+    <footer style="display: none; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%); padding: 30px 20px; margin-top: 50px; border-top: 3px solid rgba(102, 126, 234, 0.3);">
         <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #66c8ea; font-size: 24px; margin-bottom: 10px; font-weight: 700;">Hi Julie</h3>

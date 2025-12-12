@@ -2411,6 +2411,145 @@ async def get_today_stats(authorization: Optional[str] = Header(None)):
         logger.error(f"Error getting today stats: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
+@app.get("/api/billing-config")
+async def get_billing_config():
+    """Get billing configuration (credits pricing)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Create billing_config table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS billing_config (
+                id INTEGER PRIMARY KEY,
+                credits_per_connected_call REAL DEFAULT 5.0,
+                credits_per_minute REAL DEFAULT 2.0,
+                credits_per_calendar_booking REAL DEFAULT 10.0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Get config or insert defaults
+        cursor.execute('SELECT * FROM billing_config WHERE id = 1')
+        config = cursor.fetchone()
+        if not config:
+            cursor.execute('''
+                INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking)
+                VALUES (1, 5.0, 2.0, 10.0)
+            ''')
+            conn.commit()
+            config = (1, 5.0, 2.0, 10.0, None)
+        
+        conn.close()
+        
+        return JSONResponse({
+            "credits_per_connected_call": config[1],
+            "credits_per_minute": config[2],
+            "credits_per_calendar_booking": config[3]
+        })
+    except Exception as e:
+        logger.error(f"Error getting billing config: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get("/api/billing-history")
+async def get_billing_history(authorization: Optional[str] = Header(None)):
+    """Get billing/usage history for current user"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get billing config
+        cursor.execute('SELECT * FROM billing_config WHERE id = 1')
+        config = cursor.fetchone()
+        if not config:
+            config = (1, 5.0, 2.0, 10.0, None)
+        
+        credits_per_call = config[1]
+        credits_per_minute = config[2]
+        credits_per_booking = config[3]
+        
+        # Get all calls for this user
+        cursor.execute('''
+            SELECT call_uuid, start_time, duration, caller_number, summary
+            FROM calls 
+            WHERE user_id = ?
+            ORDER BY start_time DESC
+        ''', (user_id,))
+        
+        calls = []
+        total_credits = 0
+        
+        for row in cursor.fetchall():
+            call_uuid, start_time, duration, caller_number, summary = row
+            
+            # Calculate credits for this call
+            call_credits = credits_per_call  # Connection charge
+            if duration:
+                minutes = duration / 60
+                call_credits += minutes * credits_per_minute
+            
+            total_credits += call_credits
+            
+            calls.append({
+                "type": "call",
+                "call_uuid": call_uuid,
+                "date": start_time,
+                "description": f"Call from {caller_number}",
+                "duration": duration,
+                "credits": round(call_credits, 2)
+            })
+        
+        # Get calendar bookings made by AI
+        cursor.execute('''
+            SELECT id, title, date, time, created_at
+            FROM appointments 
+            WHERE user_id = ? AND created_by = 'ai_agent'
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        
+        bookings = []
+        for row in cursor.fetchall():
+            appt_id, title, date, time, created_at = row
+            total_credits += credits_per_booking
+            
+            bookings.append({
+                "type": "booking",
+                "id": appt_id,
+                "date": created_at,
+                "description": f"Calendar booking: {title}",
+                "appointment_date": f"{date} {time}",
+                "credits": credits_per_booking
+            })
+        
+        # Combine and sort by date
+        all_transactions = calls + bookings
+        all_transactions.sort(key=lambda x: x['date'], reverse=True)
+        
+        # Get current credits balance from account_settings
+        cursor.execute('SELECT minutes_remaining FROM account_settings WHERE user_id = ?', (user_id,))
+        balance_row = cursor.fetchone()
+        current_balance = balance_row[0] if balance_row else 0
+        
+        conn.close()
+        
+        return JSONResponse({
+            "current_balance": current_balance,
+            "total_used": round(total_credits, 2),
+            "transactions": all_transactions,
+            "pricing": {
+                "per_call": credits_per_call,
+                "per_minute": credits_per_minute,
+                "per_booking": credits_per_booking
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting billing history: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.get("/api/owned-numbers")
 async def get_owned_numbers(authorization: Optional[str] = Header(None)):
     """Get all owned Vonage numbers and their account assignments"""
@@ -2442,6 +2581,8 @@ async def get_owned_numbers(authorization: Optional[str] = Header(None)):
             # Get account assignments from database
             conn = get_db_connection()
             cursor = conn.cursor()
+            
+            # Get user assignments
             cursor.execute('''
                 SELECT user_id, phone_number 
                 FROM account_settings 
@@ -2452,11 +2593,36 @@ async def get_owned_numbers(authorization: Optional[str] = Header(None)):
             # Get user names for display
             cursor.execute('SELECT id, name FROM users')
             users = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Create availability table if doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS number_availability (
+                    phone_number TEXT PRIMARY KEY,
+                    is_available INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Get manual availability settings
+            cursor.execute('SELECT phone_number, is_available FROM number_availability')
+            availability_settings = {row[0]: bool(row[1]) for row in cursor.fetchall()}
+            
             conn.close()
             
             for number in numbers:
                 msisdn = number.get("msisdn")
                 user_id = assignments.get(msisdn)
+                
+                # Check manual availability setting
+                # If no record exists, default to available (True)
+                # If record exists, use the stored value
+                if msisdn in availability_settings:
+                    manually_available = availability_settings[msisdn]
+                else:
+                    manually_available = True  # Default to available if no record
+                
+                # Number is available if: not assigned to user AND manually available
+                is_available = user_id is None and manually_available
                 
                 owned_numbers.append({
                     "number": msisdn,
@@ -2464,7 +2630,7 @@ async def get_owned_numbers(authorization: Optional[str] = Header(None)):
                     "type": number.get("type"),
                     "assigned_to": users.get(user_id) if user_id else None,
                     "user_id": user_id,
-                    "available": user_id is None
+                    "available": is_available
                 })
         
         return JSONResponse({
@@ -3612,38 +3778,53 @@ async def answer_call(request: Request):
     
     logger.info(f"📞 Incoming call: {caller} -> {called} (UUID: {call_uuid})")
     
-    # For shared phone number: assign all calls to user "James"
+    # Look up which user owns the phone number that was called
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT user_id, minutes_remaining FROM account_settings a JOIN users u ON a.user_id = u.id WHERE u.name = ?', ('James',))
+    
+    # First, try to find the user who owns this phone number
+    cursor.execute('''
+        SELECT a.user_id, a.minutes_remaining, u.name 
+        FROM account_settings a 
+        JOIN users u ON a.user_id = u.id 
+        WHERE a.phone_number = ?
+    ''', (called,))
     result = cursor.fetchone()
     
     if not result:
-        # If James doesn't exist, create the account
-        cursor.execute('INSERT INTO users (name, last_login) VALUES (?, ?)', ('James', datetime.now().isoformat()))
-        james_user_id = cursor.lastrowid
-        cursor.execute('INSERT INTO account_settings (user_id, minutes_remaining) VALUES (?, 60)', (james_user_id,))
-        conn.commit()
-        assigned_user_id = james_user_id
-        logger.info(f"📞 Created new user 'James' (ID: {james_user_id}) for incoming calls")
-    elif result[1] <= 0:
-        # James exists but no minutes
+        # No user assigned to this number - reject the call
         conn.close()
-        logger.warning(f"⚠️ Call rejected - James account has no minutes remaining")
+        logger.warning(f"⚠️ Call rejected - No user assigned to phone number {called}")
         return JSONResponse([
             {
                 "action": "talk",
-                "text": "We're sorry, but this service is currently unavailable. Please contact support."
+                "text": "We're sorry, but this phone number is not currently assigned. Please contact support."
             },
             {
                 "action": "hangup"
             }
         ])
-    else:
-        assigned_user_id = result[0]
+    
+    assigned_user_id = result[0]
+    minutes_remaining = result[1]
+    user_name = result[2]
+    
+    if minutes_remaining <= 0:
+        # User exists but no minutes
+        conn.close()
+        logger.warning(f"⚠️ Call rejected - User {user_name} has no credits remaining")
+        return JSONResponse([
+            {
+                "action": "talk",
+                "text": "We're sorry, but this account has no credits remaining. Please contact support to add more credits."
+            },
+            {
+                "action": "hangup"
+            }
+        ])
     
     conn.close()
-    logger.info(f"📞 Call assigned to James (user_id: {assigned_user_id})")
+    logger.info(f"📞 Call assigned to {user_name} (user_id: {assigned_user_id})")
     
     # Create session and connect to OpenAI
     session = await sessions.create_session(call_uuid, caller, called, assigned_user_id)
