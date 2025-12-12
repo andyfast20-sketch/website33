@@ -172,6 +172,29 @@ class ServerControlGUI:
         )
         self.ngrok_reset_btn.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        # Git buttons
+        self.git_push_btn = tk.Button(
+            button_frame,
+            text="⬆️ Push to Git",
+            bg='#16a085',
+            fg='white',
+            activebackground='#138d75',
+            command=self.git_push,
+            **button_style
+        )
+        self.git_push_btn.grid(row=4, column=0, padx=5, pady=5)
+        
+        self.git_pull_btn = tk.Button(
+            button_frame,
+            text="⬇️ Pull from Git",
+            bg='#2980b9',
+            fg='white',
+            activebackground='#21618c',
+            command=self.git_pull,
+            **button_style
+        )
+        self.git_pull_btn.grid(row=4, column=1, padx=5, pady=5)
+        
         # Log Frame
         log_label = tk.Label(
             main_frame,
@@ -598,6 +621,46 @@ class ServerControlGUI:
             self.log(f"🌐 Opening {url} in browser...")
         except Exception as e:
             self.log(f"❌ Error opening browser: {e}")
+    
+    def git_push(self):
+        """Push changes to GitHub repository"""
+        self.log("⬆️ Pushing changes to Git...")
+        try:
+            # Add all changes
+            result = subprocess.run(['git', 'add', '.'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+            
+            # Commit changes
+            result = subprocess.run(['git', 'commit', '-m', 'Auto-commit from GUI'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+            if 'nothing to commit' in result.stdout:
+                self.log("✅ No changes to push")
+                return
+            
+            # Push to remote
+            result = subprocess.run(['git', 'push'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+            
+            if result.returncode == 0:
+                self.log("✅ Successfully pushed to Git")
+            else:
+                self.log(f"❌ Git push failed: {result.stderr}")
+        except Exception as e:
+            self.log(f"❌ Error pushing to Git: {e}")
+    
+    def git_pull(self):
+        """Pull updates from GitHub repository"""
+        self.log("⬇️ Pulling updates from Git...")
+        try:
+            result = subprocess.run(['git', 'pull'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+            
+            if result.returncode == 0:
+                if 'Already up to date' in result.stdout:
+                    self.log("✅ Already up to date")
+                else:
+                    self.log("✅ Successfully pulled updates from Git")
+                    self.log("🔄 Please restart server to apply changes")
+            else:
+                self.log(f"❌ Git pull failed: {result.stderr}")
+        except Exception as e:
+            self.log(f"❌ Error pulling from Git: {e}")
     
     def show_indicator_info(self, indicator_name):
         """Show popup with indicator information"""
