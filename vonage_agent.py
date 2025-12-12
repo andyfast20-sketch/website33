@@ -333,6 +333,12 @@ def init_database():
     except:
         pass
     
+    # Add calendar_booking_enabled column
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN calendar_booking_enabled INTEGER DEFAULT 1')
+    except:
+        pass
+    
     # Create global_settings table for admin-controlled settings
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS global_settings (
@@ -1808,6 +1814,7 @@ async def get_config(authorization: Optional[str] = Header(None)):
     business_info = ''
     agent_personality = 'Friendly and professional. Keep responses brief and conversational.'
     agent_instructions = 'Answer questions about the business. Take messages if needed.'
+    calendar_booking_enabled = True
     
     if user_id:
         try:
@@ -1816,7 +1823,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
             cursor.execute('''
                 SELECT voice, use_elevenlabs, elevenlabs_voice_id, phone_number, 
                        response_latency, voice_provider, cartesia_voice_id, google_voice,
-                       agent_name, business_info, agent_personality, agent_instructions
+                       agent_name, business_info, agent_personality, agent_instructions,
+                       calendar_booking_enabled
                 FROM account_settings WHERE user_id = ?
             ''', (user_id,))
             row = cursor.fetchone()
@@ -1850,6 +1858,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
                 if row[11]:
                     agent_instructions = row[11]
                     CONFIG["AGENT_INSTRUCTIONS"] = agent_instructions
+                if row[12] is not None:
+                    calendar_booking_enabled = bool(row[12])
         except Exception as e:
             logger.error(f"Failed to load user config: {e}")
     
@@ -1865,7 +1875,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "CARTESIA_VOICE_ID": cartesia_voice_id,
         "GOOGLE_VOICE": google_voice,
         "PHONE_NUMBER": phone_number,
-        "RESPONSE_LATENCY": response_latency
+        "RESPONSE_LATENCY": response_latency,
+        "CALENDAR_BOOKING_ENABLED": calendar_booking_enabled
     }
 
 
@@ -1937,6 +1948,12 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             cursor.execute('UPDATE account_settings SET response_latency = ? WHERE user_id = ?', 
                          (data["RESPONSE_LATENCY"], user_id))
             logger.info(f"Response latency updated to {data['RESPONSE_LATENCY']}ms for user {user_id}")
+        
+        if "CALENDAR_BOOKING_ENABLED" in data:
+            calendar_enabled = 1 if data["CALENDAR_BOOKING_ENABLED"] else 0
+            cursor.execute('UPDATE account_settings SET calendar_booking_enabled = ? WHERE user_id = ?', 
+                         (calendar_enabled, user_id))
+            logger.info(f"Calendar booking enabled updated to {data['CALENDAR_BOOKING_ENABLED']} for user {user_id}")
         
         conn.commit()
         conn.close()

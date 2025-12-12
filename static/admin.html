@@ -202,6 +202,66 @@
             50% { background-color: rgba(255, 220, 0, 0.4); box-shadow: 0 0 20px rgba(255, 220, 0, 0.6); }
         }
 
+        /* Custom scrollbar for billing modal */
+        #billingCallListContainer::-webkit-scrollbar {
+            width: 20px;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 0;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-thumb {
+            background: #f39c12;
+            border-radius: 10px;
+            border: 4px solid #1a1a2e;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-thumb:hover {
+            background: #e67e22;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button {
+            background: #2a2a3e;
+            height: 30px;
+            border-radius: 0;
+            display: block;
+            border: 2px solid #f39c12;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button:hover {
+            background: #f39c12;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button:vertical:decrement {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="%23f39c12"><path d="M10 6l-8 8h16z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 14px;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button:vertical:increment {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="%23f39c12"><path d="M10 14l8-8H2z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 14px;
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button:hover:vertical:decrement {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="%23ffffff"><path d="M10 6l-8 8h16z"/></svg>');
+        }
+
+        #billingCallListContainer::-webkit-scrollbar-button:hover:vertical:increment {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="%23ffffff"><path d="M10 14l8-8H2z"/></svg>');
+        }
+
+        /* Firefox scrollbar */
+        #billingCallListContainer {
+            scrollbar-width: auto;
+            scrollbar-color: #f39c12 #1a1a2e;
+        }
+
         .sidebar-nav-btn:hover {
             background: rgba(102, 126, 234, 0.1);
             color: white !important;
@@ -531,6 +591,98 @@
     </style>
 </head>
 <body>
+    <!-- Billing Modal -->
+    <div id="billingModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%); border-radius: 20px; width: 90%; max-width: 1000px; max-height: 90vh; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 2px solid rgba(243, 156, 18, 0.3);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 30px 40px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="font-size: 28px; font-weight: 800; margin: 0; color: white;">💰 Billing & Call History</h2>
+                    <p style="font-size: 14px; color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">All calls and charges for your account</p>
+                </div>
+                <button onclick="closeBillingModal()" style="background: rgba(255,255,255,0.2); border: none; width: 40px; height: 40px; border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
+            </div>
+
+            <!-- Balance Summary -->
+            <div style="padding: 25px 40px; background: rgba(243, 156, 18, 0.1); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Current Balance</div>
+                        <div style="font-size: 32px; font-weight: 900; color: #f39c12;" id="modalCurrentBalance">--</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px;">Available Credits</div>
+                    </div>
+                    <div style="text-align: center; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Total Used</div>
+                        <div style="font-size: 32px; font-weight: 900; color: #e74c3c;" id="modalTotalUsed">--</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px;">Credits Spent</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Total Calls</div>
+                        <div style="font-size: 32px; font-weight: 900; color: #667eea;" id="modalTotalCalls">--</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px;">Call Records</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Call List -->
+            <div id="billingCallListContainer" style="padding: 30px 40px 30px 30px; height: 350px; overflow-y: scroll; overflow-x: hidden; background: rgba(0,0,0,0.3);">
+                <h3 style="font-size: 18px; font-weight: 700; color: white; margin: 0 0 20px 0;">📞 Call Records</h3>
+                <div id="billingCallList">
+                    <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+                        Loading call records...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 20px 40px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">
+                    Pricing: <span style="color: #667eea; font-weight: 600;" id="modalPricePerCall">--</span> credits/call + <span style="color: #2ecc71; font-weight: 600;" id="modalPricePerMinute">--</span> credits/minute
+                </div>
+                <button onclick="closeBillingModal()" style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credit Breakdown Popup -->
+    <div id="creditBreakdownPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20000; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%); border-radius: 16px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 2px solid #f39c12; min-width: 400px;">
+        <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 20px 25px; border-radius: 14px 14px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white;">💳 Credit Calculation</h3>
+            <button onclick="closeBreakdownPopup()" style="background: rgba(255,255,255,0.2); border: none; width: 30px; height: 30px; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
+        </div>
+        <div style="padding: 25px;">
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">Call Details</div>
+                <div style="font-size: 16px; color: white; font-weight: 600;" id="breakdownCallDetails">--</div>
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div>
+                        <div style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600;">📞 Connection Fee</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 3px;">One-time charge per call</div>
+                    </div>
+                    <div style="font-size: 18px; font-weight: 700; color: #667eea;" id="breakdownConnectionFee">--</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div>
+                        <div style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600;">⏱️ Duration Charge</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 3px;"><span id="breakdownMinutes">--</span> minutes × <span id="breakdownRatePerMinute">--</span> credits/min</div>
+                    </div>
+                    <div style="font-size: 18px; font-weight: 700; color: #2ecc71;" id="breakdownDurationCharge">--</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
+                    <div style="font-size: 16px; color: white; font-weight: 700;">💰 Total Credits</div>
+                    <div style="font-size: 24px; font-weight: 900; color: #e74c3c;" id="breakdownTotal">--</div>
+                </div>
+            </div>
+            
+            <button onclick="closeBreakdownPopup()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">Close</button>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <div style="position: fixed; left: 0; top: 0; bottom: 0; width: 280px; background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1e 100%); border-right: 1px solid rgba(102, 126, 234, 0.2); display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.3);">
         <!-- Logo -->
@@ -569,7 +721,7 @@
                 <span style="font-size: 20px;">📅</span>
                 <span>Calendar</span>
             </button>
-            <button class="sidebar-nav-btn" data-tab="billing" onclick="switchMainTab('billing')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+            <button class="sidebar-nav-btn" onclick="openBillingModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
                 <span style="font-size: 20px;">💰</span>
                 <span>Billing</span>
             </button>
@@ -916,6 +1068,26 @@
                         <div style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
                             <div style="font-size: 13px; color: rgba(255,255,255,0.8);">
                                 <strong>ℹ️ Note:</strong> Billing rates are set by your administrator in the Vonage Agent Server Control panel. Contact your admin to adjust pricing.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>📅 Calendar & Appointments</h3>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
+                                <input type="checkbox" id="calendarBookingEnabled" style="width: 24px; height: 24px; cursor: pointer;" onchange="updateCalendarBookingStatus()">
+                                <div>
+                                    <div style="font-size: 16px; font-weight: 700; color: white;">Enable Calendar Bookings</div>
+                                    <div style="font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 4px;">Allow the AI agent to book appointments in your calendar during calls</div>
+                                </div>
+                            </label>
+                            <div class="example-box" style="margin-top: 15px;">
+                                <strong>💰 Note:</strong> Calendar bookings cost <strong><span id="bookingCreditCost">10</span> credits</strong> per appointment made by the agent. This pricing can be adjusted in the Vonage Agent Server Control billing settings.
+                            </div>
+                            <div id="calendarBookingStatus" style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); display: none;">
+                                <div style="font-size: 13px; color: #e74c3c; font-weight: 600;">⚠️ Calendar bookings are currently disabled</div>
+                                <div style="font-size: 12px; color: rgba(231, 76, 60, 0.8); margin-top: 4px;">The AI agent will not be able to create appointments until this feature is enabled.</div>
                             </div>
                         </div>
                     </div>
@@ -1531,6 +1703,10 @@
                 document.getElementById('agentPersonality').value = config.AGENT_PERSONALITY || '';
                 document.getElementById('agentInstructions').value = config.AGENT_INSTRUCTIONS;
                 
+                // Load calendar booking setting
+                document.getElementById('calendarBookingEnabled').checked = config.CALENDAR_BOOKING_ENABLED !== false;
+                updateCalendarBookingStatus();
+                
                 // Update assigned phone number in numbers tab
                 const assignedNumberEl = document.getElementById('assignedPhoneNumber');
                 if (assignedNumberEl) {
@@ -1572,6 +1748,20 @@
             playht: null,
             provider: null
         };
+
+        // Update calendar booking status display
+        function updateCalendarBookingStatus() {
+            const checkbox = document.getElementById('calendarBookingEnabled');
+            const statusDiv = document.getElementById('calendarBookingStatus');
+            
+            if (checkbox && statusDiv) {
+                if (checkbox.checked) {
+                    statusDiv.style.display = 'none';
+                } else {
+                    statusDiv.style.display = 'block';
+                }
+            }
+        }
 
         // Load billing configuration
         async function loadBillingConfig() {
@@ -1697,6 +1887,115 @@
                     </div>
                 `;
             }
+        }
+
+        // Open billing modal
+        async function openBillingModal() {
+            const modal = document.getElementById('billingModal');
+            modal.style.display = 'flex';
+            
+            try {
+                const response = await fetch('/api/billing-history', {
+                    headers: getAuthHeaders()
+                });
+                const data = await response.json();
+                
+                // Update summary
+                document.getElementById('modalCurrentBalance').textContent = data.current_balance || 0;
+                document.getElementById('modalTotalUsed').textContent = data.total_used || 0;
+                document.getElementById('modalPricePerCall').textContent = data.pricing.per_call || 5;
+                document.getElementById('modalPricePerMinute').textContent = data.pricing.per_minute || 2;
+                
+                // Filter only calls (not bookings)
+                const calls = data.transactions ? data.transactions.filter(t => t.type === 'call') : [];
+                document.getElementById('modalTotalCalls').textContent = calls.length;
+                
+                const callList = document.getElementById('billingCallList');
+                
+                if (calls.length === 0) {
+                    callList.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+                            <div style="font-size: 48px; margin-bottom: 15px; opacity: 0.4;">📞</div>
+                            <div style="font-size: 16px;">No call records yet</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Display calls - one line per call
+                callList.innerHTML = calls.map((call, index) => {
+                    const date = new Date(call.date);
+                    const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    const duration = call.duration ? `${Math.floor(call.duration / 60)}m ${call.duration % 60}s` : '0s';
+                    
+                    return `
+                        <div onclick="showCreditBreakdown(${index})" style="padding: 15px 20px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; cursor: pointer;" onmouseover="this.style.background='rgba(243, 156, 18, 0.15)'; this.style.borderColor='rgba(243, 156, 18, 0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.02)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                            <div style="flex: 1;">
+                                <span style="color: rgba(255,255,255,0.9); font-weight: 600; font-size: 14px;">${call.description}</span>
+                                <span style="color: rgba(255,255,255,0.5); font-size: 13px; margin-left: 15px;">${formattedDate} at ${formattedTime}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 20px;">
+                                <span style="color: rgba(255,255,255,0.6); font-size: 13px; min-width: 60px; text-align: right;">⏱️ ${duration}</span>
+                                <span style="color: #e74c3c; font-weight: 700; font-size: 15px; min-width: 80px; text-align: right;">-${call.credits} credits</span>
+                                <span style="color: rgba(255,255,255,0.4); font-size: 18px;">ℹ️</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Store calls data for breakdown popup
+                window.billingCalls = calls;
+                window.billingPricing = data.pricing;
+                
+            } catch (error) {
+                console.error('Failed to load billing data:', error);
+                document.getElementById('billingCallList').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: rgba(231, 76, 60, 0.8);">
+                        <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                        <div style="font-size: 16px;">Failed to load call records</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Close billing modal
+        function closeBillingModal() {
+            document.getElementById('billingModal').style.display = 'none';
+        }
+
+        // Show credit breakdown popup
+        function showCreditBreakdown(callIndex) {
+            const call = window.billingCalls[callIndex];
+            const pricing = window.billingPricing;
+            
+            if (!call || !pricing) return;
+            
+            const date = new Date(call.date);
+            const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            
+            // Calculate breakdown
+            const connectionFee = pricing.per_call;
+            const minutes = call.duration ? (call.duration / 60).toFixed(2) : 0;
+            const durationCharge = minutes * pricing.per_minute;
+            const total = call.credits;
+            
+            // Update popup content
+            document.getElementById('breakdownCallDetails').textContent = `${call.description} - ${formattedDate} at ${formattedTime}`;
+            document.getElementById('breakdownConnectionFee').textContent = `${connectionFee.toFixed(2)} credits`;
+            document.getElementById('breakdownMinutes').textContent = minutes;
+            document.getElementById('breakdownRatePerMinute').textContent = pricing.per_minute;
+            document.getElementById('breakdownDurationCharge').textContent = `${durationCharge.toFixed(2)} credits`;
+            document.getElementById('breakdownTotal').textContent = `${total} credits`;
+            
+            // Show popup
+            document.getElementById('creditBreakdownPopup').style.display = 'block';
+        }
+
+        // Close breakdown popup
+        function closeBreakdownPopup() {
+            document.getElementById('creditBreakdownPopup').style.display = 'none';
         }
 
         // Load available owned numbers for assignment
@@ -2080,7 +2379,8 @@
                         RESPONSE_LATENCY: 500,
                         BUSINESS_INFO: businessInfo,
                         AGENT_PERSONALITY: agentPersonality,
-                        AGENT_INSTRUCTIONS: agentInstructions
+                        AGENT_INSTRUCTIONS: agentInstructions,
+                        CALENDAR_BOOKING_ENABLED: document.getElementById('calendarBookingEnabled').checked
                     })
                 });
                 
