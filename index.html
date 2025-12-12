@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Voice Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">EchoLine</div>
+    <nav class="main-nav">
+      <a href="#how-it-works">How it works</a>
+      <a href="#benefits">Benefits</a>
+      <a href="#faq">FAQ</a>
+      <a class="button" href="#cta">Get started</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <p class="eyebrow">Real-time, local-first voice assistant</p>
+        <h1>No more robotic calls—meet your on-device voice concierge.</h1>
+        <p class="lede">EchoLine listens, thinks, and speaks back with human pacing, so customers get answers instantly without telephony fees.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#cta">Launch demo</a>
+          <a class="button ghost" href="#how-it-works">See the flow</a>
+        </div>
+        <div class="badges">
+          <span>Streaming STT</span>
+          <span>Barge-in aware</span>
+          <span>Local-friendly</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="card">
+          <p class="label">Live call preview</p>
+          <div class="chat-bubble user">“How late are you open today?”</div>
+          <div class="chat-bubble agent">“We’re open until 9 PM. Want directions?”</div>
+          <div class="meter">
+            <div class="meter-fill"></div>
+          </div>
+          <p class="caption">Adaptive volume + instant interruptions</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The modern call flow</p>
+        <h2>How EchoLine handles every conversation</h2>
+        <p class="lede">A streamlined pipeline that keeps latency low while letting you interrupt at any point.</p>
+      </div>
+      <div class="timeline">
+        <div class="timeline-line"></div>
+        <article class="step">
+          <div class="step-icon">🎙️</div>
+          <div class="step-body">
+            <h3>Capture speech instantly</h3>
+            <p>Microphone input is streamed with lightweight buffering so every word lands in the pipeline without waiting for long chunks.</p>
+          </div>
+          <span class="step-number">01</span>
+        </article>
+        <article class="step">
+          <div class="step-icon">✨</div>
+          <div class="step-body">
+            <h3>Transcribe as you talk</h3>
+            <p>Deepgram or Whisper produce partial results in milliseconds, letting the assistant react mid-sentence.</p>
+          </div>
+          <span class="step-number">02</span>
+        </article>
+        <article class="step">
+          <div class="step-icon">🧠</div>
+          <div class="step-body">
+            <h3>Reason with streaming LLM</h3>
+            <p>Token-by-token responses keep the conversation flowing while respecting your brand voice and safety guardrails.</p>
+          </div>
+          <span class="step-number">03</span>
+        </article>
+        <article class="step">
+          <div class="step-icon">🔊</div>
+          <div class="step-body">
+            <h3>Speak naturally</h3>
+            <p>ElevenLabs or local TTS voices speak with human pacing. If a caller interrupts, playback stops immediately.</p>
+          </div>
+          <span class="step-number">04</span>
+        </article>
+        <article class="step">
+          <div class="step-icon">🔄</div>
+          <div class="step-body">
+            <h3>Loop without friction</h3>
+            <p>Every cycle returns to listening mode in under a second, delivering a truly duplex experience callers love.</p>
+          </div>
+          <span class="step-number">05</span>
+        </article>
+      </div>
+    </section>
+
+    <section id="benefits" class="section cards">
+      <div class="section-heading">
+        <p class="eyebrow">Why teams choose EchoLine</p>
+        <h2>Built for responsive support, on your terms</h2>
+      </div>
+      <div class="card-grid">
+        <article class="card">
+          <h3>On-device friendly</h3>
+          <p>Toggle mock STT/LLM/TTS modules when hardware or connectivity is limited.</p>
+        </article>
+        <article class="card">
+          <h3>Barge-in aware</h3>
+          <p>Interrupts halt speech, cancel LLM streaming, and immediately resume listening.</p>
+        </article>
+        <article class="card">
+          <h3>Fast to prototype</h3>
+          <p>Run <code>python -m agent.app</code> to try a local call; swap providers with environment flags.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="faq" class="section faq">
+      <div class="section-heading">
+        <p class="eyebrow">Questions</p>
+        <h2>FAQs</h2>
+      </div>
+      <div class="faq-grid">
+        <article>
+          <h3>Does it require internet?</h3>
+          <p>Use Whisper and local TTS for a fully offline loop, or plug in cloud services for premium quality.</p>
+        </article>
+        <article>
+          <h3>Can I integrate telephony?</h3>
+          <p>The state machine is ready for SIP/Vonage-style ingress once you expose audio streams to the app.</p>
+        </article>
+        <article>
+          <h3>How do I test quickly?</h3>
+          <p>Run <code>python test_local_call.py</code> to simulate a call flow with mock audio in constrained environments.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="cta" class="cta">
+      <div class="cta-inner">
+        <h2>Bring humane voice automation to your product.</h2>
+        <p>Spin up EchoLine locally in minutes and ship a better voice experience.</p>
+        <a class="button primary" href="mailto:hello@example.com">Book a walkthrough</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>EchoLine Voice · Built for real conversations.</p>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Support</a>
+    </div>
+  </footer>
+</body>
+</html>
