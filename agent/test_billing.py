@@ -2,7 +2,13 @@ import math
 
 import pytest
 
-from agent.billing import BillingConfig, build_billing_view, build_call_charges, calculate_charge
+from agent.billing import (
+    BillingConfig,
+    build_account_billing_pages,
+    build_billing_view,
+    build_call_charges,
+    calculate_charge,
+)
 
 
 def test_calculate_charge_rounds_up_and_adds_connection_fee():
@@ -67,6 +73,12 @@ def test_build_billing_view_shapes_data_for_ui():
 
     assert view["header"] == "💰 Billing & Usage"
     assert view["summary"] == {"current_balance": 57.0, "total_used": 3.47}
+    assert view["usage_totals"] == {
+        "call_count": 3,
+        "total_duration_seconds": 170,
+        "total_duration_minutes": 2.83,
+        "total_charges": 0.23,
+    }
     assert [card["label"] for card in view["pricing_cards"]] == ["Calls", "Minutes", "Bookings"]
 
     history = view["usage_history"]
@@ -83,3 +95,45 @@ def test_build_billing_view_calculates_total_used_when_missing():
     view = build_billing_view(records, current_balance=10.0, total_used=None, config=config)
 
     assert view["summary"]["total_used"] == pytest.approx(0.10)
+
+
+def test_build_account_billing_pages_keep_accounts_isolated():
+    config = BillingConfig(per_minute_rate=0.10, connection_fee=0.25)
+    accounts = [
+        {
+            "account_id": "acct-1",
+            "current_balance": 12.5,
+            "records": [
+                {"id": "call-1", "duration_seconds": 60, "caller": "Alice"},
+                {"id": "call-2", "duration_seconds": 10, "caller": "Bob"},
+            ],
+        },
+        {
+            "account_id": "acct-2",
+            "current_balance": 4.0,
+            "records": [
+                {"id": "call-3", "duration_seconds": 120, "caller": "Carol"},
+            ],
+        },
+    ]
+
+    result = build_account_billing_pages(accounts, config=config)
+
+    assert result["header"] == "💰 Billing & Usage"
+    assert len(result["accounts"]) == 2
+
+    acct1 = next(acc for acc in result["accounts"] if acc["account_id"] == "acct-1")
+    acct2 = next(acc for acc in result["accounts"] if acc["account_id"] == "acct-2")
+
+    assert acct1["summary"]["current_balance"] == 12.5
+    assert acct1["usage_totals"] == {
+        "call_count": 2,
+        "total_duration_seconds": 70,
+        "total_duration_minutes": 1.17,
+        "total_charges": 0.7,
+    }
+    assert [row["caller"] for row in acct1["usage_history"]] == ["Alice", "Bob"]
+
+    assert acct2["summary"]["current_balance"] == 4.0
+    assert acct2["usage_totals"]["call_count"] == 1
+    assert acct2["usage_history"][0]["caller"] == "Carol"
