@@ -1299,15 +1299,15 @@ class ServerControlGUI:
         """Show billing configuration window"""
         popup = tk.Toplevel(self.root)
         popup.title("💰 Billing Settings")
-        popup.geometry("600x500")
+        popup.geometry("600x650")
         popup.configure(bg='#2c3e50')
         popup.resizable(False, False)
         
         # Center window
         popup.update_idletasks()
         x = (popup.winfo_screenwidth() // 2) - (600 // 2)
-        y = (popup.winfo_screenheight() // 2) - (500 // 2)
-        popup.geometry(f'600x500+{x}+{y}')
+        y = (popup.winfo_screenheight() // 2) - (650 // 2)
+        popup.geometry(f'600x650+{x}+{y}')
         
         # Title
         title_label = tk.Label(
@@ -1349,31 +1349,55 @@ class ServerControlGUI:
                     credits_per_connected_call REAL DEFAULT 5.0,
                     credits_per_minute REAL DEFAULT 2.0,
                     credits_per_calendar_booking REAL DEFAULT 10.0,
+                    credits_per_task REAL DEFAULT 5.0,
+                    credits_per_advanced_voice REAL DEFAULT 3.0,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
+            # Add missing columns if they don't exist
+            try:
+                cursor.execute('ALTER TABLE billing_config ADD COLUMN credits_per_task REAL DEFAULT 5.0')
+            except:
+                pass
+            
+            try:
+                cursor.execute('ALTER TABLE billing_config ADD COLUMN credits_per_advanced_voice REAL DEFAULT 3.0')
+            except:
+                pass
+            
+            try:
+                cursor.execute('ALTER TABLE billing_config ADD COLUMN credits_per_sales_detection REAL DEFAULT 2.0')
+            except:
+                pass
+            
             # Get current values or insert defaults
-            cursor.execute('SELECT * FROM billing_config WHERE id = 1')
+            cursor.execute('SELECT credits_per_connected_call, credits_per_minute, credits_per_calendar_booking, credits_per_task, credits_per_advanced_voice, credits_per_sales_detection FROM billing_config WHERE id = 1')
             config = cursor.fetchone()
             if not config:
                 cursor.execute('''
-                    INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking)
-                    VALUES (1, 5.0, 2.0, 10.0)
+                    INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking, credits_per_task, credits_per_advanced_voice, credits_per_sales_detection)
+                    VALUES (1, 5.0, 2.0, 10.0, 5.0, 3.0, 2.0)
                 ''')
                 conn.commit()
-                config = (1, 5.0, 2.0, 10.0, None)
+                config = (5.0, 2.0, 10.0, 5.0, 3.0, 2.0)
             
             conn.close()
             
-            current_call_credits = config[1]
-            current_minute_credits = config[2]
-            current_booking_credits = config[3]
+            current_call_credits = config[0]
+            current_minute_credits = config[1]
+            current_booking_credits = config[2]
+            current_task_credits = config[3] if len(config) > 3 else 5.0
+            current_advanced_voice_credits = config[4] if len(config) > 4 else 3.0
+            current_sales_detector_credits = config[5] if len(config) > 5 else 2.0
         except Exception as e:
             self.log(f"⚠️ Error loading billing config: {e}")
             current_call_credits = 5.0
             current_minute_credits = 2.0
             current_booking_credits = 10.0
+            current_task_credits = 5.0
+            current_sales_detector_credits = 2.0
+            current_advanced_voice_credits = 3.0
         
         # Settings fields
         fields = []
@@ -1456,11 +1480,89 @@ class ServerControlGUI:
             fg='#95a5a6'
         ).pack(side=tk.LEFT, padx=(10, 0))
         
+        # Task Extraction Credits
+        task_frame = tk.Frame(settings_frame, bg='#34495e')
+        task_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            task_frame,
+            text="✓ Credits per Task Extraction:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        task_entry = tk.Entry(task_frame, font=('Segoe UI', 10), width=10)
+        task_entry.insert(0, str(current_task_credits))
+        task_entry.pack(side=tk.LEFT)
+        fields.append(('task', task_entry))
+        
+        tk.Label(
+            task_frame,
+            text="(when AI extracts task from call)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Advanced Voice Credits
+        voice_frame = tk.Frame(settings_frame, bg='#34495e')
+        voice_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            voice_frame,
+            text="🎙️ Credits per Advanced Voice Call:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        voice_entry = tk.Entry(voice_frame, font=('Segoe UI', 10), width=10)
+        voice_entry.insert(0, str(current_advanced_voice_credits))
+        voice_entry.pack(side=tk.LEFT)
+        fields.append(('voice', voice_entry))
+        
+        tk.Label(
+            voice_frame,
+            text="(when advanced voice is used)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Sales Detector Credits
+        sales_frame = tk.Frame(settings_frame, bg='#34495e')
+        sales_frame.pack(padx=20, pady=15, fill=tk.X)
+        
+        tk.Label(
+            sales_frame,
+            text="🚫 Credits per Sales Call Detection:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#34495e',
+            fg='#ecf0f1',
+            anchor='w'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        sales_entry = tk.Entry(sales_frame, font=('Segoe UI', 10), width=10)
+        sales_entry.insert(0, str(current_sales_detector_credits))
+        sales_entry.pack(side=tk.LEFT)
+        fields.append(('sales', sales_entry))
+        
+        tk.Label(
+            sales_frame,
+            text="(AI analyzes if call is a sales pitch)",
+            font=('Segoe UI', 8),
+            bg='#34495e',
+            fg='#95a5a6'
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        
         # Info box
         info_frame = tk.Frame(settings_frame, bg='#2c3e50', relief=tk.SUNKEN, bd=1)
         info_frame.pack(padx=20, pady=20, fill=tk.X)
         
-        info_text = "ℹ️ Note: If a user has 0 or fewer credits, the AI agent will NOT offer to book calendar appointments."
+        info_text = "ℹ️ Note: Bundles are only charged when used in a call. Sales detector runs during the call and politely ends sales calls."
         tk.Label(
             info_frame,
             text=info_text,
@@ -1480,9 +1582,12 @@ class ServerControlGUI:
                 call_credits = float(call_entry.get())
                 minute_credits = float(minute_entry.get())
                 booking_credits = float(booking_entry.get())
+                task_credits = float(task_entry.get())
+                voice_credits = float(voice_entry.get())
+                sales_credits = float(sales_entry.get())
                 
                 # Validate
-                if call_credits < 0 or minute_credits < 0 or booking_credits < 0:
+                if call_credits < 0 or minute_credits < 0 or booking_credits < 0 or task_credits < 0 or voice_credits < 0 or sales_credits < 0:
                     self.log("❌ Credit values cannot be negative")
                     return
                 
@@ -1497,9 +1602,12 @@ class ServerControlGUI:
                     SET credits_per_connected_call = ?,
                         credits_per_minute = ?,
                         credits_per_calendar_booking = ?,
+                        credits_per_task = ?,
+                        credits_per_advanced_voice = ?,
+                        credits_per_sales_detection = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = 1
-                ''', (call_credits, minute_credits, booking_credits))
+                ''', (call_credits, minute_credits, booking_credits, task_credits, voice_credits, sales_credits))
                 
                 conn.commit()
                 conn.close()
@@ -1508,6 +1616,9 @@ class ServerControlGUI:
                 self.log(f"   📞 Connected call: {call_credits} credits")
                 self.log(f"   ⏱️ Per minute: {minute_credits} credits")
                 self.log(f"   📅 Calendar booking: {booking_credits} credits")
+                self.log(f"   ✓ Task extraction: {task_credits} credits")
+                self.log(f"   🎙️ Advanced voice: {voice_credits} credits")
+                self.log(f"   🚫 Sales detection: {sales_credits} credits")
                 
                 popup.destroy()
                 

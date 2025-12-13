@@ -588,6 +588,20 @@
                 align-items: flex-start;
             }
         }
+
+        /* Bundle Toggle Styles */
+        input[type="checkbox"]:checked ~ .bundle-toggle-slider {
+            background-color: #2ed573 !important;
+            border-color: #2ed573 !important;
+        }
+
+        input[type="checkbox"]:checked ~ .bundle-toggle-knob {
+            transform: translateX(34px) !important;
+        }
+        
+        .bundle-toggle-knob {
+            transition: transform 0.4s !important;
+        }
     </style>
 </head>
 <body>
@@ -656,27 +670,18 @@
                 <div style="font-size: 16px; color: white; font-weight: 600;" id="breakdownCallDetails">--</div>
             </div>
             
-            <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div>
-                        <div style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600;">📞 Connection Fee</div>
-                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 3px;">One-time charge per call</div>
-                    </div>
-                    <div style="font-size: 18px; font-weight: 700; color: #667eea;" id="breakdownConnectionFee">--</div>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div>
-                        <div style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600;">⏱️ Duration Charge</div>
-                        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 3px;"><span id="breakdownMinutes">--</span> minutes × <span id="breakdownRatePerMinute">--</span> credits/min</div>
-                    </div>
-                    <div style="font-size: 18px; font-weight: 700; color: #2ecc71;" id="breakdownDurationCharge">--</div>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px;">
-                    <div style="font-size: 16px; color: white; font-weight: 700;">💰 Total Credits</div>
-                    <div style="font-size: 24px; font-weight: 900; color: #e74c3c;" id="breakdownTotal">--</div>
-                </div>
+            <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tbody id="breakdownCharges">
+                        <!-- Charges will be inserted here dynamically -->
+                    </tbody>
+                    <tfoot>
+                        <tr style="border-top: 2px solid rgba(255,255,255,0.2);">
+                            <td style="padding: 12px 0 0 0; font-size: 16px; color: white; font-weight: 700;">💰 Total Credits</td>
+                            <td style="padding: 12px 0 0 0; font-size: 22px; font-weight: 900; color: #e74c3c; text-align: right;" id="breakdownTotal">--</td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
             
             <button onclick="closeBreakdownPopup()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">Close</button>
@@ -713,9 +718,9 @@
                 <span style="font-size: 20px;">⚙️</span>
                 <span>Configuration</span>
             </button>
-            <button class="sidebar-nav-btn" data-tab="numbers" onclick="switchMainTab('numbers')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
-                <span style="font-size: 20px;">📱</span>
-                <span>Phone Numbers</span>
+            <button class="sidebar-nav-btn" onclick="openTasksModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">✅</span>
+                <span>Tasks</span>
             </button>
             <button class="sidebar-nav-btn" onclick="openCalendarModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
                 <span style="font-size: 20px;">📅</span>
@@ -725,9 +730,9 @@
                 <span style="font-size: 20px;">💰</span>
                 <span>Billing</span>
             </button>
-            <button class="sidebar-nav-btn" data-tab="admin" onclick="switchMainTab('admin')" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
-                <span style="font-size: 20px;">🛠️</span>
-                <span>System Tools</span>
+            <button class="sidebar-nav-btn" onclick="openBundlesModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
+                <span style="font-size: 20px;">📦</span>
+                <span>Bundles</span>
             </button>
         </div>
 
@@ -806,7 +811,7 @@
                     </div>
 
                     <!-- Unread Appointments Card -->
-                    <div style="background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%); border-radius: 16px; padding: 20px; border: 2px solid rgba(255, 107, 107, 0.3); position: relative; overflow: hidden; transition: all 0.3s; cursor: pointer;" onclick="openCalendarModal()" onmouseover="this.style.borderColor='rgba(255, 107, 107, 0.6)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(238, 90, 111, 0.15) 100%)'" onmouseout="this.style.borderColor='rgba(255, 107, 107, 0.3)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%)'">
+                    <div style="background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%); border-radius: 16px; padding: 20px; border: 2px solid rgba(255, 107, 107, 0.3); position: relative; overflow: hidden; transition: all 0.3s; cursor: pointer;" onclick="openCalendarModal(unreadAppointmentsList.length > 0 ? unreadAppointmentsList[0].id : null)" onmouseover="this.style.borderColor='rgba(255, 107, 107, 0.6)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(238, 90, 111, 0.15) 100%)'" onmouseout="this.style.borderColor='rgba(255, 107, 107, 0.3)'; this.style.background='linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 111, 0.1) 100%)'">
                         <div style="position: absolute; top: -5px; right: -5px; font-size: 50px; opacity: 0.08;">📅</div>
                         <div style="position: relative; z-index: 1;">
                             <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">New Appointments</div>
@@ -838,7 +843,7 @@
                                 <div style="font-size: 13px; color: rgba(255,255,255,0.9);">You have new appointments from AI calls that need your attention</div>
                             </div>
                         </div>
-                        <button onclick="switchMainTab('calendar'); closeUnreadAlert();" style="background: rgba(255,255,255,0.95); color: #ff6b6b; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        <button onclick="openCalendarModal(unreadAppointmentsList.length > 0 ? unreadAppointmentsList[0].id : null); closeUnreadAlert();" style="background: rgba(255,255,255,0.95); color: #ff6b6b; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                             View Calendar →
                         </button>
                     </div>
@@ -1049,29 +1054,6 @@
                         </div>
                     </div>
 
-                    <div class="form-section" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(230, 126, 34, 0.1) 100%); border: 2px solid rgba(241, 196, 15, 0.3); border-radius: 12px; padding: 25px;">
-                        <h3 style="color: #f1c40f;">💰 Calendar Booking Credits</h3>
-                        <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">📅</span>
-                                <div>
-                                    <div style="font-size: 16px; font-weight: 700; color: white; margin-bottom: 4px;">Calendar Booking Cost</div>
-                                    <div style="font-size: 14px; color: rgba(255,255,255,0.7);">Credits deducted when AI books an appointment</div>
-                                </div>
-                            </div>
-                            <div style="font-size: 32px; font-weight: 900; color: #f1c40f; text-align: center; margin: 15px 0;" id="bookingCreditCost">--</div>
-                            <div style="font-size: 12px; color: rgba(255,255,255,0.5); text-align: center;">credits per booking</div>
-                        </div>
-                        <div class="example-box" style="background: rgba(231, 76, 60, 0.1); border-color: rgba(231, 76, 60, 0.3);">
-                            <strong>⚠️ Important:</strong> The AI agent will NOT offer to book appointments if your credit balance is 0 or negative. Ensure you have sufficient credits for calendar bookings to work.
-                        </div>
-                        <div style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
-                            <div style="font-size: 13px; color: rgba(255,255,255,0.8);">
-                                <strong>ℹ️ Note:</strong> Billing rates are set by your administrator in the Vonage Agent Server Control panel. Contact your admin to adjust pricing.
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="form-section">
                         <h3>📅 Calendar & Appointments</h3>
                         <div class="form-group">
@@ -1105,24 +1087,7 @@
                 <div id="callLogs"></div>
             </div>
 
-            <div id="numbersTab" class="tab-content">
-                <div class="diagnostic-card">
-                    <h3 style="margin-bottom: 20px; font-size: 22px;">📱 Phone Numbers</h3>
-                    
-                    <div style="padding: 60px 40px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 16px; border: 2px dashed rgba(255,255,255,0.1);">
-                        <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">📞</div>
-                        <div style="font-size: 22px; color: rgba(255,255,255,0.8); margin-bottom: 12px; font-weight: 600;">Phone Number Management</div>
-                        <div style="font-size: 15px; color: rgba(255,255,255,0.5); margin-bottom: 25px; line-height: 1.6;">
-                            Phone numbers are managed by your administrator.<br>
-                            Contact your account manager to purchase or configure phone numbers.
-                        </div>
-                        <div style="display: inline-block; background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%); padding: 20px 30px; border-radius: 12px; border: 1px solid rgba(102, 126, 234, 0.3);">
-                            <div style="font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Assigned Number</div>
-                            <div style="font-size: 24px; color: #667eea; font-weight: 700;" id="assignedPhoneNumber">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- Billing Tab -->
             <div id="billingTab" class="main-tab-content" style="display: none;">
@@ -1332,6 +1297,10 @@
             loadTodayStats();
             loadCredits();
             loadConfig(); // Load config to populate phone number and other settings
+            loadBundles(); // Load bundle settings
+            
+            // Handle form submission - must be inside DOMContentLoaded
+            document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
         });
 
         function switchMainTab(tabName) {
@@ -1370,6 +1339,8 @@
                 setActiveFilter('today'); // Set today button as active
             } else if (tabName === 'dashboard') {
                 loadDashboard();
+            } else if (tabName === 'tasks') {
+                loadTasks();
             } else if (tabName === 'billing') {
                 loadBillingHistory();
             } else if (tabName === 'admin') {
@@ -1384,13 +1355,182 @@
             switchMainTab(tabName);
         }
 
-        function openCalendarModal() {
+        function openCalendarModal(appointmentId = null) {
+            targetAppointmentId = appointmentId;
             document.getElementById('calendarModal').style.display = 'block';
             loadCalendar();
         }
 
         function closeCalendarModal() {
             document.getElementById('calendarModal').style.display = 'none';
+        }
+
+        function openBundlesModal() {
+            document.getElementById('bundlesModal').style.display = 'block';
+            loadBundles();
+        }
+
+        function closeBundlesModal() {
+            document.getElementById('bundlesModal').style.display = 'none';
+        }
+
+        async function loadBundles() {
+            try {
+                const response = await fetch('/api/config', {
+                    headers: getAuthHeaders()
+                });
+                const config = await response.json();
+                
+                // Load calendar bundle state
+                const calendarEnabled = config.CALENDAR_BOOKING_ENABLED !== false;
+                document.getElementById('calendarBundleToggle').checked = calendarEnabled;
+                updateToggleStyle('calendarBundleToggle', calendarEnabled);
+                
+                // Load tasks bundle state
+                const tasksEnabled = config.TASKS_ENABLED !== false;
+                document.getElementById('tasksBundleToggle').checked = tasksEnabled;
+                updateToggleStyle('tasksBundleToggle', tasksEnabled);
+                
+                // Load advanced voice bundle state
+                const advancedVoiceEnabled = config.ADVANCED_VOICE_ENABLED === true;
+                document.getElementById('advancedVoiceBundleToggle').checked = advancedVoiceEnabled;
+                updateToggleStyle('advancedVoiceBundleToggle', advancedVoiceEnabled);
+                
+                // Load sales detector bundle state
+                const salesDetectorEnabled = config.SALES_DETECTOR_ENABLED === true;
+                document.getElementById('salesDetectorBundleToggle').checked = salesDetectorEnabled;
+                updateToggleStyle('salesDetectorBundleToggle', salesDetectorEnabled);
+                
+                // Load pricing from config (display only)
+                document.getElementById('calendarPriceDisplay').textContent = config.CALENDAR_BOOKING_CREDITS || 10;
+                document.getElementById('tasksPriceDisplay').textContent = config.TASK_CREDITS || 5;
+                document.getElementById('advancedVoicePriceDisplay').textContent = config.ADVANCED_VOICE_CREDITS || 3;
+                document.getElementById('salesDetectorPriceDisplay').textContent = config.SALES_DETECTOR_CREDITS || 2;
+            } catch (error) {
+                console.error('Failed to load bundles:', error);
+            }
+        }
+
+        function toggleBundle(bundleType) {
+            // Just update the UI, don't save yet - user will click Save button
+            const toggleId = bundleType + 'BundleToggle';
+            const checkbox = document.getElementById(toggleId);
+            const isEnabled = checkbox.checked;
+            
+            updateToggleStyle(toggleId, isEnabled);
+        }
+
+        async function saveBundleSettings() {
+            try {
+                // Get all toggle states
+                const calendarEnabled = document.getElementById('calendarBundleToggle').checked;
+                const tasksEnabled = document.getElementById('tasksBundleToggle').checked;
+                const advancedVoiceEnabled = document.getElementById('advancedVoiceBundleToggle').checked;
+                const salesDetectorEnabled = document.getElementById('salesDetectorBundleToggle').checked;
+                
+                // Save all settings in one request
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        CALENDAR_BOOKING_ENABLED: calendarEnabled,
+                        TASKS_ENABLED: tasksEnabled,
+                        ADVANCED_VOICE_ENABLED: advancedVoiceEnabled,
+                        SALES_DETECTOR_ENABLED: salesDetectorEnabled
+                    })
+                });
+                
+                if (response.ok) {
+                    showBundleMessage('✅ Bundle settings saved successfully!', 'success');
+                } else {
+                    throw new Error('Failed to save bundle settings');
+                }
+            } catch (error) {
+                console.error('Failed to save bundle settings:', error);
+                showBundleMessage('❌ Failed to save bundle settings. Please try again.', 'error');
+            }
+        }
+
+        function updateToggleStyle(toggleId, isEnabled) {
+            const checkbox = document.getElementById(toggleId);
+            const slider = checkbox.nextElementSibling;
+            const knob = slider.nextElementSibling;
+            
+            if (isEnabled) {
+                slider.style.backgroundColor = '#2ed573';
+                slider.style.borderColor = '#2ed573';
+                knob.style.transform = 'translateX(34px)';
+            } else {
+                slider.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                slider.style.borderColor = 'rgba(255,255,255,0.3)';
+                knob.style.transform = 'translateX(0)';
+            }
+        }
+
+        function showBundleMessage(message, type) {
+            const messageDiv = document.getElementById('bundleMessage');
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+            messageDiv.style.background = type === 'success' 
+                ? 'linear-gradient(135deg, #2ed573 0%, #00b894 100%)' 
+                : 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)';
+            messageDiv.style.color = 'white';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function showSalesReasoning(reasoning, confidence) {
+            const confidenceColor = confidence >= 70 ? '#ff4444' : confidence >= 50 ? '#ffaa44' : '#44aa44';
+            const confidenceLabel = confidence >= 70 ? 'HIGH CONFIDENCE' : confidence >= 50 ? 'MEDIUM CONFIDENCE' : 'LOW CONFIDENCE';
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+            
+            modal.innerHTML = `
+                <div style="background: linear-gradient(135deg, rgba(30,30,40,0.98) 0%, rgba(20,20,30,0.98) 100%); border-radius: 20px; padding: 35px; max-width: 600px; width: 90%; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                        <h2 style="margin: 0; font-size: 24px; color: white; display: flex; align-items: center; gap: 12px;">
+                            🚫 Sales Call Detection
+                        </h2>
+                        <button onclick="this.closest('div').parentElement.remove()" style="background: rgba(255,100,100,0.2); border: 2px solid rgba(255,100,100,0.4); color: white; font-size: 24px; cursor: pointer; padding: 8px 16px; border-radius: 10px; transition: all 0.3s;">✕</button>
+                    </div>
+                    
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: ${confidenceColor}; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 14px;">
+                                ${confidence}% ${confidenceLabel}
+                            </div>
+                        </div>
+                        <div style="color: rgba(255,255,255,0.9); font-size: 16px; line-height: 1.6;">
+                            ${reasoning}
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button onclick="this.closest('div').parentElement.remove()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px 32px; border-radius: 10px; color: white; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        }
+
+        function openTasksModal() {
+            document.getElementById('tasksModal').style.display = 'block';
+            loadTasks();
+        }
+
+        function closeTasksModal() {
+            document.getElementById('tasksModal').style.display = 'none';
+            hideAddTaskForm();
         }
 
         async function runDiagnostics() {
@@ -1644,7 +1784,32 @@
                             const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                             const duration = call.duration ? `${call.duration}s` : 'N/A';
                             const isCompleted = call.status === 'completed';
-                            const apptBadge = call.has_appointment ? `<span style="background: #ff4444; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 10px; display: inline-block;">📅 APPOINTMENT</span>` : '';
+                            const apptBadge = call.has_appointment ? `<span onclick="openCalendarModal(${call.appointment_id}); event.stopPropagation();" style="background: #ff4444; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 10px; display: inline-block; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#ff6666'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff4444'; this.style.transform='scale(1)'">📅 APPOINTMENT</span>` : '';
+                            
+                            // Add sales confidence badge if available
+                            let salesBadge = '';
+                            if (call.sales_confidence !== null && call.sales_confidence !== undefined) {
+                                const confidence = call.sales_confidence;
+                                let badgeColor, label, icon;
+                                
+                                if (confidence >= 70) {
+                                    badgeColor = '#ff4444';
+                                    label = 'SALES CALL';
+                                    icon = '🚫';
+                                } else if (confidence >= 30) {
+                                    badgeColor = '#ffaa44';
+                                    label = 'POSSIBLE SALES';
+                                    icon = '⚠️';
+                                } else {
+                                    badgeColor = '#44aa44';
+                                    label = 'NOT SALES';
+                                    icon = '✅';
+                                }
+                                
+                                const reasoning = (call.sales_reasoning || 'No reasoning provided').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                                const endedIndicator = call.sales_ended_by_detector ? ' ⚡ ENDED' : '';
+                                salesBadge = `<span onclick='showSalesReasoning(\`${reasoning}\`, ${confidence}); event.stopPropagation();' style="background: ${badgeColor}; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 10px; display: inline-block; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.opacity='0.9'" onmouseout="this.style.transform='scale(1)'; this.style.opacity='1'">${icon} ${label} (${confidence}%)${endedIndicator}</span>`;
+                            }
                             
                             return `
                                 <div style="background: rgba(255,255,255,0.03); border-radius: 16px; padding: 25px; border: 1px solid rgba(255,255,255,0.06); transition: all 0.3s;" 
@@ -1655,6 +1820,7 @@
                                             <div style="font-size: 18px; font-weight: 700; color: white; margin-bottom: 6px;">
                                                 📱 ${call.caller_number}
                                                 ${apptBadge}
+                                                ${salesBadge}
                                             </div>
                                             <div style="font-size: 13px; color: rgba(255,255,255,0.5);">
                                                 📅 ${formattedTime} • ⏱️ ${duration}
@@ -1691,20 +1857,49 @@
                 });
                 const config = await response.json();
                 
-                document.getElementById('agentName').value = config.AGENT_NAME;
-                document.getElementById('phoneNumber').value = config.PHONE_NUMBER || '';
-                document.getElementById('agentVoice').value = config.VOICE || 'shimmer';
+                const agentNameEl = document.getElementById('agentName');
+                if (agentNameEl) agentNameEl.value = config.AGENT_NAME;
+                
+                const phoneNumberEl = document.getElementById('phoneNumber');
+                if (phoneNumberEl) phoneNumberEl.value = config.PHONE_NUMBER || '';
+                
+                const agentVoiceEl = document.getElementById('agentVoice');
+                if (agentVoiceEl) agentVoiceEl.value = config.VOICE || 'shimmer';
+                
+                const voiceProviderEl = document.getElementById('voiceProvider');
+                if (voiceProviderEl) voiceProviderEl.value = config.VOICE_PROVIDER || 'openai';
+                
                 // useElevenlabs checkbox removed
-                if (document.getElementById('elevenLabsVoice')) {
-                    document.getElementById('elevenLabsVoice').value = config.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+                const elevenLabsVoiceEl = document.getElementById('elevenLabsVoice');
+                if (elevenLabsVoiceEl) {
+                    elevenLabsVoiceEl.value = config.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
                 }
-                document.getElementById('responseLatency').value = config.RESPONSE_LATENCY || 500;
-                document.getElementById('businessInfo').value = config.BUSINESS_INFO || '';
-                document.getElementById('agentPersonality').value = config.AGENT_PERSONALITY || '';
-                document.getElementById('agentInstructions').value = config.AGENT_INSTRUCTIONS;
+                
+                const googleVoiceEl = document.getElementById('googleVoice');
+                if (googleVoiceEl) {
+                    googleVoiceEl.value = config.GOOGLE_VOICE || 'en-GB-Neural2-A';
+                }
+                
+                const playhtVoiceEl = document.getElementById('playhtVoice');
+                if (playhtVoiceEl) {
+                    playhtVoiceEl.value = config.PLAYHT_VOICE_ID || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
+                }
+                
+                const responseLatencyEl = document.getElementById('responseLatency');
+                if (responseLatencyEl) responseLatencyEl.value = config.RESPONSE_LATENCY || 500;
+                
+                const businessInfoEl = document.getElementById('businessInfo');
+                if (businessInfoEl) businessInfoEl.value = config.BUSINESS_INFO || '';
+                
+                const agentPersonalityEl = document.getElementById('agentPersonality');
+                if (agentPersonalityEl) agentPersonalityEl.value = config.AGENT_PERSONALITY || '';
+                
+                const agentInstructionsEl = document.getElementById('agentInstructions');
+                if (agentInstructionsEl) agentInstructionsEl.value = config.AGENT_INSTRUCTIONS;
                 
                 // Load calendar booking setting
-                document.getElementById('calendarBookingEnabled').checked = config.CALENDAR_BOOKING_ENABLED !== false;
+                const calendarBookingEl = document.getElementById('calendarBookingEnabled');
+                if (calendarBookingEl) calendarBookingEl.checked = config.CALENDAR_BOOKING_ENABLED !== false;
                 updateCalendarBookingStatus();
                 
                 // Update assigned phone number in numbers tab
@@ -1979,15 +2174,113 @@
             const connectionFee = pricing.per_call;
             const minutes = call.duration ? (call.duration / 60).toFixed(2) : 0;
             const durationCharge = minutes * pricing.per_minute;
-            const total = call.credits;
+            
+            // Parse description to extract booking/task/voice charges
+            let bookingCharge = 0;
+            let taskCharge = 0;
+            let voiceCharge = 0;
+            let salesCharge = 0;
+            
+            if (call.description && call.description.includes(' + ')) {
+                const parts = call.description.split(' + ');
+                parts.forEach(part => {
+                    const match = part.match(/([\d.]+) credits for (bookings|tasks|advanced voice|sales detection)/);
+                    if (match) {
+                        const amount = parseFloat(match[1]);
+                        const type = match[2];
+                        if (type === 'bookings') bookingCharge = amount;
+                        else if (type === 'tasks') taskCharge = amount;
+                        else if (type === 'advanced voice') voiceCharge = amount;
+                        else if (type === 'sales detection') salesCharge = amount;
+                    }
+                });
+            }
+            
+            // Build charges table
+            let chargesHTML = '';
+            
+            // Connection Fee
+            chargesHTML += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        <div style="font-weight: 600;">📞 Connection Fee</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">One-time per call</div>
+                    </td>
+                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #667eea; text-align: right;">${connectionFee.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            // Duration Charge
+            chargesHTML += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        <div style="font-weight: 600;">⏱️ Duration Charge</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">${minutes} min × ${pricing.per_minute} credits/min</div>
+                    </td>
+                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #2ecc71; text-align: right;">${durationCharge.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            // Booking Charge (if applicable)
+            if (bookingCharge > 0) {
+                chargesHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                            <div style="font-weight: 600;">📅 Calendar Booking</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-created appointment</div>
+                        </td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${bookingCharge.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            // Task Charge (if applicable)
+            if (taskCharge > 0) {
+                chargesHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                            <div style="font-weight: 600;">✅ Task Extraction</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-extracted tasks</div>
+                        </td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #9b59b6; text-align: right;">${taskCharge.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            // Advanced Voice Charge (if applicable)
+            if (voiceCharge > 0) {
+                chargesHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                            <div style="font-weight: 600;">🎙️ Advanced Voice</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">Premium voice quality</div>
+                        </td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #3498db; text-align: right;">${voiceCharge.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            // Sales Detection Charge (if applicable)
+            if (salesCharge > 0) {
+                chargesHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                            <div style="font-weight: 600;">🚫 Sales Detection</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-powered sales call screening</div>
+                        </td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #e74c3c; text-align: right;">${salesCharge.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            // Extract caller number from description (first part before '+')
+            const callerMatch = call.description.match(/Call from ([^\+]+)/);
+            const callerNumber = callerMatch ? callerMatch[1].trim() : 'Unknown';
             
             // Update popup content
-            document.getElementById('breakdownCallDetails').textContent = `${call.description} - ${formattedDate} at ${formattedTime}`;
-            document.getElementById('breakdownConnectionFee').textContent = `${connectionFee.toFixed(2)} credits`;
-            document.getElementById('breakdownMinutes').textContent = minutes;
-            document.getElementById('breakdownRatePerMinute').textContent = pricing.per_minute;
-            document.getElementById('breakdownDurationCharge').textContent = `${durationCharge.toFixed(2)} credits`;
-            document.getElementById('breakdownTotal').textContent = `${total} credits`;
+            document.getElementById('breakdownCallDetails').textContent = `Call from ${callerNumber} - ${formattedDate} at ${formattedTime}`;
+            document.getElementById('breakdownCharges').innerHTML = chargesHTML;
+            document.getElementById('breakdownTotal').textContent = `${call.credits} credits`;
             
             // Show popup
             document.getElementById('creditBreakdownPopup').style.display = 'block';
@@ -2939,30 +3232,30 @@
         }
 
         // Handle form submission
-        document.getElementById('configForm').addEventListener('submit', async (e) => {
+        async function handleConfigSubmit(e) {
             e.preventDefault();
             
             console.log('🔵 Form submitted - starting save...');
             
-            const agentName = document.getElementById('agentName').value;
-            const phoneNumber = document.getElementById('phoneNumber').value;
-            const voiceProvider = document.getElementById('voiceProvider').value;
-            const agentVoice = document.getElementById('agentVoice').value;
+            const agentName = document.getElementById('agentName')?.value || 'Judie';
+            const phoneNumber = document.getElementById('phoneNumber')?.value || '';
+            const voiceProvider = document.getElementById('voiceProvider')?.value || 'openai';
+            const agentVoice = document.getElementById('agentVoice')?.value || 'shimmer';
             const elevenLabsVoiceId = document.getElementById('elevenLabsVoice')?.value || 'EXAVITQu4vr4xnSDxMaL';
             const cartesiaVoiceId = 'a0e99841-438c-4a64-b679-ae501e7d6091'; // Cartesia removed
             const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
             const playhtVoiceId = document.getElementById('playhtVoice')?.value || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
-            const responseLatency = parseInt(document.getElementById('responseLatency').value);
-            const businessInfo = document.getElementById('businessInfo').value;
-            const agentPersonality = document.getElementById('agentPersonality').value;
-            const agentInstructions = document.getElementById('agentInstructions').value;
+            const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
+            const businessInfo = document.getElementById('businessInfo')?.value || '';
+            const agentPersonality = document.getElementById('agentPersonality')?.value || '';
+            const agentInstructions = document.getElementById('agentInstructions')?.value || '';
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
             console.log('🔵 PlayHT voice selected:', playhtVoiceId);
             
             try {
-                showMessage('💾 Saving configuration...', 'info');
+                showMessage('💾 Saving voice settings...', 'info');
                 
                 console.log('🔵 Calling /api/update-voice-provider...');
                 // Save voice provider separately
@@ -2985,10 +3278,12 @@
                 if (!voiceResponse.ok) {
                     const voiceError = await voiceResponse.json();
                     console.error('❌ Voice provider save failed:', voiceError);
+                    showMessage('❌ Failed to save voice settings: ' + (voiceError.error || voiceResponse.statusText), 'error');
                     throw new Error('Voice provider save failed: ' + (voiceError.error || voiceResponse.statusText));
                 }
                 
                 console.log('✅ Voice provider saved successfully');
+                showMessage('✅ Voice settings saved! Saving other configuration...', 'info');
                 
                 console.log('🔵 Calling /api/config...');
                 // Save other config
@@ -3014,7 +3309,11 @@
                 
                 if (response.ok) {
                     console.log('✅ Configuration saved successfully');
-                    showMessage('✅ Configuration saved successfully! Changes will apply to new calls.', 'success');
+                    showMessage('✅ All settings saved successfully! Changes will apply to new calls.', 'success');
+                    
+                    // Brief delay so user sees the message
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
                     // Update header with new phone number
                     if (phoneNumber) {
                         document.getElementById('userPhone').textContent = `📞 ${phoneNumber}`;
@@ -3027,7 +3326,7 @@
                 console.error('❌ Save error:', error);
                 showMessage('❌ Error saving configuration: ' + error.message, 'error');
             }
-        });
+        }
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
@@ -3048,7 +3347,7 @@
                 });
                 const data = await response.json();
                 const creditsEl = document.getElementById('creditsRemaining');
-                creditsEl.textContent = data.minutes_remaining;
+                creditsEl.textContent = Math.floor(data.minutes_remaining);  // Show as whole number
                 
                 // Change color based on remaining credits
                 if (data.minutes_remaining === 0) {
@@ -3087,6 +3386,17 @@
                 const unreadCount = data.unread_appointments || 0;
                 if (unreadAppointmentsEl) unreadAppointmentsEl.textContent = unreadCount;
                 if (unreadAppointmentsCardEl) unreadAppointmentsCardEl.textContent = unreadCount;
+                
+                // Fetch unread appointments list for navigation
+                if (unreadCount > 0) {
+                    const apptResponse = await fetch('/api/appointments', {
+                        headers: getAuthHeaders()
+                    });
+                    const apptData = await apptResponse.json();
+                    unreadAppointmentsList = (apptData.appointments || []).filter(
+                        apt => apt.status === 'scheduled' && apt.created_by === 'ai_agent'
+                    );
+                }
                 
                 // Show/hide unread appointments alert
                 if (alertDiv && pluralSpan) {
@@ -3253,7 +3563,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage(`✅ Successfully added 60 credits! New balance: ${data.minutes_remaining} credits`, 'success');
+                    showMessage(`✅ Successfully added 60 credits! New balance: ${Math.floor(data.minutes_remaining)} credits`, 'success');
                     await loadCredits();
                 } else {
                     showMessage('❌ Error purchasing credits: ' + data.error, 'error');
@@ -3375,8 +3685,166 @@
             }
         }
 
-        // Global variable to track current week offset
+        // Global variables for calendar navigation and highlighting
         let currentWeekOffset = 0;
+        let unreadAppointmentsList = [];
+        let targetAppointmentId = null;
+
+        // ============================================================================
+        // TASK MANAGEMENT FUNCTIONS
+        // ============================================================================
+
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks', {
+                    headers: getAuthHeaders()
+                });
+                const data = await response.json();
+                
+                if (data.tasks && data.tasks.length > 0) {
+                    document.getElementById('tasksEmptyState').style.display = 'none';
+                    document.getElementById('tasksList').style.display = 'flex';
+                    renderTasks(data.tasks);
+                } else {
+                    document.getElementById('tasksEmptyState').style.display = 'block';
+                    document.getElementById('tasksList').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+            }
+        }
+
+        function renderTasks(tasks) {
+            const tasksList = document.getElementById('tasksList');
+            
+            tasksList.innerHTML = tasks.map(task => {
+                const isCompleted = task.completed === 1;
+                const createdDate = new Date(task.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                const sourceIcon = task.source === 'ai' ? '🤖' : '✍️';
+                const sourceLabel = task.source === 'ai' ? 'AI Generated' : 'Manual';
+                const sourceBg = task.source === 'ai' ? 'linear-gradient(135deg, rgba(100,200,255,0.2) 0%, rgba(102,126,234,0.2) 100%)' : 'linear-gradient(135deg, rgba(118,75,162,0.2) 0%, rgba(102,126,234,0.2) 100%)';
+                
+                return `
+                    <div style="background: ${isCompleted ? 'rgba(255,255,255,0.03)' : 'linear-gradient(135deg, rgba(102,126,234,0.12) 0%, rgba(118,75,162,0.08) 100%)'}; border-radius: 16px; padding: 24px; border: 2px solid ${isCompleted ? 'rgba(100,255,100,0.2)' : 'rgba(102,126,234,0.25)'}; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(102,126,234,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        ${!isCompleted ? '<div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);"></div>' : ''}
+                        
+                        <div style="display: flex; align-items: flex-start; gap: 18px;">
+                            <div onclick="toggleTask(${task.id}, ${isCompleted ? 0 : 1})" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; border: 2px solid ${isCompleted ? 'rgba(100,255,100,0.8)' : 'rgba(102,126,234,0.8)'}; background: ${isCompleted ? 'linear-gradient(135deg, rgba(100,255,100,0.3) 0%, rgba(66,234,150,0.3) 100%)' : 'rgba(255,255,255,0.05)'}; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.3s; margin-top: 2px;" onmouseover="this.style.transform='scale(1.15) rotate(5deg)'; this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='scale(1) rotate(0)'; this.style.boxShadow='none'">
+                                ${isCompleted ? '✔' : ''}
+                            </div>
+                            
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 17px; color: ${isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.95)'}; margin-bottom: 12px; ${isCompleted ? 'text-decoration: line-through;' : ''} line-height: 1.6; font-weight: 500;">
+                                    ${task.description}
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                    <span style="font-size: 13px; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 6px;">
+                                        <span>📅</span>
+                                        <span>${createdDate}</span>
+                                    </span>
+                                    <span style="background: ${sourceBg}; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.85); border: 1px solid rgba(102,126,234,0.3); display: flex; align-items: center; gap: 6px;">
+                                        <span>${sourceIcon}</span>
+                                        <span>${sourceLabel}</span>
+                                    </span>
+                                    ${task.call_uuid ? '<span style="background: rgba(100,200,255,0.15); padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: rgba(100,200,255,0.9); border: 1px solid rgba(100,200,255,0.3); display: flex; align-items: center; gap: 6px;"><span>📞</span><span>From Call</span></span>' : ''}
+                                    ${isCompleted ? '<span style="background: rgba(100,255,100,0.2); padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; color: rgba(100,255,100,0.9); border: 1px solid rgba(100,255,100,0.3); display: flex; align-items: center; gap: 6px;"><span>✅</span><span>Completed</span></span>' : ''}
+                                </div>
+                            </div>
+                            
+                            <button onclick="deleteTask(${task.id})" style="flex-shrink: 0; background: rgba(255,100,100,0.15); border: 2px solid rgba(255,100,100,0.3); padding: 10px 16px; border-radius: 10px; color: rgba(255,150,150,0.95); font-size: 13px; cursor: pointer; transition: all 0.3s; font-weight: 600; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.background='rgba(255,100,100,0.25)'; this.style.borderColor='rgba(255,100,100,0.5)'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(255,100,100,0.15)'; this.style.borderColor='rgba(255,100,100,0.3)'; this.style.transform='scale(1)'">
+                                <span>🗑️</span>
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAddTaskForm() {
+            document.getElementById('addTaskForm').style.display = 'block';
+            document.getElementById('newTaskDescription').focus();
+        }
+
+        function hideAddTaskForm() {
+            document.getElementById('addTaskForm').style.display = 'none';
+            document.getElementById('newTaskDescription').value = '';
+        }
+
+        async function addManualTask() {
+            const description = document.getElementById('newTaskDescription').value.trim();
+            
+            if (!description) {
+                alert('Please enter a task description');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        description: description,
+                        source: 'manual'
+                    })
+                });
+
+                if (response.ok) {
+                    hideAddTaskForm();
+                    loadTasks();
+                } else {
+                    alert('Failed to add task');
+                }
+            } catch (error) {
+                console.error('Error adding task:', error);
+                alert('Error adding task');
+            }
+        }
+
+        async function toggleTask(taskId, completed) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ completed: completed })
+                });
+
+                if (response.ok) {
+                    loadTasks();
+                } else {
+                    alert('Failed to update task');
+                }
+            } catch (error) {
+                console.error('Error updating task:', error);
+                alert('Error updating task');
+            }
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('Are you sure you want to delete this task?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    loadTasks();
+                } else {
+                    alert('Failed to delete task');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                alert('Error deleting task');
+            }
+        }
+
+        // ============================================================================
+        // END TASK MANAGEMENT FUNCTIONS
+        // ============================================================================
 
         async function loadCalendar() {
             try {
@@ -3385,6 +3853,32 @@
                 });
                 const data = await response.json();
                 const appointments = data.appointments || [];
+
+                // If we have a target appointment, calculate the week offset to show it
+                if (targetAppointmentId !== null) {
+                    console.log('Looking for appointment ID:', targetAppointmentId);
+                    const targetApt = appointments.find(apt => apt.id === targetAppointmentId);
+                    if (targetApt) {
+                        console.log('Found target appointment:', targetApt);
+                        const aptDate = new Date(targetApt.date + 'T00:00:00');
+                        const now = new Date();
+                        const currentDay = now.getDay();
+                        const currentWeekStart = new Date(now);
+                        currentWeekStart.setDate(now.getDate() - currentDay);
+                        currentWeekStart.setHours(0, 0, 0, 0);
+                        
+                        const aptDay = aptDate.getDay();
+                        const aptWeekStart = new Date(aptDate);
+                        aptWeekStart.setDate(aptDate.getDate() - aptDay);
+                        aptWeekStart.setHours(0, 0, 0, 0);
+                        
+                        const daysDiff = Math.floor((aptWeekStart - currentWeekStart) / (1000 * 60 * 60 * 24));
+                        currentWeekOffset = Math.floor(daysDiff / 7);
+                        console.log('Week offset calculated:', currentWeekOffset);
+                    } else {
+                        console.log('Target appointment not found in list');
+                    }
+                }
 
                 // Get current week based on offset
                 const now = new Date();
@@ -3450,8 +3944,13 @@
                         slotAppointments.forEach(apt => {
                             const emoji = apt.status === 'busy' ? '🚫' : apt.status === 'completed' ? '✅' : '📅';
                             const bgColor = apt.status === 'busy' ? 'rgba(255,100,100,0.4)' : apt.created_by === 'ai_agent' ? 'rgba(100,200,255,0.4)' : 'rgba(102,126,234,0.6)';
+                            const isTarget = targetAppointmentId !== null && apt.id === targetAppointmentId;
                             
-                            calendarHTML += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" style="background: ${bgColor}; padding: 6px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 11px; font-weight: 600; border-left: 3px solid rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
+                            if (isTarget) {
+                                console.log('Applying yellow flicker to appointment:', apt.id);
+                            }
+                            
+                            calendarHTML += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" class="${isTarget ? 'flicker-target' : ''}" style="background: ${bgColor}; padding: 6px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 11px; font-weight: 600; border-left: 3px solid rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s; ${isTarget ? 'animation: yellowFlicker 2s ease-in-out 3 !important;' : ''}" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
                             calendarHTML += `<div style="display: flex; align-items: center; gap: 4px;">`;
                             calendarHTML += `<span>${emoji}</span>`;
                             calendarHTML += `<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${apt.time} ${apt.title || 'Appointment'}</span>`;
@@ -3468,6 +3967,20 @@
                 
                 calendarHTML += '</div></div>';
                 document.getElementById('calendarGrid').innerHTML = calendarHTML;
+                
+                // Scroll to the target appointment if it exists
+                if (targetAppointmentId !== null) {
+                    setTimeout(() => {
+                        const targetElement = document.querySelector('.flicker-target');
+                        if (targetElement) {
+                            console.log('Scrolling to target appointment');
+                            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 100);
+                }
+                
+                // Clear target appointment after first render
+                targetAppointmentId = null;
             } catch (error) {
                 console.error('Failed to load calendar:', error);
                 document.getElementById('calendarGrid').innerHTML = '<div style="padding: 40px; text-align: center; color: rgba(255,255,255,0.5);">Error loading calendar</div>';
@@ -3759,7 +4272,228 @@
             0%, 100% { transform: translateY(0) rotate(0deg); }
             50% { transform: translateY(-20px) rotate(5deg); }
         }
+        
+        @keyframes yellowFlicker {
+            0%, 100% { background-color: inherit; box-shadow: none; }
+            25% { background-color: rgba(255, 255, 100, 0.8); box-shadow: 0 0 20px rgba(255, 255, 100, 0.6); }
+            50% { background-color: rgba(255, 255, 150, 0.9); box-shadow: 0 0 30px rgba(255, 255, 100, 0.8); }
+            75% { background-color: rgba(255, 255, 100, 0.8); box-shadow: 0 0 20px rgba(255, 255, 100, 0.6); }
+        }
+        
+        .flicker-target {
+            animation: yellowFlicker 2s ease-in-out 3 !important;
+        }
     </style>
+
+    <!-- Tasks Modal -->
+    <div id="tasksModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; backdrop-filter: blur(10px); animation: fadeIn 0.3s ease-out;">
+        <div style="width: 100%; height: 100%; overflow-y: auto; padding: 20px;">
+            <div style="max-width: 900px; margin: 0 auto; animation: slideUp 0.4s ease-out;">
+                <!-- Modal Header -->
+                <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%); border-radius: 20px 20px 0 0; padding: 30px 40px; box-shadow: 0 10px 40px rgba(102,126,234,0.4); position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%; filter: blur(40px);"></div>
+                    <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 50%; filter: blur(30px);"></div>
+                    <div style="position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2 style="font-size: 36px; margin: 0 0 8px 0; font-weight: 900; display: flex; align-items: center; gap: 15px;">✅ My Tasks</h2>
+                            <p style="font-size: 15px; margin: 0; opacity: 0.95;">Manage your action items and reminders</p>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <button onclick="showAddTaskForm()" style="background: rgba(255,255,255,0.95); color: #667eea; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'">
+                                <span style="font-size: 18px;">➕</span>
+                                <span>Add Task</span>
+                            </button>
+                            <button onclick="closeTasksModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 28px; cursor: pointer; padding: 8px 16px; border-radius: 12px; transition: all 0.3s; line-height: 1;" onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='rotate(90deg)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='rotate(0)'">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Content -->
+                <div style="background: linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(20, 20, 40, 0.98) 100%); border-radius: 0 0 20px 20px; padding: 30px 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); min-height: 400px;">
+                    <!-- Add Task Form -->
+                    <div id="addTaskForm" style="display: none; background: linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%); padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 2px solid rgba(102,126,234,0.3); animation: slideDown 0.3s ease-out;">
+                        <div style="margin-bottom: 18px;">
+                            <label style="display: block; margin-bottom: 10px; font-weight: 700; color: rgba(255,255,255,0.95); font-size: 15px;">📝 Task Description</label>
+                            <textarea id="newTaskDescription" placeholder="What needs to be done? (e.g., Call back John tomorrow at 2pm, Send meeting notes to team...)" style="width: 100%; padding: 15px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: white; font-size: 15px; font-family: inherit; resize: vertical; min-height: 100px; transition: all 0.3s;" onfocus="this.style.borderColor='rgba(102,126,234,0.6)'; this.style.background='rgba(255,255,255,0.08)'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'; this.style.background='rgba(255,255,255,0.05)'"></textarea>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <button onclick="addManualTask()" style="background: linear-gradient(135deg, #66ea96 0%, #66c8ea 100%); border: none; padding: 12px 28px; border-radius: 12px; color: white; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102,234,150,0.3); display: flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102,234,150,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102,234,150,0.3)'">
+                                <span>💾</span>
+                                <span>Save Task</span>
+                            </button>
+                            <button onclick="hideAddTaskForm()" style="background: rgba(255,100,100,0.2); border: 2px solid rgba(255,100,100,0.4); padding: 12px 28px; border-radius: 12px; color: white; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,100,100,0.3)'" onmouseout="this.style.background='rgba(255,100,100,0.2)'">
+                                ✕ Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tasks List -->
+                    <div id="tasksList" style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Tasks will be loaded here -->
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="tasksEmptyState" style="padding: 80px 40px; text-align: center;">
+                        <div style="font-size: 80px; margin-bottom: 25px; opacity: 0.3; animation: float 3s ease-in-out infinite;">📋</div>
+                        <div style="font-size: 26px; color: rgba(255,255,255,0.9); margin-bottom: 15px; font-weight: 700;">No Tasks Yet</div>
+                        <div style="font-size: 16px; color: rgba(255,255,255,0.5); line-height: 1.8; max-width: 500px; margin: 0 auto;">
+                            Your AI assistant will automatically create tasks from your calls.<br>
+                            <span style="color: rgba(102,126,234,0.8);">Click "Add Task" to create one manually.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideDown {
+            from { 
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+    <!-- Bundles Modal -->
+    <div id="bundlesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; backdrop-filter: blur(10px); animation: fadeIn 0.3s ease-out; overflow-y: auto;">
+        <div style="max-width: 850px; margin: 50px auto; padding: 0 20px;">
+            <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border-radius: 20px; padding: 32px; border: 2px solid rgba(102,126,234,0.4); backdrop-filter: blur(20px); box-shadow: 0 25px 70px rgba(0,0,0,0.6);">
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px;">
+                    <div>
+                        <h2 style="font-size: 32px; margin: 0 0 8px 0; font-weight: 900; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 12px;"><span style="font-size: 30px;">📦</span> Feature Bundles</h2>
+                        <p style="margin: 0; color: rgba(255,255,255,0.65); font-size: 14px;">Enable premium features for your AI agent • Only active features are available to callers</p>
+                    </div>
+                    <button onclick="closeBundlesModal()" style="background: rgba(255,100,100,0.25); border: 2px solid rgba(255,100,100,0.4); color: white; font-size: 24px; cursor: pointer; padding: 8px 16px; border-radius: 10px; transition: all 0.3s; font-weight: 700;" onmouseover="this.style.background='rgba(255,100,100,0.45)'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(255,100,100,0.25)'; this.style.transform='scale(1)'">✕</button>
+                </div>
+
+                <!-- Feature Bundles -->
+                <div style="display: grid; gap: 16px; margin-top: 24px;">
+                    <!-- Calendar Bookings Bundle -->
+                    <div style="background: linear-gradient(135deg, rgba(255,107,107,0.08) 0%, rgba(238,90,111,0.12) 100%); border: 2px solid rgba(255,107,107,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(255,107,107,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(255,107,107,0.25)'" onmouseout="this.style.borderColor='rgba(255,107,107,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(255,107,107,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(255,107,107,0.25) 0%, rgba(238,90,111,0.25) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(255,107,107,0.3);">📅</div>
+                                    <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; letter-spacing: -0.3px;">Calendar Bookings</h3>
+                                </div>
+                                <p style="margin: 0 0 12px 0; color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; padding-left: 60px;">Create and manage calendar appointments during calls with automatic saving</p>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 60px;">
+                                    <span style="background: linear-gradient(135deg, rgba(255,107,107,0.3) 0%, rgba(238,90,111,0.3) 100%); padding: 6px 14px; border-radius: 8px; font-weight: 700; color: #ff6b6b; font-size: 13px; border: 1px solid rgba(255,107,107,0.4); box-shadow: 0 2px 8px rgba(255,107,107,0.2);"><span id="calendarPriceDisplay">10</span> credits per booking</span>
+                                    <span style="color: rgba(255,255,255,0.45); font-size: 12px;">• Set in Server Control</span>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-block; width: 64px; height: 34px; flex-shrink: 0; cursor: pointer;">
+                                <input type="checkbox" id="calendarBundleToggle" onchange="toggleBundle('calendar')" style="opacity: 0; width: 0; height: 0;">
+                                <span class="bundle-toggle-slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: 0.4s; border-radius: 34px; border: 2px solid rgba(255,255,255,0.25); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                <span class="bundle-toggle-knob" style="position: absolute; content: ''; height: 26px; width: 26px; left: 3px; bottom: 2px; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); transition: 0.4s; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Tasks Bundle -->
+                    <div style="background: linear-gradient(135deg, rgba(46,213,115,0.08) 0%, rgba(0,184,148,0.12) 100%); border: 2px solid rgba(46,213,115,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(46,213,115,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(46,213,115,0.25)'" onmouseout="this.style.borderColor='rgba(46,213,115,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(46,213,115,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(46,213,115,0.25) 0%, rgba(0,184,148,0.25) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(46,213,115,0.3);">✓</div>
+                                    <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; letter-spacing: -0.3px;">AI Task Extraction</h3>
+                                </div>
+                                <p style="margin: 0 0 12px 0; color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; padding-left: 60px;">Automatically extract and save action items from conversations using AI</p>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 60px;">
+                                    <span style="background: linear-gradient(135deg, rgba(46,213,115,0.3) 0%, rgba(0,184,148,0.3) 100%); padding: 6px 14px; border-radius: 8px; font-weight: 700; color: #2ed573; font-size: 13px; border: 1px solid rgba(46,213,115,0.4); box-shadow: 0 2px 8px rgba(46,213,115,0.2);"><span id="tasksPriceDisplay">5</span> credits per task</span>
+                                    <span style="color: rgba(255,255,255,0.45); font-size: 12px;">• Set in Server Control</span>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-block; width: 64px; height: 34px; flex-shrink: 0; cursor: pointer;">
+                                <input type="checkbox" id="tasksBundleToggle" onchange="toggleBundle('tasks')" style="opacity: 0; width: 0; height: 0;">
+                                <span class="bundle-toggle-slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: 0.4s; border-radius: 34px; border: 2px solid rgba(255,255,255,0.25); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                <span class="bundle-toggle-knob" style="position: absolute; content: ''; height: 26px; width: 26px; left: 3px; bottom: 2px; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); transition: 0.4s; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Voice Bundle -->
+                    <div style="background: linear-gradient(135deg, rgba(108,92,231,0.08) 0%, rgba(155,81,224,0.12) 100%); border: 2px solid rgba(108,92,231,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(108,92,231,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(108,92,231,0.25)'" onmouseout="this.style.borderColor='rgba(108,92,231,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(108,92,231,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(108,92,231,0.25) 0%, rgba(155,81,224,0.25) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(108,92,231,0.3);">🎙️</div>
+                                    <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; letter-spacing: -0.3px;">Advanced Voice</h3>
+                                </div>
+                                <p style="margin: 0 0 12px 0; color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; padding-left: 60px;">Premium voice quality with ultra-low latency for natural conversations</p>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 60px;">
+                                    <span style="background: linear-gradient(135deg, rgba(108,92,231,0.3) 0%, rgba(155,81,224,0.3) 100%); padding: 6px 14px; border-radius: 8px; font-weight: 700; color: #9b51e0; font-size: 13px; border: 1px solid rgba(108,92,231,0.4); box-shadow: 0 2px 8px rgba(108,92,231,0.2);"><span id="advancedVoicePriceDisplay">3</span> credits per call</span>
+                                    <span style="color: rgba(255,255,255,0.45); font-size: 12px;">• Set in Server Control</span>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-block; width: 64px; height: 34px; flex-shrink: 0; cursor: pointer;">
+                                <input type="checkbox" id="advancedVoiceBundleToggle" onchange="toggleBundle('advancedvoice')" style="opacity: 0; width: 0; height: 0;">
+                                <span class="bundle-toggle-slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: 0.4s; border-radius: 34px; border: 2px solid rgba(255,255,255,0.25); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                <span class="bundle-toggle-knob" style="position: absolute; content: ''; height: 26px; width: 26px; left: 3px; bottom: 2px; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); transition: 0.4s; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Sales Call Detector Bundle -->
+                    <div style="background: linear-gradient(135deg, rgba(231,76,60,0.08) 0%, rgba(192,57,43,0.12) 100%); border: 2px solid rgba(231,76,60,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(231,76,60,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(231,76,60,0.25)'" onmouseout="this.style.borderColor='rgba(231,76,60,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(231,76,60,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(231,76,60,0.25) 0%, rgba(192,57,43,0.25) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(231,76,60,0.3);">🚫</div>
+                                    <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; letter-spacing: -0.3px;">Sales Call Detector</h3>
+                                </div>
+                                <p style="margin: 0 0 12px 0; color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; padding-left: 60px;">AI analyzes calls and politely ends sales pitches (>70% confidence)</p>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 60px;">
+                                    <span style="background: linear-gradient(135deg, rgba(231,76,60,0.3) 0%, rgba(192,57,43,0.3) 100%); padding: 6px 14px; border-radius: 8px; font-weight: 700; color: #e74c3c; font-size: 13px; border: 1px solid rgba(231,76,60,0.4); box-shadow: 0 2px 8px rgba(231,76,60,0.2);"><span id="salesDetectorPriceDisplay">2</span> credits per call</span>
+                                    <span style="color: rgba(255,255,255,0.45); font-size: 12px;">• Set in Server Control</span>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-block; width: 64px; height: 34px; flex-shrink: 0; cursor: pointer;">
+                                <input type="checkbox" id="salesDetectorBundleToggle" onchange="toggleBundle('salesdetector')" style="opacity: 0; width: 0; height: 0;">
+                                <span class="bundle-toggle-slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: 0.4s; border-radius: 34px; border: 2px solid rgba(255,255,255,0.25); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                <span class="bundle-toggle-knob" style="position: absolute; content: ''; height: 26px; width: 26px; left: 3px; bottom: 2px; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); transition: 0.4s; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div style="margin-top: 30px; text-align: center;">
+                        <button onclick="saveBundleSettings()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 16px 48px; border-radius: 12px; color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102,126,234,0.4);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102,126,234,0.6)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102,126,234,0.4)'">
+                            💾 Save Bundle Settings
+                        </button>
+                    </div>
+                </div>
+
+                <div id="bundleMessage" style="margin-top: 20px; padding: 14px; border-radius: 10px; display: none; font-weight: 600; text-align: center; font-size: 14px;"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Calendar Modal -->
     <div id="calendarModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; overflow-y: auto;">

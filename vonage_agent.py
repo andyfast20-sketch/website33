@@ -47,8 +47,9 @@ CONFIG = {
     # OpenAI - hardcoded to avoid environment variable conflicts
     "OPENAI_API_KEY": "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",
     
-    # DeepSeek API Key (optional - for cheaper summaries)
+    # DeepSeek API Keys (with fallback)
     "DEEPSEEK_API_KEY": "sk-5892b01daa764aa9869c77a6b23ce271",
+    "DEEPSEEK_API_KEY_FALLBACK": "sk-ea0deb6b6e7d49a28facff939fbf08ce",
     
     # ElevenLabs API Key and Voice ID
     "ELEVENLABS_API_KEY": "sk_ed0fdc5eb5acd0a634bca953582f7cf9aa750424809900a4",
@@ -226,6 +227,42 @@ def init_database():
     except:
         pass  # Column already exists
     
+    # Add credits tracking columns
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN booking_credits_charged REAL DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN task_credits_charged REAL DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN advanced_voice_credits_charged REAL DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN sales_detector_credits_charged REAL DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN sales_confidence INTEGER DEFAULT NULL')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN sales_reasoning TEXT DEFAULT NULL')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN sales_ended_by_detector INTEGER DEFAULT 0')
+    except:
+        pass
+    
     # Create appointments table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS appointments (
@@ -241,6 +278,20 @@ def init_database():
             created_by TEXT DEFAULT 'user',
             call_uuid TEXT,
             user_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+    
+    # Create tasks table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            completed INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'manual',
+            call_uuid TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -278,6 +329,12 @@ def init_database():
     except:
         pass
     
+    # Add elevenlabs_voice_id column if doesn't exist
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN elevenlabs_voice_id TEXT DEFAULT "EXAVITQu4vr4xnSDxMaL"')
+    except:
+        pass
+    
     # Add phone_number column if doesn't exist
     try:
         cursor.execute('ALTER TABLE account_settings ADD COLUMN phone_number TEXT')
@@ -309,6 +366,12 @@ def init_database():
     except:
         pass
     
+    # Add playht_voice_id column
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN playht_voice_id TEXT DEFAULT "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json"')
+    except:
+        pass
+    
     # Add agent_name column
     try:
         cursor.execute('ALTER TABLE account_settings ADD COLUMN agent_name TEXT DEFAULT "Judie"')
@@ -336,6 +399,24 @@ def init_database():
     # Add calendar_booking_enabled column
     try:
         cursor.execute('ALTER TABLE account_settings ADD COLUMN calendar_booking_enabled INTEGER DEFAULT 1')
+    except:
+        pass
+    
+    # Add tasks_enabled column
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN tasks_enabled INTEGER DEFAULT 1')
+    except:
+        pass
+    
+    # Add advanced_voice_enabled column
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN advanced_voice_enabled INTEGER DEFAULT 0')
+    except:
+        pass
+    
+    # Add sales_detector_enabled column
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN sales_detector_enabled INTEGER DEFAULT 0')
     except:
         pass
     
@@ -399,6 +480,141 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
 # MINUTES TRACKING
 # ============================================================================
 
+async def extract_tasks_from_call(call_uuid: str, transcript: str, user_id: int, api_provider: str, model: str):
+    """Extract actionable tasks from call transcript using AI"""
+    try:
+        logger.info(f"[{call_uuid}] Extracting tasks from transcript")
+        
+        # Get API key based on provider
+        if api_provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            base_url = None
+        elif api_provider == "deepseek":
+            api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
+            base_url = "https://api.deepseek.com"
+        else:
+            api_key = os.getenv("OPENAI_API_KEY")
+            base_url = None
+        
+        client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url) if base_url else openai.AsyncOpenAI(api_key=api_key)
+        
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system", 
+                    "content": """You are a task extraction assistant analyzing phone conversations. Your job is to identify ANY action items, follow-ups, or things that need to be done later.
+
+Extract tasks from the BUSINESS OWNER'S perspective (the person receiving calls). This includes:
+
+1. CALLBACK REQUESTS:
+   - "Call me back tomorrow"
+   - "Can you give me a ring later?"
+
+2. INFORMATION TO PROVIDE:
+   - "Let me know how many people are coming"
+   - "Get back to me about whether you can meet up"
+   - "Tell me if you're available"
+   - "Confirm if this works for you"
+
+3. FOLLOW-UP ACTIONS:
+   - "Send me the details"
+   - "Email the invoice"
+   - "Text me the address"
+
+4. THINGS TO ARRANGE/COORDINATE:
+   - "Set up a meeting"
+   - "Book an appointment"
+   - "Arrange a time to meet"
+
+5. PROMISES MADE:
+   - "I'll check on that"
+   - "I'll look into it"
+   - "I'll find out"
+
+6. REMINDERS:
+   - Any commitments made during the call
+   - Things promised to the caller
+
+Reword each task as a clear action item from the business owner's perspective. 
+For example:
+- Caller: "Can we meet up for a drink?" → Task: "Get back to [caller name] about meeting up for drinks"
+- Caller: "Let me know how many are coming" → Task: "Confirm attendance numbers with [caller name]"
+- Caller: "Will you be available on Friday?" → Task: "Respond to [caller name] about Friday availability"
+
+Return ONLY a JSON array of task descriptions. Each task should be actionable and specific.
+If no tasks are found, return an empty array: []
+
+Example output:
+["Get back to John about meeting for drinks", "Confirm party attendance numbers", "Send contract details to Sarah by email"]"""
+                },
+                {"role": "user", "content": f"Extract tasks from this conversation:\n\n{transcript}"}
+            ],
+            max_tokens=400,
+            temperature=0.3
+        )
+        
+        tasks_text = response.choices[0].message.content.strip()
+        logger.info(f"[{call_uuid}] Task extraction response: {tasks_text}")
+        
+        # Parse JSON response
+        import json
+        try:
+            # Remove markdown code blocks if present
+            if tasks_text.startswith("```"):
+                tasks_text = tasks_text.split("```")[1]
+                if tasks_text.startswith("json"):
+                    tasks_text = tasks_text[4:]
+            tasks_text = tasks_text.strip()
+            
+            tasks = json.loads(tasks_text)
+            
+            if isinstance(tasks, list) and len(tasks) > 0:
+                # Save tasks to database
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                task_count = 0
+                for task_desc in tasks:
+                    if task_desc and isinstance(task_desc, str) and len(task_desc.strip()) > 0:
+                        cursor.execute('''
+                            INSERT INTO tasks (user_id, description, source, call_uuid)
+                            VALUES (?, ?, ?, ?)
+                        ''', (user_id, task_desc.strip(), 'ai', call_uuid))
+                        task_count += 1
+                        logger.info(f"[{call_uuid}] Created task: {task_desc.strip()}")
+                
+                # Get task credit cost and charge it
+                if task_count > 0:
+                    cursor.execute('SELECT credits_per_task FROM billing_config WHERE id = 1')
+                    billing = cursor.fetchone()
+                    task_credits_each = billing[0] if billing else 5.0
+                    total_task_credits = task_count * task_credits_each
+                    
+                    # Track task credits in the call record
+                    cursor.execute('''
+                        UPDATE calls 
+                        SET task_credits_charged = ?
+                        WHERE call_uuid = ?
+                    ''', (total_task_credits, call_uuid))
+                    
+                    logger.info(f"[{call_uuid}] Charged {total_task_credits} credits for {task_count} tasks ({task_credits_each} credits each)")
+                
+                conn.commit()
+                conn.close()
+                logger.info(f"[{call_uuid}] Extracted and saved {task_count} tasks")
+            else:
+                logger.info(f"[{call_uuid}] No tasks found in conversation")
+                
+        except json.JSONDecodeError as e:
+            logger.warning(f"[{call_uuid}] Failed to parse tasks JSON: {e}. Response was: {tasks_text}")
+        
+    except Exception as e:
+        logger.error(f"[{call_uuid}] Failed to extract tasks: {e}")
+        import traceback
+        logger.error(f"[{call_uuid}] Traceback: {traceback.format_exc()}")
+
+
 class MinutesTracker:
     """Handles account minutes tracking per user"""
     
@@ -451,6 +667,64 @@ class MinutesTracker:
         conn.commit()
         conn.close()
         logger.info(f"Deducted {minutes_used} minute(s) from user {user_id} account")
+    
+    @staticmethod
+    def deduct_credits(user_id: int, call_uuid: str):
+        """Deduct total credits for a call (connection + duration + bundles)"""
+        conn = sqlite3.connect('call_logs.db')
+        cursor = conn.cursor()
+        
+        # Get billing config
+        cursor.execute('SELECT credits_per_connected_call, credits_per_minute FROM billing_config WHERE id = 1')
+        billing = cursor.fetchone()
+        if not billing:
+            billing = (5.0, 2.0)
+        
+        credits_per_call = billing[0]
+        credits_per_minute = billing[1]
+        
+        # Get call details and bundle charges
+        cursor.execute('''
+            SELECT duration, booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged
+            FROM calls 
+            WHERE call_uuid = ?
+        ''', (call_uuid,))
+        call_data = cursor.fetchone()
+        
+        if call_data:
+            duration, booking_charged, task_charged, voice_charged, sales_charged = call_data
+            
+            # Calculate total credits
+            total_credits = credits_per_call  # Connection fee
+            
+            if duration:
+                minutes = duration / 60
+                total_credits += minutes * credits_per_minute  # Duration charge
+            
+            if booking_charged:
+                total_credits += booking_charged
+            
+            if task_charged:
+                total_credits += task_charged
+            
+            if voice_charged:
+                total_credits += voice_charged
+            
+            if sales_charged:
+                total_credits += sales_charged
+            
+            # Deduct from user's balance
+            cursor.execute('''
+                UPDATE account_settings 
+                SET minutes_remaining = MAX(0, minutes_remaining - ?),
+                    last_updated = ?
+                WHERE user_id = ?
+            ''', (total_credits, datetime.now().isoformat(), user_id))
+            
+            conn.commit()
+            logger.info(f"[{call_uuid}] Deducted {total_credits:.2f} credits from user {user_id} (connection: {credits_per_call}, duration: {minutes * credits_per_minute:.2f}, bookings: {booking_charged or 0}, tasks: {task_charged or 0}, voice: {voice_charged or 0}, sales: {sales_charged or 0})")
+        
+        conn.close()
 
 # ============================================================================
 # CALL LOGGING
@@ -474,7 +748,7 @@ class CallLogger:
         conn.close()
     
     @staticmethod
-    def log_call_end(call_uuid: str, transcript: str = "", avg_response_time: Optional[float] = None):
+    def log_call_end(call_uuid: str, transcript: str = "", avg_response_time: Optional[float] = None, sales_confidence: Optional[int] = None, sales_reasoning: Optional[str] = None, sales_ended_call: bool = False):
         """Log when a call ends"""
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -491,50 +765,123 @@ class CallLogger:
             
             cursor.execute('''
                 UPDATE calls 
-                SET end_time = ?, duration = ?, transcript = ?, average_response_time = ?
+                SET end_time = ?, duration = ?, transcript = ?, average_response_time = ?, summary = ?, sales_confidence = ?, sales_reasoning = ?, sales_ended_by_detector = ?
                 WHERE call_uuid = ?
-            ''', (end_time.isoformat(), duration, transcript, avg_response_time, call_uuid))
+            ''', (end_time.isoformat(), duration, transcript, avg_response_time, "Generating AI summary...", sales_confidence, sales_reasoning, 1 if sales_ended_call else 0, call_uuid))
+            
+            # Check if advanced voice was enabled for this call and charge accordingly
+            if user_id:
+                cursor.execute('SELECT advanced_voice_enabled, sales_detector_enabled FROM account_settings WHERE user_id = ?', (user_id,))
+                settings = cursor.fetchone()
+                if settings:
+                    # Charge for advanced voice if enabled
+                    if settings[0]:
+                        cursor.execute('SELECT credits_per_advanced_voice FROM billing_config WHERE id = 1')
+                        billing = cursor.fetchone()
+                        voice_credits = billing[0] if billing else 3.0
+                        
+                        cursor.execute('''
+                            UPDATE calls 
+                            SET advanced_voice_credits_charged = ?
+                            WHERE call_uuid = ?
+                        ''', (voice_credits, call_uuid))
+                        
+                        logger.info(f"[{call_uuid}] Charged {voice_credits} credits for advanced voice")
+                    
+                    # Charge for sales detector if enabled
+                    if settings[1]:
+                        cursor.execute('SELECT credits_per_sales_detection FROM billing_config WHERE id = 1')
+                        billing = cursor.fetchone()
+                        sales_credits = billing[0] if billing else 2.0
+                        
+                        cursor.execute('''
+                            UPDATE calls 
+                            SET sales_detector_credits_charged = ?
+                            WHERE call_uuid = ?
+                        ''', (sales_credits, call_uuid))
+                        
+                        logger.info(f"[{call_uuid}] Charged {sales_credits} credits for sales detection")
             
             conn.commit()
             
-            # Deduct minutes from user's account based on call duration
+            logger.info(f"[{call_uuid}] Call ended - transcript length: {len(transcript)} chars, will generate summary")
+            
+            # Deduct total credits from user's account (connection + duration + bundles)
             if user_id:
-                MinutesTracker.deduct_minutes(user_id, duration)
+                MinutesTracker.deduct_credits(user_id, call_uuid)
         
         conn.close()
     
     @staticmethod
     async def generate_summary(call_uuid: str):
         """Generate AI summary of the call using OpenAI"""
+        logger.info(f"[{call_uuid}] *** STARTING generate_summary function ***")
+        
         conn = sqlite3.connect('call_logs.db')
         cursor = conn.cursor()
         
-        cursor.execute('SELECT transcript, caller_number FROM calls WHERE call_uuid = ?', (call_uuid,))
+        cursor.execute('SELECT transcript, caller_number, user_id FROM calls WHERE call_uuid = ?', (call_uuid,))
         result = cursor.fetchone()
+        
+        logger.info(f"[{call_uuid}] Database query result: {result is not None}")
         
         if result and result[0]:
             transcript = result[0]
             caller_number = result[1] or "Unknown"
+            user_id = result[2]
+            
+            logger.info(f"[{call_uuid}] Transcript length: {len(transcript)} chars, user_id: {user_id}")
             
             try:
                 # Use AI to summarize the conversation
                 import openai as openai_module
                 
-                summary_provider = CONFIG.get("SUMMARY_PROVIDER", "openai")
+                summary_provider = CONFIG.get("SUMMARY_PROVIDER", "deepseek")
                 
                 if summary_provider == "deepseek" and CONFIG.get("DEEPSEEK_API_KEY"):
-                    # Use DeepSeek - 15x cheaper!
-                    client = openai_module.OpenAI(
-                        api_key=CONFIG['DEEPSEEK_API_KEY'],
-                        base_url="https://api.deepseek.com"
-                    )
-                    model = "deepseek-chat"
+                    # Try DeepSeek - 15x cheaper!
+                    try:
+                        client = openai_module.OpenAI(
+                            api_key=CONFIG['DEEPSEEK_API_KEY'],
+                            base_url="https://api.deepseek.com"
+                        )
+                        model = "deepseek-chat"
+                        logger.info(f"[{call_uuid}] Using DeepSeek API for summary")
+                    except Exception as e:
+                        logger.warning(f"[{call_uuid}] Primary DeepSeek key failed, trying fallback: {e}")
+                        # Try fallback key
+                        if CONFIG.get("DEEPSEEK_API_KEY_FALLBACK"):
+                            try:
+                                client = openai_module.OpenAI(
+                                    api_key=CONFIG['DEEPSEEK_API_KEY_FALLBACK'],
+                                    base_url="https://api.deepseek.com"
+                                )
+                                model = "deepseek-chat"
+                                logger.info(f"[{call_uuid}] Using DeepSeek fallback API for summary")
+                            except Exception as e2:
+                                logger.error(f"[{call_uuid}] DeepSeek fallback also failed: {e2}")
+                                # Fall back to OpenAI
+                                client = openai_module.OpenAI(
+                                    api_key=CONFIG['OPENAI_API_KEY']
+                                )
+                                model = CONFIG.get("SUMMARY_MODEL", "gpt-4o-mini")
+                                summary_provider = "openai"
+                                logger.info(f"[{call_uuid}] Falling back to OpenAI for summary")
+                        else:
+                            # No fallback, use OpenAI
+                            client = openai_module.OpenAI(
+                                api_key=CONFIG['OPENAI_API_KEY']
+                            )
+                            model = CONFIG.get("SUMMARY_MODEL", "gpt-4o-mini")
+                            summary_provider = "openai"
+                            logger.info(f"[{call_uuid}] No fallback available, using OpenAI for summary")
                 else:
                     # Use OpenAI
                     client = openai_module.OpenAI(
                         api_key=CONFIG['OPENAI_API_KEY']
                     )
                     model = CONFIG.get("SUMMARY_MODEL", "gpt-4o-mini")
+                    logger.info(f"[{call_uuid}] Using OpenAI for summary")
                 
                 response = client.chat.completions.create(
                     model=model,
@@ -546,13 +893,25 @@ class CallLogger:
                 )
                 
                 summary = response.choices[0].message.content.strip()
-                logger.info(f"[{call_uuid}] Summary generated using {summary_provider}/{model}")
+                logger.info(f"[{call_uuid}] Summary generated using {summary_provider}/{model}: {summary}")
                 
                 # Save summary to database
                 cursor.execute('UPDATE calls SET summary = ? WHERE call_uuid = ?', (summary, call_uuid))
                 conn.commit()
                 
                 logger.info(f"[{call_uuid}] Generated summary: {summary}")
+                
+                # Extract tasks from the conversation using AI (only if enabled)
+                # Check if tasks are enabled for this user
+                cursor.execute('SELECT tasks_enabled FROM account_settings WHERE user_id = ?', (user_id,))
+                tasks_row = cursor.fetchone()
+                tasks_enabled = bool(tasks_row[0]) if tasks_row and tasks_row[0] is not None else True
+                
+                if tasks_enabled:
+                    logger.info(f"[{call_uuid}] Tasks enabled - extracting tasks from call")
+                    await extract_tasks_from_call(call_uuid, transcript, user_id, summary_provider, model)
+                else:
+                    logger.info(f"[{call_uuid}] Tasks disabled - skipping task extraction (user turned off bundle)")
                 
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to generate summary: {e}")
@@ -576,18 +935,20 @@ class CallLogger:
         if user_id:
             cursor.execute('''
                 SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time, 
-                       c.end_time, c.duration, c.transcript, c.summary, c.status,
-                       (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid AND user_id = ?) as has_appointment
+                       c.end_time, c.duration, c.transcript, c.summary, c.status, c.sales_confidence, c.sales_reasoning, c.sales_ended_by_detector,
+                       (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid AND user_id = ?) as has_appointment,
+                       (SELECT id FROM appointments WHERE call_uuid = c.call_uuid AND user_id = ? ORDER BY created_at DESC LIMIT 1) as appointment_id
                 FROM calls c
                 WHERE c.user_id = ?
                 ORDER BY c.start_time DESC
                 LIMIT ?
-            ''', (user_id, user_id, limit))
+            ''', (user_id, user_id, user_id, limit))
         else:
             cursor.execute('''
                 SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time, 
-                       c.end_time, c.duration, c.transcript, c.summary, c.status,
-                       (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid) as has_appointment
+                       c.end_time, c.duration, c.transcript, c.summary, c.status, c.sales_confidence, c.sales_reasoning, c.sales_ended_by_detector,
+                       (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid) as has_appointment,
+                       (SELECT id FROM appointments WHERE call_uuid = c.call_uuid ORDER BY created_at DESC LIMIT 1) as appointment_id
                 FROM calls c
                 ORDER BY c.start_time DESC
                 LIMIT ?
@@ -608,7 +969,11 @@ class CallLogger:
                 "transcript": row[6],
                 "summary": row[7] or "Processing...",
                 "status": row[8] or "active",
-                "has_appointment": row[9] > 0
+                "sales_confidence": row[9],
+                "sales_reasoning": row[10],
+                "sales_ended_by_detector": row[11],
+                "has_appointment": row[12] > 0,
+                "appointment_id": row[13]
             })
         
         return calls
@@ -643,6 +1008,195 @@ class CallSession:
         self._elevenlabs_text_buffer = ""  # Buffer for accumulating text
         self._elevenlabs_sent = False  # Track if we've already sent audio for this response
         
+        # Sales detection
+        self._last_sales_check_time = None
+        self._sales_detection_interval = 20  # Check every 20 seconds (reduced frequency)
+        self.sales_detector_enabled = False  # Will be set from account settings
+        self._sales_detection_ran = False  # Track if detection has run
+        self.sales_confidence = None  # Store confidence percentage for display
+        self.sales_reasoning = None  # Store reasoning for display
+        self.sales_ended_call = False  # Track if we ended the call due to sales detection
+    
+    async def _check_sales_in_background(self):
+        """Background task to check for sales calls without blocking conversation"""
+        try:
+            is_sales = await self.check_for_sales_call()
+            if is_sales:
+                logger.warning(f"[{self.call_uuid}] 🚫 Sales call detected! Ending call politely")
+                self.sales_ended_call = True  # Mark that we're ending due to sales detection
+                await self.politely_end_call()
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Error in background sales detection: {e}")
+    
+    async def check_for_sales_call(self):
+        """Use OpenAI to analyze if caller is trying to sell something - FAST"""
+        if not self.sales_detector_enabled:
+            return False
+        
+        current_time = asyncio.get_event_loop().time()
+        
+        # Only check every N seconds to reduce API costs
+        if self._last_sales_check_time and (current_time - self._last_sales_check_time) < self._sales_detection_interval:
+            return False
+        
+        self._last_sales_check_time = current_time
+        
+        # Need at least some conversation to analyze (reduced from 3 to 2)
+        if len(self.transcript_parts) < 2:
+            return False
+        
+        # Get more context - include recent exchanges for better analysis
+        transcript = "\n".join(self.transcript_parts[-12:])  # Analyze last 12 exchanges for more context
+        
+        # Add extra context about screening questions if present
+        conversation_context = transcript
+        if any(keyword in transcript.lower() for keyword in ['what is this regarding', 'what brings you', 'have we spoken', 'existing client', 'how did you hear']):
+            conversation_context = f"""SCREENING QUESTIONS WERE ASKED:
+{transcript}
+
+Note: Pay attention to how the caller responded to questions about their purpose and relationship."""
+        
+        try:
+            # Use DeepSeek for background sales detection (cost-effective, doesn't impact call quality)
+            if not CONFIG.get("DEEPSEEK_API_KEY"):
+                logger.warning(f"[{self.call_uuid}] DeepSeek API key not configured for sales detection")
+                return False
+            
+            import httpx
+            
+            response = await httpx.AsyncClient().post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {CONFIG['DEEPSEEK_API_KEY']}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [
+                    {
+                        "role": "system",
+                        "content": """You are a sales call detector. Your job is to identify UNWANTED SALES CALLS where someone is trying to SELL TO the business, NOT customers who want to BUY services.
+
+CRITICAL: A caller wanting to BUY services from the business is NOT a sales call!
+
+🚫 MARK AS SALES CALL (High Confidence 75%+) IF:
+1. Caller is trying to SELL services/products TO the business (marketing, software, consulting, etc.)
+2. Caller refuses to explain what they're calling about when directly asked
+3. Caller is vague and evasive: "business opportunity", "work with companies like yours"
+4. Caller has no prior relationship and won't state their company/purpose clearly
+5. Caller asks for "decision-maker" without explaining why
+6. Caller uses sales language: "special offer", "limited time", "save money"
+
+✅ DO NOT FLAG AS SALES (Should be 0-20% confidence) IF:
+- Caller wants to BUY services from the business (customer inquiry)
+- Caller clearly states their problem/need: "need electrician", "plumbing issue", "book appointment"
+- Caller is an existing customer with a question
+- Caller was referred by someone specific
+- Caller gives direct, honest answers about why they're calling
+- Caller is following up on previous business
+- Caller asks basic questions about the business's services/pricing
+
+REMEMBER: Someone calling to BUY from you = CUSTOMER (not sales call)
+Someone calling to SELL to you = SALES CALL
+
+Respond with JSON: {"is_sales_call": true/false, "confidence": 0-100, "reasoning": "1-3 sentences"}
+
+If confidence >= 75%, reasoning MUST clearly explain which sales indicators were present.
+If confidence < 30%, reasoning should explain why this appears to be a legitimate customer/inquiry."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Conversation:
+{conversation_context}
+
+Analyze this conversation carefully. 
+
+KEY QUESTION: Is the caller trying to SELL something TO the business, or is the caller a CUSTOMER trying to BUY services FROM the business?
+
+If the caller wants to buy services, book an appointment, or has a service need = NOT a sales call (0-20% confidence)
+If the caller is trying to sell marketing, software, services TO the business = Sales call (75%+ confidence)
+
+Pay attention to:
+1. What is the caller's stated purpose?
+2. Are they being direct and honest about what they need?
+3. Are they trying to sell TO the business or buy FROM the business?
+
+Provide your analysis."""
+                    }
+                ],
+                    "temperature": 0.2,
+                    "max_tokens": 150
+                },
+                timeout=10.0
+            )
+            
+            response.raise_for_status()
+            result_data = response.json()
+            result_text = result_data['choices'][0]['message']['content'].strip()
+            logger.info(f"[{self.call_uuid}] Sales detection analysis: {result_text}")
+            
+            # Mark that detection has run
+            self._sales_detection_ran = True
+            
+            # Parse JSON response
+            import json
+            import re
+            json_match = re.search(r'\{[^}]+\}', result_text)
+            if json_match:
+                result = json.loads(json_match.group())
+                is_sales = result.get('is_sales_call', False)
+                confidence = result.get('confidence', 0)
+                reasoning = result.get('reasoning', 'No reasoning provided')
+                
+                # Store confidence and reasoning for later display in admin panel
+                self.sales_confidence = confidence
+                self.sales_reasoning = reasoning
+                
+                logger.info(f"[{self.call_uuid}] Sales call detection: {is_sales}, Confidence: {confidence}% - {reasoning}")
+                
+                # Return True if confidence is 75% or higher
+                if is_sales and confidence >= 75:
+                    return True
+            else:
+                # If JSON parsing fails, store the raw response as reasoning
+                self.sales_reasoning = result_text
+                logger.warning(f"[{self.call_uuid}] Failed to parse sales detection JSON response")
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Sales detection error: {e}")
+        
+        return False
+    
+    async def politely_end_call(self):
+        """Politely end the call after detecting a sales pitch"""
+        goodbye_message = "I appreciate you reaching out, but we're not interested in any sales calls at the moment. Thank you for your time, and have a great day. Goodbye!"
+        
+        try:
+            # Send goodbye message through OpenAI
+            await self.openai_ws.send(json.dumps({
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
+                }
+            }))
+            
+            await self.openai_ws.send(json.dumps({"type": "response.create"}))
+            
+            # Wait a moment for the message to be sent
+            await asyncio.sleep(3)
+            
+            logger.info(f"[{self.call_uuid}] Ending sales call politely")
+            
+            # Close the call
+            self.is_active = False
+            if self.vonage_ws:
+                await self.vonage_ws.close()
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Error ending sales call: {e}")
+    
     async def connect_to_openai(self):
         """Establish connection to OpenAI Realtime API"""
         # Retry up to 3 times
@@ -699,8 +1253,28 @@ class CallSession:
                 instructions_parts.append("- Provide clear, complete answers without rambling")
                 instructions_parts.append("- NEVER include meta-commentary like 'Assistant:', 'mode:', or stage directions")
                 instructions_parts.append("- Speak ONLY as the receptionist - no prefixes, labels, or formatting")
-                instructions_parts.append("\nYou can book appointments using the book_appointment function when a caller requests one.")
-                instructions_parts.append("\nIf a time slot is already booked, the system will return alternative available times - offer these alternatives to the caller.")
+                instructions_parts.append("- NEVER say you'll check if someone is available unless you can actually transfer the call")
+                instructions_parts.append("- If you can't transfer a call, say you'll take a message and have them call back")
+                
+                # Natural engagement for context gathering (helps sales detection)
+                instructions_parts.append("\nCONVERSATIONAL ENGAGEMENT & SCREENING:")
+                instructions_parts.append("- ALWAYS ask callers what their call is regarding if they don't immediately state it")
+                instructions_parts.append("- Ask 'Have we spoken before?' or 'Are you an existing client?' to establish relationship")
+                instructions_parts.append("- If caller is evasive or won't explain their purpose, politely press for clarity")
+                instructions_parts.append("- For new callers: 'How did you hear about us?' helps identify referrals vs cold calls")
+                instructions_parts.append("- Be genuinely helpful and conversational - gather context naturally")
+                instructions_parts.append("- If someone won't explain what they're calling about, it's likely a sales call")
+                instructions_parts.append("- Don't be pushy, but do ask clarifying questions to understand who's calling and why")
+                instructions_parts.append("\nSALES CALLS:")
+                instructions_parts.append("- If it becomes clear someone is cold-calling to sell something, politely decline without offering to take a message")
+                instructions_parts.append("- For sales calls, be brief: 'Thank you, but we're not interested. Have a great day!'")
+                instructions_parts.append("- Do NOT offer to pass on details or have someone call back sales callers")
+                
+                # Only mention booking if calendar bundle is enabled
+                if getattr(self, 'calendar_booking_enabled', True):
+                    instructions_parts.append("\nYou can book appointments using the book_appointment function when a caller requests one.")
+                    instructions_parts.append("\nIf a time slot is already booked, the system will return alternative available times - offer these alternatives to the caller.")
+                    instructions_parts.append("\nIf the booking function returns an 'insufficient_credits' error, politely tell the caller: 'I don't have access to the diary right now, but I can take your details and ask [person's name] to call you back.'")
                 
                 current_instructions = "\n".join(instructions_parts)
                 logger.info(f"[{self.call_uuid}] Using instructions: {current_instructions[:100]}...")
@@ -738,15 +1312,15 @@ class CallSession:
                 if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht']:
                     modalities = ["text"]  # Text only - external TTS will handle audio
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
-                    # For external TTS: higher threshold to prevent false triggers/hallucinations
+                    # For external TTS: balanced threshold to prevent interrupting user while staying responsive
                     turn_detection_config = {
                         "type": "server_vad",
-                        "threshold": 0.7,  # Higher threshold to prevent picking up noise/echo
+                        "threshold": 0.5,  # Balanced threshold
                         "prefix_padding_ms": 300,  # Standard padding
-                        "silence_duration_ms": max(response_latency, 500),  # Minimum 500ms for faster responses
+                        "silence_duration_ms": max(response_latency, 450),  # Quick response
                         "create_response": True
                     }
-                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} TTS VAD: threshold=0.7, silence={max(response_latency, 500)}ms")
+                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} TTS VAD: threshold=0.5, silence={max(response_latency, 450)}ms")
                 else:
                     modalities = ["text", "audio"]  # OpenAI handles both text and audio
                     # For OpenAI voice: need lower threshold for better conversational flow
@@ -758,6 +1332,44 @@ class CallSession:
                         "create_response": True
                     }
                     logger.info(f"[{self.call_uuid}] OpenAI voice VAD: threshold=0.5, silence={response_latency}ms")
+                
+                # Build tools list based on enabled bundles
+                tools = []
+                if getattr(self, 'calendar_booking_enabled', True):
+                    tools.append({
+                        "type": "function",
+                        "name": "book_appointment",
+                        "description": "Book an appointment for the caller. Use this when someone wants to schedule a meeting or appointment.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "date": {
+                                    "type": "string",
+                                    "description": "The date of the appointment in YYYY-MM-DD format"
+                                },
+                                "time": {
+                                    "type": "string",
+                                    "description": "The time of the appointment in HH:MM format (24-hour)"
+                                },
+                                "customer_name": {
+                                    "type": "string",
+                                    "description": "The caller's name"
+                                },
+                                "customer_phone": {
+                                    "type": "string",
+                                    "description": "The caller's phone number"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Notes about the appointment"
+                                }
+                            },
+                            "required": ["date", "time", "customer_name"]
+                        }
+                    })
+                    logger.info(f"[{self.call_uuid}] Calendar booking tool ENABLED")
+                else:
+                    logger.info(f"[{self.call_uuid}] Calendar booking tool DISABLED (user turned off bundle)")
                 
                 await self.openai_ws.send(json.dumps({
                     "type": "session.update",
@@ -773,39 +1385,7 @@ class CallSession:
                         "turn_detection": turn_detection_config,
                         "max_response_output_tokens": 300,  # Balanced length
                         "temperature": 0.8,  # Faster generation
-                        "tools": [
-                            {
-                                "type": "function",
-                                "name": "book_appointment",
-                                "description": "Book an appointment for the caller. Use this when someone wants to schedule a meeting or appointment.",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {
-                                        "date": {
-                                            "type": "string",
-                                            "description": "The date of the appointment in YYYY-MM-DD format"
-                                        },
-                                        "time": {
-                                            "type": "string",
-                                            "description": "The time of the appointment in HH:MM format (24-hour)"
-                                        },
-                                        "customer_name": {
-                                            "type": "string",
-                                            "description": "The caller's name"
-                                        },
-                                        "customer_phone": {
-                                            "type": "string",
-                                            "description": "The caller's phone number"
-                                        },
-                                        "description": {
-                                            "type": "string",
-                                            "description": "Notes about the appointment"
-                                        }
-                                    },
-                                    "required": ["date", "time", "customer_name"]
-                                }
-                            }
-                        ],
+                        "tools": tools,
                         "tool_choice": "auto"
                     }
                 }))
@@ -891,6 +1471,10 @@ class CallSession:
                     logger.info(f"[{self.call_uuid}] 📞 Caller: {transcript}")
                     self.transcript_parts.append(f"Caller: {transcript}")
                     self._last_speech_time = asyncio.get_event_loop().time()
+                    
+                    # Check for sales call in background (non-blocking) - don't wait for result
+                    if self.sales_detector_enabled:
+                        asyncio.create_task(self._check_sales_in_background())
                 
                 elif event_type == "response.audio.delta":
                     # Agent is speaking
@@ -935,14 +1519,31 @@ class CallSession:
                             logger.info(f"[{self.call_uuid}] ⚡ FAST MODE: Started ElevenLabs with complete sentence ({len(self._elevenlabs_text_buffer)} chars)")
                     
                 elif event_type == "response.text.delta":
-                    # Text response when in text-only mode (Cartesia/ElevenLabs)
+                    # Text response when in text-only mode (Cartesia/ElevenLabs/Google/PlayHT)
                     text = event.get("delta", "")
                     if not hasattr(self, '_text_response_buffer'):
                         self._text_response_buffer = ""
+                        self._audio_generation_started = False
+                    
                     self._text_response_buffer += text
                     
+                    # Get user's voice provider preference
+                    voice_provider = getattr(self, 'voice_provider', 'openai')
+                    
+                    # For ElevenLabs: Start audio generation as soon as we have a complete sentence
+                    # This gives instant response like heyjodie.com
+                    if voice_provider == 'elevenlabs' and eleven_client and not self._audio_generation_started:
+                        buffer_ends_with_punctuation = self._text_response_buffer.strip().endswith(('.', '!', '?'))  # Full stops only
+                        buffer_long_enough = len(self._text_response_buffer) >= 20  # Start quickly
+                        
+                        if buffer_ends_with_punctuation and buffer_long_enough:
+                            # Start streaming audio immediately with first sentence
+                            asyncio.create_task(self._send_elevenlabs_audio(self._text_response_buffer))
+                            self._audio_generation_started = True
+                            logger.info(f"[{self.call_uuid}] ⚡ INSTANT MODE: Started ElevenLabs early with {len(self._text_response_buffer)} chars")
+                    
                 elif event_type == "response.text.done":
-                    # Complete text response - generate audio with Cartesia/ElevenLabs
+                    # Complete text response - generate audio if not already started
                     transcript = event.get("text", "")
                     if not transcript and hasattr(self, '_text_response_buffer'):
                         transcript = self._text_response_buffer
@@ -954,18 +1555,25 @@ class CallSession:
                     # Get user's voice provider preference
                     voice_provider = getattr(self, 'voice_provider', 'openai')
                     
-                    # Generate audio with the selected voice provider
-                    if voice_provider == 'cartesia' and cartesia_client and transcript:
-                        await self._send_cartesia_audio(transcript)
-                    elif voice_provider == 'elevenlabs' and eleven_client and transcript:
-                        await self._send_elevenlabs_audio(transcript)
-                    elif voice_provider == 'google' and google_tts_client and transcript:
-                        await self._send_google_tts_audio(transcript)
-                    elif voice_provider == 'playht' and playht_api_key and transcript:
-                        await self._send_playht_audio(transcript)
+                    # Only generate audio if we haven't already started (for non-ElevenLabs or if ElevenLabs didn't trigger early)
+                    audio_already_started = getattr(self, '_audio_generation_started', False)
+                    
+                    # Generate audio with the selected voice provider (only if not already started)
+                    if not audio_already_started:
+                        if voice_provider == 'cartesia' and cartesia_client and transcript:
+                            await self._send_cartesia_audio(transcript)
+                        elif voice_provider == 'elevenlabs' and eleven_client and transcript:
+                            await self._send_elevenlabs_audio(transcript)
+                        elif voice_provider == 'google' and google_tts_client and transcript:
+                            await self._send_google_tts_audio(transcript)
+                        elif voice_provider == 'playht' and playht_api_key and transcript:
+                            await self._send_playht_audio(transcript)
+                    else:
+                        logger.info(f"[{self.call_uuid}] ⚡ Audio already streaming, skipping duplicate generation")
                     
                     # Reset buffer
                     self._text_response_buffer = ""
+                    self._audio_generation_started = False
                     
                 elif event_type == "response.audio_transcript.done":
                     # Audio response when in audio mode (OpenAI voice)
@@ -1143,41 +1751,38 @@ class CallSession:
                 text=text,
                 model_id="eleven_turbo_v2_5",  # Fastest model available
                 output_format="pcm_16000",  # Request PCM at 16kHz directly
-                optimize_streaming_latency=3,  # Balanced streaming optimization
+                optimize_streaming_latency=2,  # Lower latency without crackling
                 voice_settings=VoiceSettings(
-                    stability=0.4,  # Balanced quality/speed
-                    similarity_boost=0.6,  # Better voice quality
+                    stability=0.7,  # Higher stability for natural, slower speech
+                    similarity_boost=0.8,  # High quality voice matching
                     style=0.0,
-                    use_speaker_boost=True  # Better voice quality
+                    use_speaker_boost=True
                 )
             )
             
-            logger.info(f"[{self.call_uuid}] Collecting audio chunks from ElevenLabs...")
-            # Collect audio chunks
-            audio_chunks = []
+            logger.info(f"[{self.call_uuid}] Streaming audio chunks from ElevenLabs...")
+            # Buffer chunks to avoid crackling - send in larger batches
+            chunk_buffer = b''
+            chunk_count = 0
+            buffer_size = 4096  # Send every 4KB to avoid crackling
+            
             for chunk in audio_generator:
-                audio_chunks.append(chunk)
+                if chunk and self.is_active:
+                    chunk_buffer += chunk
+                    
+                    # Send when buffer reaches target size or end of stream
+                    if len(chunk_buffer) >= buffer_size:
+                        if self.vonage_ws:
+                            await self.vonage_ws.send_bytes(chunk_buffer)
+                            chunk_count += 1
+                        chunk_buffer = b''
             
-            # Combine all chunks
-            audio_data = b''.join(audio_chunks)
-            logger.info(f"[{self.call_uuid}] ElevenLabs generated {len(audio_data)} bytes of audio")
+            # Send any remaining buffered audio
+            if chunk_buffer and self.vonage_ws and self.is_active:
+                await self.vonage_ws.send_bytes(chunk_buffer)
+                chunk_count += 1
             
-            if len(audio_data) == 0:
-                logger.error(f"[{self.call_uuid}] ElevenLabs returned empty audio!")
-                return False
-            
-            # Audio is already PCM 16kHz (as requested)
-            # Convert to int16 numpy array, then to bytes (matching OpenAI format)
-            audio_array = np.frombuffer(audio_data, dtype=np.int16)
-            
-            # Send in the same way as OpenAI audio - all at once
-            if self.vonage_ws and self.is_active:
-                await self.vonage_ws.send_bytes(audio_array.tobytes())
-                logger.info(f"[{self.call_uuid}] ✅ ElevenLabs audio sent successfully ({len(audio_data)} bytes)")
-            else:
-                logger.warning(f"[{self.call_uuid}] Vonage WS disconnected, cannot send audio")
-                return False
-            
+            logger.info(f"[{self.call_uuid}] ✅ ElevenLabs streamed {chunk_count} audio chunks successfully")
             return True
             
         except Exception as e:
@@ -1383,6 +1988,32 @@ class CallSession:
     async def _handle_book_appointment(self, call_id: str, arguments: dict):
         """Handle appointment booking function call from AI"""
         try:
+            # Check if user has sufficient credits (need at least 2 credits)
+            user_id = getattr(self, 'user_id', None)
+            if user_id:
+                conn_check = sqlite3.connect('call_logs.db')
+                cursor_check = conn_check.cursor()
+                cursor_check.execute('SELECT minutes_remaining FROM account_settings WHERE user_id = ?', (user_id,))
+                balance = cursor_check.fetchone()
+                conn_check.close()
+                
+                if balance and balance[0] is not None and balance[0] < 2:
+                    logger.warning(f"[{self.call_uuid}] Insufficient credits for booking - balance: {balance[0]}")
+                    await self.openai_ws.send(json.dumps({
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": json.dumps({
+                                "success": False,
+                                "error": "insufficient_credits",
+                                "message": "I don't have access to the diary right now, but I can ask them to call you back"
+                            })
+                        }
+                    }))
+                    await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                    return
+            
             # Extract appointment details
             date = arguments.get("date")
             time = arguments.get("time")
@@ -1470,8 +2101,23 @@ class CallSession:
                 customer_name, customer_phone, "scheduled", "ai_agent", self.call_uuid, user_id
             ))
             appointment_id = cursor.lastrowid
+            
+            # Get booking credit cost and charge it
+            cursor.execute('SELECT credits_per_calendar_booking FROM billing_config WHERE id = 1')
+            billing = cursor.fetchone()
+            booking_credits = billing[0] if billing else 10.0
+            
+            # Track booking credits in the call record
+            cursor.execute('''
+                UPDATE calls 
+                SET booking_credits_charged = COALESCE(booking_credits_charged, 0) + ?
+                WHERE call_uuid = ?
+            ''', (booking_credits, self.call_uuid))
+            
             conn.commit()
             conn.close()
+            
+            logger.info(f"[{self.call_uuid}] Charged {booking_credits} credits for calendar booking")
             
             logger.info(f"[{self.call_uuid}] Appointment {appointment_id} booked for {customer_name} on {date} at {time}")
             
@@ -1594,7 +2240,7 @@ class CallSession:
             avg_response_time = sum(self._response_times) / len(self._response_times)
             logger.info(f"[{self.call_uuid}] Average response time: {avg_response_time:.0f}ms from {len(self._response_times)} responses")
         
-        CallLogger.log_call_end(self.call_uuid, full_transcript, avg_response_time)
+        CallLogger.log_call_end(self.call_uuid, full_transcript, avg_response_time, self.sales_confidence, self.sales_reasoning, self.sales_ended_call)
         
         # Generate AI summary in background
         asyncio.create_task(CallLogger.generate_summary(self.call_uuid))
@@ -1617,13 +2263,14 @@ class SessionManager:
         session = CallSession(call_uuid, caller, called)
         session.user_id = user_id  # Store user_id in session
         
-        # Load user's voice and provider preference from database
+        # Load user's voice, provider preference, and bundle settings from database
         if user_id:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice, playht_voice_id
+                    SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
+                           calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled
                     FROM account_settings WHERE user_id = ?
                 ''', (user_id,))
                 row = cursor.fetchone()
@@ -1659,6 +2306,13 @@ class SessionManager:
                     session.playht_voice_id = row[6] if row[6] else 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
                     if session.voice_provider == 'playht':
                         logger.info(f"[{call_uuid}] PlayHT voice ID: {session.playht_voice_id}")
+                    
+                    # Bundle settings
+                    session.calendar_booking_enabled = bool(row[7]) if len(row) > 7 and row[7] is not None else True
+                    session.tasks_enabled = bool(row[8]) if len(row) > 8 and row[8] is not None else True
+                    session.advanced_voice_enabled = bool(row[9]) if len(row) > 9 and row[9] is not None else False
+                    session.sales_detector_enabled = bool(row[10]) if len(row) > 10 and row[10] is not None else False
+                    logger.info(f"[{call_uuid}] Bundle settings - Calendar: {session.calendar_booking_enabled}, Tasks: {session.tasks_enabled}, AdvancedVoice: {session.advanced_voice_enabled}, SalesDetector: {session.sales_detector_enabled}")
                 else:
                     session.user_voice = 'shimmer'
                     session.voice_provider = 'openai'
@@ -1667,6 +2321,10 @@ class SessionManager:
                     session.cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
                     session.google_voice = 'en-GB-Neural2-A'
                     session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                    session.calendar_booking_enabled = True
+                    session.tasks_enabled = True
+                    session.sales_detector_enabled = False
+                    session.advanced_voice_enabled = False
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to load preferences: {e}")
                 session.user_voice = 'shimmer'
@@ -1808,6 +2466,7 @@ async def get_config(authorization: Optional[str] = Header(None)):
     voice_provider = 'openai'
     cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
     google_voice = 'en-GB-Neural2-A'
+    playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
     phone_number = ''
     response_latency = 300
     agent_name = 'Judie'
@@ -1815,6 +2474,9 @@ async def get_config(authorization: Optional[str] = Header(None)):
     agent_personality = 'Friendly and professional. Keep responses brief and conversational.'
     agent_instructions = 'Answer questions about the business. Take messages if needed.'
     calendar_booking_enabled = True
+    tasks_enabled = True
+    advanced_voice_enabled = False
+    sales_detector_enabled = False
     
     if user_id:
         try:
@@ -1822,9 +2484,9 @@ async def get_config(authorization: Optional[str] = Header(None)):
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT voice, use_elevenlabs, elevenlabs_voice_id, phone_number, 
-                       response_latency, voice_provider, cartesia_voice_id, google_voice,
+                       response_latency, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
                        agent_name, business_info, agent_personality, agent_instructions,
-                       calendar_booking_enabled
+                       calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled
                 FROM account_settings WHERE user_id = ?
             ''', (user_id,))
             row = cursor.fetchone()
@@ -1847,21 +2509,46 @@ async def get_config(authorization: Optional[str] = Header(None)):
                 if row[7]:
                     google_voice = row[7]
                 if row[8]:
-                    agent_name = row[8]
-                    CONFIG["AGENT_NAME"] = agent_name  # Update in-memory config
+                    playht_voice_id = row[8]
                 if row[9]:
-                    business_info = row[9]
-                    CONFIG["BUSINESS_INFO"] = business_info
+                    agent_name = row[9]
+                    CONFIG["AGENT_NAME"] = agent_name  # Update in-memory config
                 if row[10]:
-                    agent_personality = row[10]
-                    CONFIG["AGENT_PERSONALITY"] = agent_personality
+                    business_info = row[10]
+                    CONFIG["BUSINESS_INFO"] = business_info
                 if row[11]:
-                    agent_instructions = row[11]
+                    agent_personality = row[11]
+                    CONFIG["AGENT_PERSONALITY"] = agent_personality
+                if row[12]:
+                    agent_instructions = row[12]
                     CONFIG["AGENT_INSTRUCTIONS"] = agent_instructions
-                if row[12] is not None:
-                    calendar_booking_enabled = bool(row[12])
+                if row[13] is not None:
+                    calendar_booking_enabled = bool(row[13])
+                if row[14] is not None:
+                    tasks_enabled = bool(row[14])
+                if row[15] is not None:
+                    advanced_voice_enabled = bool(row[15])
+                if row[16] is not None:
+                    sales_detector_enabled = bool(row[16])
         except Exception as e:
             logger.error(f"Failed to load user config: {e}")
+    
+    # Load billing config to include pricing
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT credits_per_calendar_booking, credits_per_task, credits_per_advanced_voice, credits_per_sales_detection FROM billing_config WHERE id = 1')
+        billing = cursor.fetchone()
+        conn.close()
+        calendar_credits = billing[0] if billing else 10.0
+        task_credits = billing[1] if billing and len(billing) > 1 else 5.0
+        voice_credits = billing[2] if billing and len(billing) > 2 else 3.0
+        sales_credits = billing[3] if billing and len(billing) > 3 else 2.0
+    except Exception as e:
+        logger.error(f"Failed to load billing config: {e}")
+        calendar_credits = 10.0
+        task_credits = 5.0
+        voice_credits = 3.0
     
     return {
         "AGENT_NAME": agent_name,
@@ -1874,9 +2561,17 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "VOICE_PROVIDER": voice_provider,
         "CARTESIA_VOICE_ID": cartesia_voice_id,
         "GOOGLE_VOICE": google_voice,
+        "PLAYHT_VOICE_ID": playht_voice_id,
         "PHONE_NUMBER": phone_number,
         "RESPONSE_LATENCY": response_latency,
-        "CALENDAR_BOOKING_ENABLED": calendar_booking_enabled
+        "CALENDAR_BOOKING_ENABLED": calendar_booking_enabled,
+        "TASKS_ENABLED": tasks_enabled,
+        "ADVANCED_VOICE_ENABLED": advanced_voice_enabled,
+        "SALES_DETECTOR_ENABLED": sales_detector_enabled,
+        "CALENDAR_BOOKING_CREDITS": calendar_credits,
+        "TASK_CREDITS": task_credits,
+        "ADVANCED_VOICE_CREDITS": voice_credits,
+        "SALES_DETECTOR_CREDITS": sales_credits
     }
 
 
@@ -1954,6 +2649,24 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             cursor.execute('UPDATE account_settings SET calendar_booking_enabled = ? WHERE user_id = ?', 
                          (calendar_enabled, user_id))
             logger.info(f"Calendar booking enabled updated to {data['CALENDAR_BOOKING_ENABLED']} for user {user_id}")
+        
+        if "TASKS_ENABLED" in data:
+            tasks_enabled = 1 if data["TASKS_ENABLED"] else 0
+            cursor.execute('UPDATE account_settings SET tasks_enabled = ? WHERE user_id = ?', 
+                         (tasks_enabled, user_id))
+            logger.info(f"Tasks enabled updated to {data['TASKS_ENABLED']} for user {user_id}")
+        
+        if "ADVANCED_VOICE_ENABLED" in data:
+            voice_enabled = 1 if data["ADVANCED_VOICE_ENABLED"] else 0
+            cursor.execute('UPDATE account_settings SET advanced_voice_enabled = ? WHERE user_id = ?', 
+                         (voice_enabled, user_id))
+            logger.info(f"Advanced voice enabled updated to {data['ADVANCED_VOICE_ENABLED']} for user {user_id}")
+        
+        if "SALES_DETECTOR_ENABLED" in data:
+            sales_enabled = 1 if data["SALES_DETECTOR_ENABLED"] else 0
+            cursor.execute('UPDATE account_settings SET sales_detector_enabled = ? WHERE user_id = ?', 
+                         (sales_enabled, user_id))
+            logger.info(f"Sales detector enabled updated to {data['SALES_DETECTOR_ENABLED']} for user {user_id}")
         
         conn.commit()
         conn.close()
@@ -2428,6 +3141,91 @@ async def get_today_stats(authorization: Optional[str] = Header(None)):
         logger.error(f"Error getting today stats: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
+@app.post("/api/bundle-pricing")
+async def update_bundle_pricing(request: Request, authorization: Optional[str] = Header(None)):
+    """Update bundle pricing (admin only)"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        data = await request.json()
+        
+        calendar_credits = float(data.get('calendar_credits', 10.0))
+        task_credits = float(data.get('task_credits', 5.0))
+        voice_credits = float(data.get('advanced_voice_credits', 3.0))
+        
+        # Validate
+        if calendar_credits < 0 or task_credits < 0 or voice_credits < 0:
+            raise HTTPException(status_code=400, detail="Prices must be 0 or greater")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Ensure billing_config table exists
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS billing_config (
+                id INTEGER PRIMARY KEY,
+                credits_per_connected_call REAL DEFAULT 5.0,
+                credits_per_minute REAL DEFAULT 2.0,
+                credits_per_calendar_booking REAL DEFAULT 10.0,
+                credits_per_task REAL DEFAULT 5.0,
+                credits_per_advanced_voice REAL DEFAULT 3.0,
+                credits_per_sales_detection REAL DEFAULT 2.0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Add sales detection column if doesn't exist
+        try:
+            cursor.execute('ALTER TABLE billing_config ADD COLUMN credits_per_sales_detection REAL DEFAULT 2.0')
+        except:
+            pass
+        
+        # Check if record exists
+        cursor.execute('SELECT id FROM billing_config WHERE id = 1')
+        exists = cursor.fetchone()
+        
+        if exists:
+            cursor.execute('''
+                UPDATE billing_config 
+                SET credits_per_calendar_booking = ?,
+                    credits_per_task = ?,
+                    credits_per_advanced_voice = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = 1
+            ''', (calendar_credits, task_credits, voice_credits))
+        else:
+            cursor.execute('''
+                INSERT INTO billing_config 
+                (id, credits_per_calendar_booking, credits_per_task, credits_per_advanced_voice)
+                VALUES (1, ?, ?, ?)
+            ''', (calendar_credits, task_credits, voice_credits))
+        
+        # Add sales detection column if doesn't exist
+        try:
+            cursor.execute('ALTER TABLE billing_config ADD COLUMN credits_per_sales_detection REAL DEFAULT 2.0')
+        except:
+            pass
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Bundle pricing updated by user {user_id}: Calendar={calendar_credits}, Tasks={task_credits}, Voice={voice_credits}")
+        
+        return JSONResponse({
+            "success": True,
+            "calendar_credits": calendar_credits,
+            "task_credits": task_credits,
+            "advanced_voice_credits": voice_credits
+        })
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid price format")
+    except Exception as e:
+        logger.error(f"Error updating bundle pricing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/billing-config")
 async def get_billing_config():
     """Get billing configuration (credits pricing)"""
@@ -2442,6 +3240,8 @@ async def get_billing_config():
                 credits_per_connected_call REAL DEFAULT 5.0,
                 credits_per_minute REAL DEFAULT 2.0,
                 credits_per_calendar_booking REAL DEFAULT 10.0,
+                credits_per_task REAL DEFAULT 5.0,
+                credits_per_advanced_voice REAL DEFAULT 3.0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -2451,18 +3251,20 @@ async def get_billing_config():
         config = cursor.fetchone()
         if not config:
             cursor.execute('''
-                INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking)
-                VALUES (1, 5.0, 2.0, 10.0)
+                INSERT INTO billing_config (id, credits_per_connected_call, credits_per_minute, credits_per_calendar_booking, credits_per_task, credits_per_advanced_voice)
+                VALUES (1, 5.0, 2.0, 10.0, 5.0, 3.0)
             ''')
             conn.commit()
-            config = (1, 5.0, 2.0, 10.0, None)
+            config = (1, 5.0, 2.0, 10.0, 5.0, 3.0, None)
         
         conn.close()
         
         return JSONResponse({
             "credits_per_connected_call": config[1],
             "credits_per_minute": config[2],
-            "credits_per_calendar_booking": config[3]
+            "credits_per_calendar_booking": config[3],
+            "credits_per_task": config[4] if len(config) > 4 else 5.0,
+            "credits_per_advanced_voice": config[5] if len(config) > 5 else 3.0
         })
     except Exception as e:
         logger.error(f"Error getting billing config: {e}")
@@ -2491,7 +3293,8 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
         
         # Get all calls for this user
         cursor.execute('''
-            SELECT call_uuid, start_time, duration, caller_number, summary
+            SELECT call_uuid, start_time, duration, caller_number, summary, 
+                   booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged, sales_confidence
             FROM calls 
             WHERE user_id = ?
             ORDER BY start_time DESC
@@ -2501,7 +3304,7 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
         total_credits = 0
         
         for row in cursor.fetchall():
-            call_uuid, start_time, duration, caller_number, summary = row
+            call_uuid, start_time, duration, caller_number, summary, booking_charged, task_charged, voice_charged, sales_charged, sales_conf = row
             
             # Calculate credits for this call
             call_credits = credits_per_call  # Connection charge
@@ -2509,41 +3312,42 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
                 minutes = duration / 60
                 call_credits += minutes * credits_per_minute
             
+            # Add bundle charges
+            if booking_charged:
+                call_credits += booking_charged
+            if task_charged:
+                call_credits += task_charged
+            if voice_charged:
+                call_credits += voice_charged
+            if sales_charged:
+                call_credits += sales_charged
+            if voice_charged:
+                call_credits += voice_charged
+            
             total_credits += call_credits
+            
+            # Build description with breakdown
+            breakdown = [f"Call from {caller_number}"]
+            if booking_charged:
+                breakdown.append(f"{booking_charged} credits for bookings")
+            if task_charged:
+                breakdown.append(f"{task_charged} credits for tasks")
+            if voice_charged:
+                breakdown.append(f"{voice_charged} credits for advanced voice")
+            if sales_charged:
+                breakdown.append(f"{sales_charged} credits for sales detection")
             
             calls.append({
                 "type": "call",
                 "call_uuid": call_uuid,
                 "date": start_time,
-                "description": f"Call from {caller_number}",
+                "description": " + ".join(breakdown),
                 "duration": duration,
                 "credits": round(call_credits, 2)
             })
         
-        # Get calendar bookings made by AI
-        cursor.execute('''
-            SELECT id, title, date, time, created_at
-            FROM appointments 
-            WHERE user_id = ? AND created_by = 'ai_agent'
-            ORDER BY created_at DESC
-        ''', (user_id,))
-        
-        bookings = []
-        for row in cursor.fetchall():
-            appt_id, title, date, time, created_at = row
-            total_credits += credits_per_booking
-            
-            bookings.append({
-                "type": "booking",
-                "id": appt_id,
-                "date": created_at,
-                "description": f"Calendar booking: {title}",
-                "appointment_date": f"{date} {time}",
-                "credits": credits_per_booking
-            })
-        
-        # Combine and sort by date
-        all_transactions = calls + bookings
+        # All charges are now tracked in the calls table
+        all_transactions = calls
         all_transactions.sort(key=lambda x: x['date'], reverse=True)
         
         # Get current credits balance from account_settings
@@ -3221,6 +4025,14 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Log what we're about to save
+        logger.info(f"Saving voice settings for user {user_id}:")
+        logger.info(f"  - voice_provider: {voice_provider}")
+        logger.info(f"  - openai_voice: {openai_voice}")
+        logger.info(f"  - elevenlabs_voice_id: {elevenlabs_voice_id}")
+        logger.info(f"  - google_voice: {google_voice}")
+        logger.info(f"  - playht_voice_id: {playht_voice_id}")
+        
         # Update voice provider
         cursor.execute('''
             UPDATE account_settings 
@@ -3233,10 +4045,11 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
             WHERE user_id = ?
         ''', (voice_provider, openai_voice, elevenlabs_voice_id, cartesia_voice_id, google_voice, playht_voice_id, user_id))
         
+        rows_affected = cursor.rowcount
         conn.commit()
         conn.close()
         
-        logger.info(f"Updated voice provider for user {user_id}: {voice_provider}")
+        logger.info(f"✅ Updated voice provider for user {user_id}: {voice_provider} (rows affected: {rows_affected})")
         
         return JSONResponse({"success": True, "message": "Voice provider updated"})
         
@@ -3425,6 +4238,127 @@ async def mark_date_busy(request: Request, authorization: Optional[str] = Header
         return {"status": "success", "appointment_id": appointment_id}
     except Exception as e:
         logger.error(f"Failed to mark date busy: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": str(e)}
+        )
+
+# ============================================================================
+# TASK MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/api/tasks")
+async def get_tasks(authorization: Optional[str] = Header(None)):
+    """Get all tasks for current user"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        conn = get_db_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM tasks 
+            WHERE user_id = ? 
+            ORDER BY completed ASC, created_at DESC
+        ''', (user_id,))
+        
+        tasks = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return {"tasks": tasks}
+    except Exception as e:
+        logger.error(f"Failed to fetch tasks: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": str(e)}
+        )
+
+@app.post("/api/tasks")
+async def create_task(request: Request, authorization: Optional[str] = Header(None)):
+    """Create a new task"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        data = await request.json()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO tasks (user_id, description, source, call_uuid)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            user_id,
+            data.get('description'),
+            data.get('source', 'manual'),
+            data.get('call_uuid')
+        ))
+        
+        task_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Task created: {task_id} for user {user_id}")
+        return {"status": "success", "task_id": task_id}
+    except Exception as e:
+        logger.error(f"Failed to create task: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": str(e)}
+        )
+
+@app.put("/api/tasks/{task_id}")
+async def update_task(task_id: int, request: Request, authorization: Optional[str] = Header(None)):
+    """Update task completion status"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        data = await request.json()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE tasks 
+            SET completed = ?
+            WHERE id = ? AND user_id = ?
+        ''', (data.get('completed'), task_id, user_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Failed to update task: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": str(e)}
+        )
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: int, authorization: Optional[str] = Header(None)):
+    """Delete a task"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM tasks WHERE id = ? AND user_id = ?', (task_id, user_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Failed to delete task: {e}")
         return JSONResponse(
             status_code=400,
             content={"status": "error", "detail": str(e)}
