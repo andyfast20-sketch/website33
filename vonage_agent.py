@@ -1426,7 +1426,7 @@ class CallSession:
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "text", "text": msg}]
+                    "content": [{"type": "input_text", "text": msg}]
                 }
             }))
         except Exception as e:
@@ -1593,7 +1593,7 @@ Provide your analysis."""
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
+                    "content": [{"type": "input_text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
                 }
             }))
             
@@ -1876,7 +1876,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "user",
-                                "content": [{"type": "text", "text": global_context}]
+                                "content": [{"type": "input_text", "text": global_context}]
                             }
                         }))
                         
@@ -1885,7 +1885,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "assistant",
-                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
+                                "content": [{"type": "input_text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
                             }
                         }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
@@ -1905,7 +1905,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "user",
-                            "content": [{"type": "text", "text": business_context}]
+                            "content": [{"type": "input_text", "text": business_context}]
                         }
                     }))
                     
@@ -1914,7 +1914,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "assistant",
-                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
+                            "content": [{"type": "input_text", "text": "Understood. I will refer to this business information for all responses."}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
