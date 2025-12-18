@@ -26,7 +26,49 @@ import sqlite3
 import io
 
 import numpy as np
-from scipy import signal
+
+# SciPy is optional. On Python 3.13, some SciPy wheels can fail to import.
+# We only used it for resampling, so we provide a NumPy fallback.
+try:
+    from scipy import signal as _scipy_signal  # type: ignore
+except Exception:
+    _scipy_signal = None
+
+
+def _resample_audio(audio: np.ndarray, orig_rate: int, target_rate: int) -> np.ndarray:
+    """Resample 1D float audio from orig_rate to target_rate.
+
+    Prefers SciPy when available, otherwise uses linear interpolation.
+    """
+    if orig_rate == target_rate:
+        return audio
+
+    if audio.size == 0:
+        return audio
+
+    if _scipy_signal is not None:
+        try:
+            if orig_rate == 16000 and target_rate == 24000:
+                num_samples = int(len(audio) * target_rate / orig_rate)
+                return _scipy_signal.resample(audio, num_samples).astype(np.float32)
+            # Generic rational resample via polyphase
+            from fractions import Fraction
+
+            frac = Fraction(target_rate, orig_rate).limit_denominator(1000)
+            return _scipy_signal.resample_poly(audio, up=frac.numerator, down=frac.denominator).astype(np.float32)
+        except Exception:
+            # Fall back to NumPy below
+            pass
+
+    # NumPy linear interpolation fallback
+    duration = len(audio) / float(orig_rate)
+    new_len = int(round(duration * target_rate))
+    if new_len <= 0:
+        return np.zeros((0,), dtype=np.float32)
+
+    x_old = np.linspace(0.0, duration, num=len(audio), endpoint=False)
+    x_new = np.linspace(0.0, duration, num=new_len, endpoint=False)
+    return np.interp(x_new, x_old, audio).astype(np.float32)
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Header, UploadFile, File, Query
 from fastapi.responses import JSONResponse, HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -1247,6 +1289,17 @@ class CallSession:
         self._speechmatics_pending_text = ""
         self._speechmatics_tts_queue: asyncio.Queue[str] = asyncio.Queue()
         self._speechmatics_tts_worker_task: Optional[asyncio.Task] = None
+        # Increment to invalidate any in-flight Speechmatics stream (barge-in).
+        self._speechmatics_output_generation: int = 0
+
+    def _barge_in_stop_speechmatics(self) -> None:
+        """Immediately stop any Speechmatics output and drop queued sentences."""
+        self._speechmatics_output_generation += 1
+        try:
+            while True:
+                self._speechmatics_tts_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
     def _pick_random_global_filler(self, voice_id: str = "sarah") -> Optional[tuple]:
         """Pick a random existing global filler WAV, preferring ones not used yet this call."""
@@ -1686,21 +1739,28 @@ Provide your analysis."""
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
                     
                     # Cartesia and Speechmatics get ULTRA-aggressive settings for instant response
-                    if voice_provider in ['cartesia', 'speechmatics']:
+                    if voice_provider == 'cartesia':
                         silence_ms = 150  # HYPER fast - detect end of speech immediately
                         padding_ms = 80   # Ultra minimal padding - instant response
+                        threshold = 0.5
+                    elif voice_provider == 'speechmatics':
+                        # Less trigger-happy to avoid talking over callers / reacting to small noises.
+                        silence_ms = 800
+                        padding_ms = 250
+                        threshold = 0.65
                     else:
                         silence_ms = max(response_latency, 450)  # Standard for others
                         padding_ms = 300
-                    
+                        threshold = 0.5
+
                     turn_detection_config = {
                         "type": "server_vad",
-                        "threshold": 0.5,  # Standard threshold - detects clear speech
+                        "threshold": threshold,
                         "prefix_padding_ms": padding_ms,
                         "silence_duration_ms": silence_ms,
                         "create_response": True
                     }
-                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} VAD: threshold=0.5, silence={silence_ms}ms, padding={padding_ms}ms")
+                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} VAD: threshold={threshold}, silence={silence_ms}ms, padding={padding_ms}ms")
                 else:
                     modalities = ["text", "audio"]  # OpenAI handles both text and audio
                     # For OpenAI voice: need lower threshold for better conversational flow
@@ -1860,8 +1920,7 @@ You must use ONLY this information when answering questions about services, area
             audio_16k = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32767.0
             
             # Resample from 16kHz (Vonage) to 24kHz (OpenAI)
-            num_samples = int(len(audio_16k) * OPENAI_SAMPLE_RATE / VONAGE_SAMPLE_RATE)
-            audio_24k = signal.resample(audio_16k, num_samples)
+            audio_24k = _resample_audio(audio_16k, VONAGE_SAMPLE_RATE, OPENAI_SAMPLE_RATE)
             
             # Convert back to int16
             audio_int16 = (audio_24k * 32767).astype(np.int16)
@@ -1902,6 +1961,10 @@ You must use ONLY this information when answering questions about services, area
                 elif event_type == "input_audio_buffer.speech_started":
                     logger.debug(f"[{self.call_uuid}] Caller speaking...")
                     self._last_speech_time = asyncio.get_event_loop().time()
+
+                    voice_provider = getattr(self, 'voice_provider', 'openai')
+                    if voice_provider == 'speechmatics':
+                        self._barge_in_stop_speechmatics()
 
                     # Reset filler-per-turn state
                     self._filler_played_for_turn = False
@@ -2237,7 +2300,7 @@ You must use ONLY this information when answering questions about services, area
 
             # Resample from 24kHz (OpenAI) to 16kHz (Vonage)
             # Use polyphase resampling to reduce artifacts on chunk boundaries.
-            audio_16k = signal.resample_poly(audio_24k, up=2, down=3)
+            audio_16k = _resample_audio(audio_24k, OPENAI_SAMPLE_RATE, VONAGE_SAMPLE_RATE)
             
             # Convert to int16 bytes
             audio_bytes = (audio_16k * 32767).astype(np.int16).tobytes()
@@ -2403,6 +2466,8 @@ You must use ONLY this information when answering questions about services, area
         """Generate audio using Speechmatics TTS STREAMING and send to Vonage. Returns True on success."""
         try:
             logger.info(f"[{self.call_uuid}] 🎙️ Starting Speechmatics TTS for: {text[:50]}...")
+
+            my_generation = self._speechmatics_output_generation
             
             # Stop any ongoing filler playback - actual response is ready
             self._agent_speaking = True
@@ -2454,6 +2519,9 @@ You must use ONLY this information when answering questions about services, area
                 async for raw in response.aiter_bytes():
                     if not raw:
                         continue
+                    if my_generation != self._speechmatics_output_generation:
+                        logger.info(f"[{self.call_uuid}] Speechmatics TTS interrupted by barge-in")
+                        return True
                     if not self.is_active or not self.vonage_ws:
                         break
 
@@ -2470,7 +2538,7 @@ You must use ONLY this information when answering questions about services, area
                         chunks_sent += 1
 
                 # Flush any remainder
-                if buffered and self.is_active and self.vonage_ws:
+                if buffered and self.is_active and self.vonage_ws and my_generation == self._speechmatics_output_generation:
                     await self.vonage_ws.send_bytes(buffered)
                     chunks_sent += 1
             
@@ -6239,22 +6307,11 @@ async def answer_call(request: Request):
     
     conn.close()
     logger.info(f"📞 Call assigned to {user_name} (user_id: {assigned_user_id})")
-    
-    # Create session and connect to OpenAI
-    session = await sessions.create_session(call_uuid, caller, called, assigned_user_id)
-    connected = await session.connect_to_openai()
-    
-    if not connected:
-        # Fallback if OpenAI connection fails
-        return JSONResponse([
-            {
-                "action": "talk",
-                "text": "I'm sorry, I'm having technical difficulties. Please try again later."
-            }
-        ])
-    
-    # Start listening for OpenAI responses
-    session.start_openai_listener()
+
+    # Create session. Do NOT block this webhook on connecting to OpenAI.
+    # Vonage expects a fast response; slow/failed OpenAI connection should be handled
+    # after the websocket connects.
+    await sessions.create_session(call_uuid, caller, called, assigned_user_id)
     
     # Build WebSocket URL (remove https:// and use wss://)
     ws_host = CONFIG["PUBLIC_URL"].replace("https://", "").replace("http://", "")
@@ -6324,6 +6381,16 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
         return
     
     session.vonage_ws = websocket
+
+    # Ensure OpenAI is connected BEFORE we start consuming caller audio.
+    if not session.openai_ws:
+        connected = await session.connect_to_openai()
+        if not connected:
+            logger.error(f"[{call_uuid}] ❌ Failed to connect to OpenAI after websocket connect")
+            await websocket.close()
+            return
+
+        session.start_openai_listener()
     
     # Trigger the AI to greet the caller immediately
     try:
