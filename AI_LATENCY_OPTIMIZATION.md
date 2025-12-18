@@ -177,8 +177,8 @@ response = client.chat.completions.create(
 ### Environment Variables (vonage_agent.py)
 ```python
 CONFIG = {
-    'DEEPSEEK_API_KEY': 'sk-5892b01daa764aa9869c77a6b23ce271',
-    'OPENAI_API_KEY': 'your-openai-key',
+  'DEEPSEEK_API_KEY': os.getenv('DEEPSEEK_API_KEY', ''),
+  'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
     # ... other config ...
 }
 ```
@@ -228,7 +228,7 @@ CONFIG = {
 ## API Key Configuration
 
 DeepSeek API is used for cost-effective analysis:
-- **API Key**: sk-5892b01daa764aa9869c77a6b23ce271
+- **API Key**: set `DEEPSEEK_API_KEY` in your environment
 - **Endpoint**: https://api.deepseek.com
 - **Model**: deepseek-chat
 - **Cost**: ~15x cheaper than GPT-4

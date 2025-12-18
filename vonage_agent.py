@@ -7464,6 +7464,58 @@ async def save_vonage_keys(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/health")
+async def health_check():
+    """System health check endpoint"""
+    import psutil
+    import time
+    
+    try:
+        # Get system metrics
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # Get process uptime
+        process = psutil.Process()
+        uptime_seconds = time.time() - process.create_time()
+        uptime_hours = uptime_seconds / 3600
+        
+        # Check database connectivity
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM call_logs")
+            call_count = cursor.fetchone()[0]
+            conn.close()
+            db_status = "healthy"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+            call_count = 0
+        
+        return {
+            "status": "healthy",
+            "uptime_hours": round(uptime_hours, 2),
+            "system": {
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory.percent,
+                "memory_available_gb": round(memory.available / (1024**3), 2),
+                "disk_percent": disk.percent
+            },
+            "database": {
+                "status": db_status,
+                "total_calls": call_count
+            },
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse({
+            "status": "error",
+            "error": str(e)
+        }, status_code=500)
+
+
 @app.get("/api/super-admin/brain-provider")
 async def get_brain_provider():
     """Get current AI brain provider selection"""

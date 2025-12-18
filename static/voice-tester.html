@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Response Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .control-group {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .control-group h3 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group h3::before {
+            content: "⚙️";
+            font-size: 1.3em;
+        }
+
+        .slider-container {
+            margin-bottom: 20px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .slider-value {
+            background: #667eea;
+            color: white;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #dee2e6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .description {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .test-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .dial-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 20px 60px;
+            font-size: 1.5em;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4);
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .dial-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(40, 167, 69, 0.5);
+        }
+
+        .dial-button:active {
+            transform: translateY(0);
+        }
+
+        .dial-button.calling {
+            background: #dc3545;
+        }
+
+        .dial-button::before {
+            content: "📞";
+            font-size: 1.3em;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-unit {
+            font-size: 0.6em;
+            color: #6c757d;
+        }
+
+        .call-simulation {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            min-height: 300px;
+        }
+
+        .call-log {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .log-entry {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-left: 3px solid #dee2e6;
+            padding-left: 15px;
+        }
+
+        .log-entry.user {
+            background: #e3f2fd;
+            border-left-color: #2196F3;
+        }
+
+        .log-entry.ai {
+            background: #f3e5f5;
+            border-left-color: #9c27b0;
+        }
+
+        .log-entry.timing {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+            font-weight: bold;
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+
+        .select-group {
+            margin-bottom: 20px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .info-box strong {
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Response Tester</h1>
+        <p class="subtitle">Fine-tune your AI agent's response timing without making real calls</p>
+
+        <div class="controls-grid">
+            <!-- Voice Activity Detection -->
+            <div class="control-group">
+                <h3>Voice Activity Detection (VAD)</h3>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Silence Duration</span>
+                        <span class="slider-value" id="silenceValue">400ms</span>
+                    </div>
+                    <input type="range" id="silenceDuration" min="100" max="800" step="50" value="400">
+                    <div class="description">How long to wait after you stop speaking before responding</div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Detection Threshold</span>
+                        <span class="slider-value" id="thresholdValue">0.55</span>
+                    </div>
+                    <input type="range" id="threshold" min="0.3" max="0.8" step="0.05" value="0.55">
+                    <div class="description">Sensitivity to voice detection (higher = less sensitive)</div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Prefix Padding</span>
+                        <span class="slider-value" id="paddingValue">200ms</span>
+                    </div>
+                    <input type="range" id="prefixPadding" min="100" max="500" step="50" value="200">
+                    <div class="description">Audio buffer before speech detection</div>
+                </div>
+            </div>
+
+            <!-- Text Processing -->
+            <div class="control-group">
+                <h3>Text Processing</h3>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Word Chunk Size</span>
+                        <span class="slider-value" id="chunkValue">8 words</span>
+                    </div>
+                    <input type="range" id="wordChunk" min="4" max="15" step="1" value="8">
+                    <div class="description">Send audio after this many words (smaller = faster but choppier)</div>
+                </div>
+
+                <div class="select-group">
+                    <div class="slider-label">
+                        <span>Voice Provider</span>
+                    </div>
+                    <select id="voiceProvider">
+                        <option value="openai">OpenAI (Fastest - Built-in)</option>
+                        <option value="google" selected>Google Cloud TTS (High Quality)</option>
+                    </select>
+                </div>
+
+                <div class="select-group">
+                    <div class="slider-label">
+                        <span>Google Voice</span>
+                    </div>
+                    <select id="googleVoice">
+                        <option value="en-GB-Standard-A">Standard-A (Fastest - Female)</option>
+                        <option value="en-GB-Standard-B" selected>Standard-B (Fast - Male)</option>
+                        <option value="en-GB-Standard-C">Standard-C (Fast - Female)</option>
+                        <option value="en-GB-Standard-F">Standard-F (Fast - Female)</option>
+                        <option value="en-GB-Wavenet-A">Wavenet-A (High Quality - Female)</option>
+                        <option value="en-GB-Wavenet-B">Wavenet-B (High Quality - Male)</option>
+                        <option value="en-GB-Wavenet-C">Wavenet-C (High Quality - Female)</option>
+                        <option value="en-GB-Wavenet-D">Wavenet-D (High Quality - Male)</option>
+                        <option value="en-GB-Wavenet-F">Wavenet-F (High Quality - Female)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Performance Tips -->
+            <div class="control-group">
+                <h3>🚀 Fast Response Tips</h3>
+                
+                <div class="info-box" style="margin-top: 0; margin-bottom: 15px;">
+                    <strong>⚡ Speed Optimization:</strong>
+                    <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                        <li>Lower silence duration = faster but may cut you off</li>
+                        <li>Higher threshold = less sensitive to noise</li>
+                        <li>OpenAI voices = fastest (no external TTS)</li>
+                        <li>Google Standard = faster than Wavenet</li>
+                    </ul>
+                </div>
+
+                <div id="aiRecommendationsContainer" style="display: none; margin-top: 20px;">
+                    <button onclick="getAIRecommendations()" id="getRecommendationsBtn" style="width: 100%; background: linear-gradient(135deg, #00d2ff 0%, #3a47d5 100%); border: none; padding: 15px; border-radius: 10px; color: white; cursor: pointer; font-size: 14px; font-weight: 700; transition: all 0.3s; box-shadow: 0 4px 15px rgba(58, 71, 213, 0.4);">
+                        🤖 Get AI Recommendations
+                    </button>
+                    
+                    <div id="aiRecommendationsResult" style="display: none; margin-top: 15px; background: #e3f2fd; border: 2px solid #2196F3; padding: 15px; border-radius: 10px;">
+                        <div style="font-weight: 600; margin-bottom: 10px; color: #1976D2;">✨ AI Analysis:</div>
+                        <div id="aiRecommendationsText" style="line-height: 1.6; margin-bottom: 15px; color: #333;"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="applyAIRecommendations()" style="flex: 1; background: #28a745; border: none; padding: 10px; border-radius: 8px; color: white; cursor: pointer; font-weight: 600;">
+                                ✅ Apply Settings
+                            </button>
+                            <button onclick="document.getElementById('aiRecommendationsResult').style.display='none'" style="flex: 1; background: #6c757d; border: none; padding: 10px; border-radius: 8px; color: white; cursor: pointer; font-weight: 600;">
+                                ❌ Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Section -->
+        <div class="test-section">
+            <button class="dial-button" id="dialButton" onclick="startCall()">Start Test Call</button>
+            
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-label">TOTAL RESPONSE TIME</div>
+                    <div class="metric-value" id="totalTime">0<span class="metric-unit">ms</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">SILENCE DETECTION</div>
+                    <div class="metric-value" id="silenceTime">0<span class="metric-unit">ms</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">TTS GENERATION</div>
+                    <div class="metric-value" id="ttsTime">0<span class="metric-unit">ms</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">NETWORK DELAY</div>
+                    <div class="metric-value" id="netTime">0<span class="metric-unit">ms</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Simulation Log -->
+        <div class="call-simulation">
+            <h3 style="margin-bottom: 20px; color: #495057;">📞 Call Simulation Log</h3>
+            <div class="call-log" id="callLog">
+                <div class="log-entry">Ready to simulate a call. Click "Start Test Call" to begin.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update slider values in real-time
+        document.getElementById('silenceDuration').addEventListener('input', (e) => {
+            document.getElementById('silenceValue').textContent = e.target.value + 'ms';
+        });
+
+        document.getElementById('threshold').addEventListener('input', (e) => {
+            document.getElementById('thresholdValue').textContent = e.target.value;
+        });
+
+        document.getElementById('prefixPadding').addEventListener('input', (e) => {
+            document.getElementById('paddingValue').textContent = e.target.value + 'ms';
+        });
+
+        document.getElementById('wordChunk').addEventListener('input', (e) => {
+            document.getElementById('chunkValue').textContent = e.target.value + ' words';
+        });
+
+        document.getElementById('ttsLatency').addEventListener('input', (e) => {
+            document.getElementById('ttsLatencyValue').textContent = e.target.value + 'ms';
+        });
+
+        document.getElementById('networkLatency').addEventListener('input', (e) => {
+            document.getElementById('networkValue').textContent = e.target.value + 'ms';
+        });
+
+        let callActive = false;
+        let callMetrics = {
+            silenceDetectionTime: 0,
+            ttsGenerationTime: 0,
+            totalResponseTime: 0,
+            provider: '',
+            voice: '',
+            settings: {}
+        };
+        let recommendedSettings = null;
+
+        function addLog(message, type = '') {
+            const log = document.getElementById('callLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+            entry.innerHTML = `<span class="timestamp">[${time}]</span>${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function startCall() {
+            if (callActive) {
+                endCall();
+                return;
+            }
+
+            callActive = true;
+            const button = document.getElementById('dialButton');
+            button.textContent = '🔴 End Test Call';
+            button.classList.add('calling');
+
+            // Clear log
+            document.getElementById('callLog').innerHTML = '';
+
+            // Get settings
+            const silenceDuration = parseInt(document.getElementById('silenceDuration').value);
+            const threshold = parseFloat(document.getElementById('threshold').value);
+            const prefixPadding = parseInt(document.getElementById('prefixPadding').value);
+            const wordChunk = parseInt(document.getElementById('wordChunk').value);
+            const ttsLatency = parseInt(document.getElementById('ttsLatency').value);
+            const networkLatency = parseInt(document.getElementById('networkLatency').value);
+            const voiceProvider = document.getElementById('voiceProvider').value;
+            const googleVoice = document.getElementById('googleVoice').value;
+
+            addLog('📞 Dialing...', 'timing');
+            await sleep(500);
+            
+            addLog('🔗 Call connected! Simulating conversation with your settings...', 'timing');
+            await sleep(300);
+
+            addLog('🤖 AI: "Hello! This is Judie. How can I help you today?"', 'ai');
+            await sleep(1000);
+
+            // Simulate user speaking
+            addLog('👤 YOU: Starting to speak...', 'user');
+            await sleep(300);
+            addLog(`⏱️ Detecting voice (threshold: ${threshold})...`, 'timing');
+            await sleep(200);
+            
+            addLog('👤 YOU: "Hi, can you tell me..."', 'user');
+            await sleep(800);
+            addLog('👤 YOU: "...about your gardening services?"', 'user');
+            
+            // Start timing
+            const startTime = performance.now();
+            
+            // Silence detection
+            addLog(`⏳ Silence detection: Waiting ${silenceDuration}ms for you to finish...`, 'timing');
+            document.getElementById('silenceTime').textContent = silenceDuration;
+            await sleep(silenceDuration);
+            
+            addLog('✅ Silence detected! Processing speech...', 'timing');
+            
+            // Processing
+            await sleep(50);
+            addLog(`🧠 AI thinking with prefix padding: ${prefixPadding}ms`, 'timing');
+            await sleep(prefixPadding);
+            
+            // Text generation
+            addLog('💭 Generating text response...', 'timing');
+            await sleep(150);
+            
+            // Text chunking
+            addLog(`📦 Chunking text (${wordChunk} words per chunk)...`, 'timing');
+            await sleep(100);
+            
+            // TTS Generation
+            if (voiceProvider === 'google') {
+                addLog(`🎙️ Generating audio with Google TTS (${googleVoice})...`, 'timing');
+                document.getElementById('ttsTime').textContent = ttsLatency;
+                await sleep(ttsLatency);
+            } else {
+                addLog('🎙️ Using OpenAI built-in audio (instant)...', 'timing');
+                document.getElementById('ttsTime').textContent = '50';
+                await sleep(50);
+            }
+            
+            // Network delay
+            addLog(`🌐 Network transmission: ${networkLatency}ms`, 'timing');
+            document.getElementById('netTime').textContent = networkLatency;
+            await sleep(networkLatency);
+            
+            const totalTime = Math.round(performance.now() - startTime);
+            document.getElementById('totalTime').textContent = totalTime;
+            
+            addLog(`⚡ TOTAL TIME: ${totalTime}ms`, 'timing');
+            addLog('🤖 AI: "Of course! We offer lawn mowing, hedge trimming, and garden design services. Would you like to schedule an appointment?"', 'ai');
+            
+            await sleep(2000);
+            addLog('✅ Test complete! Click "Get AI Recommendations" for optimal settings.', 'timing');
+            
+            // Save metrics
+            callMetrics.silenceDetectionTime = silenceDuration;
+            callMetrics.totalResponseTime = totalTime;
+            callMetrics.provider = voiceProvider;
+            callMetrics.voice = voiceProvider === 'google' ? googleVoice : 'openai-default';
+            callMetrics.settings = {
+                silenceDuration,
+                threshold,
+                prefixPadding,
+                wordChunk
+            };
+            
+            // Show AI recommendations button
+            document.getElementById('aiRecommendationsContainer').style.display = 'block';
+            
+            endCall();
+        }
+
+        function endCall() {
+            callActive = false;
+            const button = document.getElementById('dialButton');
+            button.textContent = '📞 Start Test Call';
+            button.classList.remove('calling');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Initial log
+        addLog('Ready to test! Configure your settings and click "Start Test Call".');
+
+        async function getAIRecommendations() {
+            const btn = document.getElementById('getRecommendationsBtn');
+            btn.disabled = true;
+            btn.textContent = '🤖 Analyzing...';
+            
+            try {
+                const response = await fetch('/api/ai-recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(callMetrics)
+                });
+                
+                if (!response.ok) throw new Error('Failed to get recommendations');
+                
+                const data = await response.json();
+                recommendedSettings = data.settings;
+                
+                document.getElementById('aiRecommendationsText').innerHTML = data.analysis;
+                document.getElementById('aiRecommendationsResult').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error getting AI recommendations:', error);
+                alert('Failed to get AI recommendations. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🤖 Get AI Recommendations';
+            }
+        }
+
+        function applyAIRecommendations() {
+            if (!recommendedSettings) return;
+            
+            // Apply settings
+            document.getElementById('silenceDuration').value = recommendedSettings.silenceDuration;
+            document.getElementById('silenceValue').textContent = recommendedSettings.silenceDuration + 'ms';
+            
+            document.getElementById('threshold').value = recommendedSettings.threshold;
+            document.getElementById('thresholdValue').textContent = recommendedSettings.threshold;
+            
+            document.getElementById('prefixPadding').value = recommendedSettings.prefixPadding;
+            document.getElementById('paddingValue').textContent = recommendedSettings.prefixPadding + 'ms';
+            
+            if (recommendedSettings.wordChunk) {
+                document.getElementById('wordChunk').value = recommendedSettings.wordChunk;
+                document.getElementById('chunkValue').textContent = recommendedSettings.wordChunk + ' words';
+            }
+            
+            // Hide recommendations
+            document.getElementById('aiRecommendationsResult').style.display = 'none';
+            
+            addLog('✅ AI recommendations applied! Start a new test to see the difference.', 'timing');
+        }
+    </script>
+</body>
+</html>

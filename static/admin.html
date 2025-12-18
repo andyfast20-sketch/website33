@@ -908,16 +908,12 @@
                             <label for="voiceProvider">Voice Provider</label>
                             <select id="voiceProvider" onchange="switchVoiceProvider()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
                                 <option value="openai">OpenAI (6 voices, fastest)</option>
-                                <option value="google">Google Cloud (40+ UK voices, fast)</option>
-                                <option value="elevenlabs">ElevenLabs (Premium quality)</option>
-                                <option value="playht">Play.HT (Ultra-realistic, natural)</option>
+                                <option value="speechmatics">Speechmatics (Real-time streaming)</option>
                             </select>
                             <div class="example-box" style="margin-top: 10px;">
                                 <strong>🎭 Voice Providers:</strong><br>
                                 <strong>OpenAI:</strong> 6 high-quality voices, fastest response<br>
-                                <strong>Google Cloud:</strong> 40+ UK English voices, very fast<br>
-                                <strong>ElevenLabs:</strong> Premium natural voices, highest quality<br>
-                                <strong>Play.HT:</strong> Ultra-realistic conversational voices, indistinguishable from human
+                                <strong>Speechmatics:</strong> Real-time streaming with natural UK voices
                             </div>
                         </div>
 
@@ -1019,6 +1015,23 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Speechmatics Voice Selection -->
+                        <div id="speechmaticsVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="speechmaticsVoice">Speechmatics Voice</label>
+                                <select id="speechmaticsVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <option value="sarah">Sarah (UK Female - Natural & Clear)</option>
+                                    <option value="will">Will (UK Male - Professional)</option>
+                                </select>
+                                <button onclick="testSpeechmaticsVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
+                                    🔊 Test Voice
+                                </button>
+                                <div class="example-box">
+                                    <strong>Real-Time Streaming:</strong> Speechmatics provides natural UK voices with real-time streaming capabilities for low latency conversations.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -1050,6 +1063,17 @@
                             <textarea id="agentInstructions" rows="4" placeholder="Any other specific instructions for handling calls..."></textarea>
                             <div class="example-box">
                                 <strong>Example:</strong> "Take messages if the owner isn't available. Offer to schedule appointments. Always ask for contact details."
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>👋 Opening Greeting</h3>
+                        <div class="form-group">
+                            <label for="callGreeting">Opening Greeting (Strict)</label>
+                            <input type="text" id="callGreeting" placeholder="e.g., Hello, thanks for calling Beryl's Cars, how can I help you?">
+                            <div class="example-box">
+                                <strong>Tip:</strong> If set, the AI will say this line exactly first when the call connects.
                             </div>
                         </div>
                     </div>
@@ -1896,6 +1920,9 @@
                 
                 const agentInstructionsEl = document.getElementById('agentInstructions');
                 if (agentInstructionsEl) agentInstructionsEl.value = config.AGENT_INSTRUCTIONS;
+
+                const callGreetingEl = document.getElementById('callGreeting');
+                if (callGreetingEl) callGreetingEl.value = config.CALL_GREETING || '';
                 
                 // Load calendar booking setting
                 const calendarBookingEl = document.getElementById('calendarBookingEnabled');
@@ -2633,6 +2660,7 @@
                 const businessInfo = document.getElementById('businessInfo').value || '';
                 const agentPersonality = document.getElementById('agentPersonality').value || '';
                 const agentInstructions = document.getElementById('agentInstructions').value || '';
+                const callGreeting = document.getElementById('callGreeting')?.value || '';
                 
                 // Save voice provider first
                 const voiceResponse = await fetch('/api/update-voice-provider', {
@@ -2673,6 +2701,7 @@
                         BUSINESS_INFO: businessInfo,
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
+                        CALL_GREETING: callGreeting,
                         CALENDAR_BOOKING_ENABLED: document.getElementById('calendarBookingEnabled').checked
                     })
                 });
@@ -2727,6 +2756,7 @@
                 savedVoiceSelections.google = data.GOOGLE_VOICE || 'en-GB-Neural2-A';
                 savedVoiceSelections.elevenlabs = data.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
                 savedVoiceSelections.playht = data.PLAYHT_VOICE_ID || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
+                savedVoiceSelections.speechmatics = data.SPEECHMATICS_VOICE_ID || 'sarah';
                 
                 console.log('Loaded voice settings:', savedVoiceSelections);
                 
@@ -2738,6 +2768,7 @@
                 document.getElementById('googleVoice').value = savedVoiceSelections.google;
                 document.getElementById('elevenLabsVoice').value = savedVoiceSelections.elevenlabs;
                 document.getElementById('playhtVoice').value = savedVoiceSelections.playht;
+                document.getElementById('speechmaticsVoice').value = savedVoiceSelections.speechmatics;
                 
                 // Add change listeners to remember manual selections
                 document.getElementById('agentVoice').addEventListener('change', (e) => {
@@ -2751,6 +2782,9 @@
                 });
                 document.getElementById('playhtVoice').addEventListener('change', (e) => {
                     savedVoiceSelections.playht = e.target.value;
+                });
+                document.getElementById('speechmaticsVoice').addEventListener('change', (e) => {
+                    savedVoiceSelections.speechmatics = e.target.value;
                 });
                 document.getElementById('voiceProvider').addEventListener('change', (e) => {
                     savedVoiceSelections.provider = e.target.value;
@@ -2773,16 +2807,13 @@
             document.getElementById('googleVoiceSection').style.display = 'none';
             document.getElementById('elevenLabsVoiceSection').style.display = 'none';
             document.getElementById('playhtVoiceSection').style.display = 'none';
+            document.getElementById('speechmaticsVoiceSection').style.display = 'none';
             
             // Show the selected provider section
             if (provider === 'openai') {
                 document.getElementById('openaiVoiceSection').style.display = 'block';
-            } else if (provider === 'google') {
-                document.getElementById('googleVoiceSection').style.display = 'block';
-            } else if (provider === 'elevenlabs') {
-                document.getElementById('elevenLabsVoiceSection').style.display = 'block';
-            } else if (provider === 'playht') {
-                document.getElementById('playhtVoiceSection').style.display = 'block';
+            } else if (provider === 'speechmatics') {
+                document.getElementById('speechmaticsVoiceSection').style.display = 'block';
             }
             
             // Force a repaint to ensure dropdown is visible
@@ -3118,6 +3149,72 @@
             }
         }
 
+        // Test Speechmatics voice
+        async function testSpeechmaticsVoice() {
+            const voiceId = document.getElementById('speechmaticsVoice').value;
+            const voiceSelect = document.getElementById('speechmaticsVoice');
+            const voiceName = voiceSelect.options[voiceSelect.selectedIndex].text.split(' (')[0];
+            
+            try {
+                showMessage(`🔊 Testing ${voiceName} voice...`, 'info');
+                
+                const response = await fetch('/api/test-speechmatics-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ voice_id: voiceId })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate voice sample');
+                }
+                
+                const audioBlob = await response.blob();
+                console.log('Audio blob received:', audioBlob.size, 'bytes, type:', audioBlob.type);
+                
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                
+                // Handle cleanup
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    console.log('Audio playback completed');
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('Audio playback error:', e);
+                    showMessage('❌ Failed to play audio. Check browser console.', 'error');
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+                // Try to play - handle autoplay restrictions
+                try {
+                    await audio.play();
+                    showMessage(`✅ Playing ${voiceName} voice sample`, 'success');
+                } catch (playError) {
+                    console.error('Autoplay prevented:', playError);
+                    showMessage('🔊 Click anywhere to play the audio sample', 'info');
+                    document.addEventListener('click', async function playOnClick() {
+                        try {
+                            await audio.play();
+                            showMessage(`✅ Playing ${voiceName} voice sample`, 'success');
+                            document.removeEventListener('click', playOnClick);
+                        } catch (e) {
+                            console.error('Play error:', e);
+                            showMessage('❌ Failed to play audio', 'error');
+                        }
+                    }, { once: true });
+                }
+                
+            } catch (error) {
+                console.error('Speechmatics voice test error:', error);
+                showMessage(`❌ Failed to test voice: ${error.message}`, 'error');
+            }
+        }
+
         // Analyze response times and optimize settings
         async function analyzeResponseTimes() {
             const analysisResult = document.getElementById('analysisResult');
@@ -3245,14 +3342,17 @@
             const cartesiaVoiceId = 'a0e99841-438c-4a64-b679-ae501e7d6091'; // Cartesia removed
             const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
             const playhtVoiceId = document.getElementById('playhtVoice')?.value || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
+            const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
             const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
             const businessInfo = document.getElementById('businessInfo')?.value || '';
             const agentPersonality = document.getElementById('agentPersonality')?.value || '';
             const agentInstructions = document.getElementById('agentInstructions')?.value || '';
+            const callGreeting = document.getElementById('callGreeting')?.value || '';
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
             console.log('🔵 PlayHT voice selected:', playhtVoiceId);
+            console.log('🔵 Speechmatics voice selected:', speechmaticsVoiceId);
             
             try {
                 showMessage('💾 Saving voice settings...', 'info');
@@ -3269,7 +3369,8 @@
                         elevenlabs_voice_id: elevenLabsVoiceId,
                         cartesia_voice_id: cartesiaVoiceId,
                         google_voice: googleVoice,
-                        playht_voice_id: playhtVoiceId
+                        playht_voice_id: playhtVoiceId,
+                        speechmatics_voice_id: speechmaticsVoiceId
                     })
                 });
                 
@@ -3299,7 +3400,8 @@
                         RESPONSE_LATENCY: responseLatency,
                         BUSINESS_INFO: businessInfo,
                         AGENT_PERSONALITY: agentPersonality,
-                        AGENT_INSTRUCTIONS: agentInstructions
+                        AGENT_INSTRUCTIONS: agentInstructions,
+                        CALL_GREETING: callGreeting
                     })
                 });
                 

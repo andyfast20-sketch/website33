@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import os
 
 @dataclass
 class Settings:
@@ -11,10 +12,10 @@ class Settings:
 
     stt_provider: str = "whisper_local"
 
-    deepseek_api_key: str = "sk-0b54e89d08554cf8aff13b5d181ff5ad"
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
     deepseek_model: str = "deepseek-chat"
     
-    openai_api_key: str = "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"
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
     use_mock_audio: bool = False
     use_mock_tts: bool = False

@@ -1,8 +1,12 @@
 import openai
+import os
 
 # Test OpenAI client initialization
 try:
-    client = openai.OpenAI(api_key="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")
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    client = openai.OpenAI(api_key=api_key)
     print("✓ Client created successfully")
     
     response = client.chat.completions.create(

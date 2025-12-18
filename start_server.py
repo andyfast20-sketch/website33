@@ -15,12 +15,12 @@ from pathlib import Path
 def print_header():
     """Print startup header"""
     print("\n" + "=" * 70)
-    print("  🤖 AI PHONE AGENT - Server Launcher")
+    print("  AI PHONE AGENT - Server Launcher")
     print("=" * 70 + "\n")
 
 def check_git_updates():
     """Check and pull latest updates from Git repository"""
-    print("📥 Checking for updates from Git...")
+    print("Checking for updates from Git...")
     try:
         # Check if we're in a git repository
         result = subprocess.run(
@@ -31,7 +31,7 @@ def check_git_updates():
         )
         
         if result.returncode != 0:
-            print("⚠️  Not a Git repository - skipping update check")
+            print("WARNING: Not a Git repository - skipping update check")
             return False
         
         # Fetch latest changes
@@ -50,7 +50,7 @@ def check_git_updates():
         )
         
         if "Your branch is behind" in result.stdout:
-            print("🔄 Updates available! Pulling latest changes...")
+            print("Updates available! Pulling latest changes...")
             pull_result = subprocess.run(
                 ["git", "pull"],
                 capture_output=True,
@@ -59,47 +59,47 @@ def check_git_updates():
             )
             
             if pull_result.returncode == 0:
-                print("✅ Successfully updated from Git!")
+                print("Successfully updated from Git!")
                 return True
             else:
-                print(f"❌ Failed to update: {pull_result.stderr}")
+                print(f"Failed to update: {pull_result.stderr}")
                 return False
         else:
-            print("✅ Already up to date!")
+            print("Already up to date!")
             return False
             
     except FileNotFoundError:
-        print("⚠️  Git not found - skipping update check")
+        print("WARNING: Git not found - skipping update check")
         return False
     except Exception as e:
-        print(f"⚠️  Error checking for updates: {e}")
+        print(f"WARNING: Error checking for updates: {e}")
         return False
 
 def check_dependencies():
     """Check if required dependencies are installed"""
-    print("\n📦 Checking dependencies...")
+    print("\nChecking dependencies...")
     required = ["fastapi", "uvicorn", "websockets", "numpy", "scipy"]
     missing = []
     
     for package in required:
         try:
             __import__(package)
-            print(f"  ✓ {package}")
+            print(f"  OK: {package}")
         except ImportError:
             missing.append(package)
-            print(f"  ✗ {package} (missing)")
+            print(f"  MISSING: {package}")
     
     if missing:
-        print(f"\n❌ Missing dependencies: {', '.join(missing)}")
+        print(f"\nMissing dependencies: {', '.join(missing)}")
         print(f"Install them with: pip install {' '.join(missing)}")
         return False
     
-    print("✅ All dependencies installed!")
+    print("All dependencies installed!")
     return True
 
 def start_server():
     """Start the Vonage agent server"""
-    print("\n🚀 Starting AI Phone Agent server...")
+    print("\nStarting AI Phone Agent server...")
     print("   Web Interface: http://localhost:5004")
     print("   Press Ctrl+C to stop the server\n")
     print("-" * 70 + "\n")
@@ -112,9 +112,9 @@ def start_server():
         )
         
     except KeyboardInterrupt:
-        print("\n\n🛑 Server stopped by user")
+        print("\n\nServer stopped by user")
     except Exception as e:
-        print(f"\n\n❌ Error starting server: {e}")
+        print(f"\n\nError starting server: {e}")
         import traceback
         traceback.print_exc()
 
@@ -126,13 +126,13 @@ def main():
     updated = check_git_updates()
     
     if updated:
-        print("\n⚠️  Files were updated. Please restart the script to use the latest version.")
+        print("\nWARNING: Files were updated. Please restart the script to use the latest version.")
         print("   Run: python start_server.py")
         return
     
     # Check dependencies
     if not check_dependencies():
-        print("\n⚠️  Please install missing dependencies and try again.")
+        print("\nWARNING: Please install missing dependencies and try again.")
         return
     
     # Start the server

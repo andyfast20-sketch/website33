@@ -4,8 +4,11 @@ import numpy as np
 from scipy.io import wavfile
 import io
 import requests
+import os
 
-OPENAI_KEY = "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"
+OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+if not OPENAI_KEY:
+    raise RuntimeError("OPENAI_API_KEY is not set")
 
 # Record 4 seconds of audio
 print("Recording for 4 seconds... Say 'What is the capital of Germany?'")

@@ -11,7 +11,9 @@ import numpy as np
 from scipy import signal
 from websockets import connect
 
-OPENAI_API_KEY = "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"
+import os
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # Audio settings
 INPUT_RATE = 44100  # Jabra's native rate
@@ -27,6 +29,8 @@ class RealtimeVoiceAgent:
         
     async def connect(self):
         """Connect to OpenAI Realtime API"""
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not set. Put it in your environment or a local .env file.")
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17"
         headers = {
             "Authorization": f"Bearer {OPENAI_API_KEY}",

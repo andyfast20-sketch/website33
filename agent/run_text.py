@@ -1,4 +1,5 @@
 """Simple text-based agent for testing without microphone."""
+import os
 import asyncio
 import pyttsx3
 
@@ -6,13 +7,16 @@ import pyttsx3
 engine = pyttsx3.init()
 engine.setProperty('rate', 175)
 
-DEEPSEEK_API_KEY = "sk-0b54e89d08554cf8aff13b5d181ff5ad"
+DEEPSEEK_API_KEY = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 
 
 async def get_response(user_text: str) -> str:
     """Get response from DeepSeek."""
     import aiohttp
     import json
+
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY is not set in the environment")
     
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",

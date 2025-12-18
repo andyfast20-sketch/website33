@@ -1,12 +1,3 @@
-"""
-Vonage Agent Server Control - GUI
-==================================
-Simple GUI to start, stop, restart, and monitor the server
-"""
-
-import tkinter as tk
-from tkinter import ttk, scrolledtext
-import subprocess
 import psutil
 import os
 import sys
@@ -15,6 +6,12 @@ import time
 import webbrowser
 import socket
 import requests
+import tkinter as tk
+from tkinter import scrolledtext
+import subprocess
+import sqlite3
+from datetime import datetime
+import json
 
 SERVER_SCRIPT = "vonage_agent.py"
 SERVER_PORT = 5004
@@ -223,6 +220,18 @@ class ServerControlGUI:
         )
         self.manage_numbers_btn.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        # Manage Users button
+        self.manage_users_btn = tk.Button(
+            button_frame,
+            text="👥 Manage Users",
+            bg='#e74c3c',
+            fg='white',
+            activebackground='#c0392b',
+            command=self.show_manage_users,
+            **button_style
+        )
+        self.manage_users_btn.grid(row=5, column=2, padx=5, pady=5, sticky='ew')
+        
         # Billing Settings button
         self.billing_btn = tk.Button(
             button_frame,
@@ -235,6 +244,30 @@ class ServerControlGUI:
         )
         self.billing_btn.grid(row=6, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
+        # Voice Diagnostics button
+        self.voice_diagnostics_btn = tk.Button(
+            button_frame,
+            text="🔍 Voice Diagnostics",
+            bg='#3498db',
+            fg='white',
+            activebackground='#2980b9',
+            command=self.show_voice_diagnostics,
+            **button_style
+        )
+        self.voice_diagnostics_btn.grid(row=7, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        
+        # Live Call Diagnostics button
+        self.live_diagnostics_btn = tk.Button(
+            button_frame,
+            text="📊 Live Call Diagnostics",
+            bg='#9b59b6',
+            fg='white',
+            activebackground='#8e44ad',
+            command=self.show_live_diagnostics,
+            **button_style
+        )
+        self.live_diagnostics_btn.grid(row=7, column=2, padx=5, pady=5, sticky='ew')
+        
         # Open Admin Dashboard button
         self.admin_dashboard_btn = tk.Button(
             button_frame,
@@ -245,7 +278,7 @@ class ServerControlGUI:
             command=self.open_admin_dashboard,
             **button_style
         )
-        self.admin_dashboard_btn.grid(row=7, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
+        self.admin_dashboard_btn.grid(row=8, column=0, columnspan=2, padx=5, pady=5, sticky='ew')
         
         # Log Frame
         log_label = tk.Label(
@@ -806,6 +839,269 @@ class ServerControlGUI:
         except Exception as e:
             self.log(f"❌ Failed to open admin dashboard: {e}")
     
+    def show_manage_users(self):
+        """Show user management popup with delete functionality"""
+        self.log("👥 Loading users...")
+        
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("User Management")
+        popup.geometry("800x600")
+        popup.resizable(True, True)
+        popup.configure(bg='#34495e')
+        
+        # Center popup on parent
+        popup.transient(self.root)
+        
+        # Title
+        title_label = tk.Label(
+            popup,
+            text="👥 User Management",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#34495e',
+            fg='white'
+        )
+        title_label.pack(pady=(15, 10))
+        
+        # Loading label
+        loading_label = tk.Label(
+            popup,
+            text="Loading users...",
+            font=('Segoe UI', 10),
+            bg='#34495e',
+            fg='#ecf0f1'
+        )
+        loading_label.pack(pady=20)
+        
+        # Fetch data in background
+        def fetch_users():
+            try:
+                conn = sqlite3.connect('call_logs.db')
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT u.id, u.name, u.email, a.phone_number, a.minutes_remaining
+                    FROM users u
+                    LEFT JOIN account_settings a ON u.id = a.user_id
+                    ORDER BY u.name
+                ''')
+                users = cursor.fetchall()
+                conn.close()
+                
+                popup.after(0, lambda: display_users(users))
+            except Exception as e:
+                popup.after(0, lambda: show_error(str(e)))
+        
+        def display_users(users):
+            try:
+                loading_label.destroy()
+            except:
+                pass
+            
+            if len(users) == 0:
+                no_users_label = tk.Label(
+                    popup,
+                    text="❌ No users found.",
+                    font=('Segoe UI', 10),
+                    bg='#34495e',
+                    fg='#e74c3c',
+                    justify=tk.CENTER
+                )
+                no_users_label.pack(pady=30)
+            else:
+                # Create scrollable frame
+                canvas = tk.Canvas(popup, bg='#34495e', highlightthickness=0)
+                scrollbar = tk.Scrollbar(popup, orient="vertical", command=canvas.yview)
+                scrollable_frame = tk.Frame(canvas, bg='#34495e')
+                
+                scrollable_frame.bind(
+                    "<Configure>",
+                    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+                )
+                
+                canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+                canvas.configure(yscrollcommand=scrollbar.set)
+                
+                # Summary
+                summary = tk.Label(
+                    scrollable_frame,
+                    text=f"Total Users: {len(users)}",
+                    font=('Segoe UI', 9, 'bold'),
+                    bg='#2c3e50',
+                    fg='white',
+                    pady=8
+                )
+                summary.pack(fill=tk.X, padx=15, pady=(10, 15))
+                
+                for user in users:
+                    user_id, name, email, phone_number, minutes_remaining = user
+                    
+                    user_frame = tk.Frame(scrollable_frame, bg='#2c3e50', relief=tk.RAISED, bd=1)
+                    user_frame.pack(fill=tk.X, padx=15, pady=5)
+                    
+                    # User info
+                    info_frame = tk.Frame(user_frame, bg='#2c3e50')
+                    info_frame.pack(side=tk.LEFT, padx=10, pady=8, fill=tk.X, expand=True)
+                    
+                    name_label = tk.Label(
+                        info_frame,
+                        text=f"👤 {name}",
+                        font=('Segoe UI', 10, 'bold'),
+                        bg='#2c3e50',
+                        fg='#3498db',
+                        anchor='w'
+                    )
+                    name_label.pack(anchor='w')
+                    
+                    email_label = tk.Label(
+                        info_frame,
+                        text=f"📧 {email}",
+                        font=('Segoe UI', 9),
+                        bg='#2c3e50',
+                        fg='#ecf0f1',
+                        anchor='w'
+                    )
+                    email_label.pack(anchor='w')
+                    
+                    if phone_number:
+                        phone_label = tk.Label(
+                            info_frame,
+                            text=f"📞 {phone_number}",
+                            font=('Segoe UI', 9),
+                            bg='#2c3e50',
+                            fg='#27ae60',
+                            anchor='w'
+                        )
+                        phone_label.pack(anchor='w')
+                    
+                    minutes_label = tk.Label(
+                        info_frame,
+                        text=f"⏱️ {minutes_remaining or 0} minutes remaining",
+                        font=('Segoe UI', 9),
+                        bg='#2c3e50',
+                        fg='#bdc3c7',
+                        anchor='w'
+                    )
+                    minutes_label.pack(anchor='w')
+                    
+                    # Delete button
+                    delete_btn = tk.Button(
+                        user_frame,
+                        text="🗑️ Delete User",
+                        command=lambda u=user: delete_user(u, popup),
+                        bg='#e74c3c',
+                        fg='white',
+                        font=('Segoe UI', 9, 'bold'),
+                        cursor='hand2',
+                        relief=tk.RAISED,
+                        bd=1,
+                        padx=15,
+                        pady=5
+                    )
+                    delete_btn.pack(side=tk.RIGHT, padx=10, pady=8)
+                
+                canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
+            
+            # Close button
+            close_btn = tk.Button(
+                popup,
+                text="Close",
+                command=popup.destroy,
+                bg='#3498db',
+                fg='white',
+                font=('Segoe UI', 9, 'bold'),
+                cursor='hand2',
+                relief=tk.RAISED,
+                bd=2,
+                padx=20,
+                pady=5
+            )
+            close_btn.pack(pady=(0, 15))
+        
+        def show_error(error_msg):
+            try:
+                loading_label.destroy()
+            except:
+                pass
+            error_label = tk.Label(
+                popup,
+                text=f"❌ {error_msg}",
+                font=('Segoe UI', 10),
+                bg='#34495e',
+                fg='#e74c3c',
+                wraplength=600
+            )
+            error_label.pack(pady=20)
+        
+        def delete_user(user, window):
+            """Delete user and release their phone number"""
+            import tkinter.messagebox as messagebox
+            user_id, name, email, phone_number, minutes_remaining = user
+            
+            # Confirm deletion
+            confirm_msg = f"Are you sure you want to delete user '{name}'?\n\n"
+            if phone_number:
+                confirm_msg += f"Phone number {phone_number} will be released and made available.\n\n"
+            confirm_msg += "This action cannot be undone!"
+            
+            if not messagebox.askyesno("Confirm Deletion", confirm_msg):
+                return
+            
+            try:
+                self.log(f"🗑️ Deleting user {name} (ID: {user_id})...")
+                
+                conn = sqlite3.connect('call_logs.db')
+                cursor = conn.cursor()
+                
+                # Release phone number if assigned
+                if phone_number:
+                    # Create table if doesn't exist
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS number_availability (
+                            phone_number TEXT PRIMARY KEY,
+                            is_available INTEGER DEFAULT 1,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    
+                    # Mark number as available
+                    cursor.execute('''
+                        INSERT INTO number_availability (phone_number, is_available, updated_at)
+                        VALUES (?, 1, CURRENT_TIMESTAMP)
+                        ON CONFLICT(phone_number) DO UPDATE SET
+                            is_available = 1,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (phone_number,))
+                    
+                    self.log(f"✅ Released phone number: {phone_number}")
+                
+                # Delete user data
+                cursor.execute('DELETE FROM calls WHERE user_id = ?', (user_id,))
+                cursor.execute('DELETE FROM appointments WHERE user_id = ?', (user_id,))
+                cursor.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+                cursor.execute('DELETE FROM account_settings WHERE user_id = ?', (user_id,))
+                cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                
+                conn.commit()
+                conn.close()
+                
+                self.log(f"✅ User {name} deleted successfully")
+                messagebox.showinfo("Success", f"User '{name}' has been deleted.")
+                
+                # Refresh the popup
+                window.destroy()
+                self.show_manage_users()
+                
+            except Exception as e:
+                self.log(f"❌ Error deleting user: {e}")
+                messagebox.showerror("Error", f"Failed to delete user: {str(e)}")
+        
+        # Start fetching in background thread
+        import threading
+        thread = threading.Thread(target=fetch_users, daemon=True)
+        thread.start()
+    
     def show_numbers_popup(self):
         """Show popup with owned Vonage numbers and their assignments"""
         self.log("📞 Loading number assignments...")
@@ -828,12 +1124,52 @@ class ServerControlGUI:
             bg='#34495e',
             fg='white'
         )
-        title_label.pack(pady=(15, 10))
+        title_label.pack(pady=(15, 5))
+        
+        # Sync button at top
+        def sync_numbers():
+            sync_btn.config(state='disabled', text='⏳ Syncing...')
+            def do_sync():
+                try:
+                    response = requests.post(f"http://localhost:{SERVER_PORT}/api/sync-vonage-numbers", timeout=15)
+                    if response.status_code == 200:
+                        result = response.json()
+                        if result.get('success'):
+                            messagebox.showinfo("Sync Complete", result.get('message', 'Numbers synced!'))
+                            popup.destroy()
+                            self.show_numbers_popup()  # Reload
+                        else:
+                            messagebox.showerror("Sync Failed", result.get('error', 'Unknown error'))
+                    else:
+                        messagebox.showerror("Sync Failed", f"HTTP {response.status_code}")
+                except Exception as e:
+                    messagebox.showerror("Sync Error", str(e))
+                finally:
+                    try:
+                        sync_btn.config(state='normal', text='🔄 Sync from Vonage')
+                    except:
+                        pass
+            threading.Thread(target=do_sync, daemon=True).start()
+        
+        sync_btn = tk.Button(
+            popup,
+            text="🔄 Sync from Vonage",
+            command=sync_numbers,
+            bg='#3498db',
+            fg='white',
+            font=('Segoe UI', 9, 'bold'),
+            cursor='hand2',
+            relief=tk.RAISED,
+            bd=2,
+            padx=15,
+            pady=5
+        )
+        sync_btn.pack(pady=(5, 10))
         
         # Loading label
         loading_label = tk.Label(
             popup,
-            text="Loading numbers from Vonage...",
+            text="Loading numbers from database...",
             font=('Segoe UI', 10),
             bg='#34495e',
             fg='#ecf0f1'
@@ -853,7 +1189,10 @@ class ServerControlGUI:
                 popup.after(0, lambda: show_error(f"Error: {str(e)}"))
         
         def display_numbers(data):
-            loading_label.destroy()
+            try:
+                loading_label.destroy()
+            except:
+                pass
             
             if not data.get('success'):
                 show_error(data.get('error', 'Unknown error'))
@@ -1011,7 +1350,10 @@ class ServerControlGUI:
             close_btn.pack(pady=(0, 15))
         
         def show_error(error_msg):
-            loading_label.destroy()
+            try:
+                loading_label.destroy()
+            except:
+                pass
             error_label = tk.Label(
                 popup,
                 text=f"❌ {error_msg}",
@@ -1133,19 +1475,6 @@ class ServerControlGUI:
                 self.log(f"❌ Error deassigning number: {e}")
                 import tkinter.messagebox as messagebox
                 messagebox.showerror("Error", f"Failed to deassign number: {str(e)}")
-            
-            close_btn = tk.Button(
-                popup,
-                text="Close",
-                command=popup.destroy,
-                bg='#e74c3c',
-                fg='white',
-                font=('Segoe UI', 9, 'bold'),
-                cursor='hand2',
-                padx=20,
-                pady=5
-            )
-            close_btn.pack(pady=10)
         
         # Start fetching in background thread
         import threading
@@ -1656,6 +1985,466 @@ class ServerControlGUI:
             pady=8
         )
         cancel_btn.pack(side=tk.LEFT, padx=10)
+
+    def show_voice_diagnostics(self):
+        """Show voice provider diagnostics window"""
+        popup = tk.Toplevel(self.root)
+        popup.title("🔍 Voice Provider Diagnostics")
+        popup.geometry("700x600")
+        popup.configure(bg='#34495e')
+        
+        # Header
+        header = tk.Label(
+            popup,
+            text="🔍 Voice Provider Diagnostics",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#34495e',
+            fg='white'
+        )
+        header.pack(pady=10)
+        
+        # Create scrollable text area for diagnostics
+        text_frame = tk.Frame(popup, bg='#34495e')
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        diag_text = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            yscrollcommand=scrollbar.set,
+            bg='#2c3e50',
+            fg='white',
+            font=('Consolas', 10),
+            padx=10,
+            pady=10
+        )
+        diag_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=diag_text.yview)
+        
+        def run_diagnostics():
+            diag_text.delete('1.0', tk.END)
+            diag_text.insert(tk.END, "🔄 Running voice provider diagnostics...\n\n")
+            diag_text.update()
+            
+            try:
+                import sqlite3
+                conn = sqlite3.connect('phone_agent.db')
+                cursor = conn.cursor()
+                
+                # Check PlayHT configuration
+                diag_text.insert(tk.END, "━" * 60 + "\n")
+                diag_text.insert(tk.END, "📊 PLAY.HT CONFIGURATION\n")
+                diag_text.insert(tk.END, "━" * 60 + "\n\n")
+                
+                # Check if API credentials are set in code
+                from vonage_agent import playht_api_key, playht_user_id
+                if playht_api_key and playht_user_id:
+                    diag_text.insert(tk.END, "✅ PlayHT API Key: Configured\n")
+                    diag_text.insert(tk.END, f"✅ PlayHT User ID: {playht_user_id[:10]}...\n\n")
+                else:
+                    diag_text.insert(tk.END, "❌ PlayHT API Key: NOT CONFIGURED\n")
+                    diag_text.insert(tk.END, "❌ PlayHT User ID: NOT CONFIGURED\n")
+                    diag_text.insert(tk.END, "⚠️  Set PLAYHT_API_KEY and PLAYHT_USER_ID in vonage_agent.py\n\n")
+                
+                # Check user voice provider settings
+                cursor.execute('SELECT COUNT(*) FROM account_settings WHERE voice_provider = "playht"')
+                playht_users = cursor.fetchone()[0]
+                diag_text.insert(tk.END, f"👥 Users with PlayHT selected: {playht_users}\n\n")
+                
+                # Check recent calls with PlayHT
+                cursor.execute('''
+                    SELECT COUNT(*) FROM calls c
+                    JOIN account_settings a ON c.user_id = a.user_id
+                    WHERE a.voice_provider = "playht"
+                ''')
+                playht_calls = cursor.fetchone()[0]
+                diag_text.insert(tk.END, f"📞 Total calls with PlayHT: {playht_calls}\n\n")
+                
+                # Check for common issues
+                diag_text.insert(tk.END, "━" * 60 + "\n")
+                diag_text.insert(tk.END, "🔍 COMMON ISSUES CHECK\n")
+                diag_text.insert(tk.END, "━" * 60 + "\n\n")
+                
+                issues_found = False
+                
+                if not playht_api_key or not playht_user_id:
+                    diag_text.insert(tk.END, "❌ ISSUE: PlayHT credentials not configured\n")
+                    diag_text.insert(tk.END, "   FIX: Add PLAYHT_API_KEY and PLAYHT_USER_ID in vonage_agent.py\n\n")
+                    issues_found = True
+                
+                # Check if playht_voice_id column exists
+                cursor.execute("PRAGMA table_info(account_settings)")
+                columns = [col[1] for col in cursor.fetchall()]
+                if 'playht_voice_id' not in columns:
+                    diag_text.insert(tk.END, "❌ ISSUE: Database missing playht_voice_id column\n")
+                    diag_text.insert(tk.END, "   FIX: Restart server to auto-create column\n\n")
+                    issues_found = True
+                
+                if not issues_found:
+                    diag_text.insert(tk.END, "✅ No configuration issues found!\n\n")
+                
+                # Voice provider summary
+                diag_text.insert(tk.END, "━" * 60 + "\n")
+                diag_text.insert(tk.END, "📊 ALL VOICE PROVIDERS\n")
+                diag_text.insert(tk.END, "━" * 60 + "\n\n")
+                
+                cursor.execute('''
+                    SELECT voice_provider, COUNT(*) 
+                    FROM account_settings 
+                    GROUP BY voice_provider
+                ''')
+                for provider, count in cursor.fetchall():
+                    diag_text.insert(tk.END, f"  {provider or 'openai'}: {count} users\n")
+                
+                conn.close()
+                
+                diag_text.insert(tk.END, "\n✅ Diagnostics complete!\n")
+                
+            except Exception as e:
+                diag_text.insert(tk.END, f"\n❌ Error running diagnostics: {e}\n")
+                import traceback
+                diag_text.insert(tk.END, f"\n{traceback.format_exc()}\n")
+        
+        # Run diagnostics button
+        run_btn = tk.Button(
+            popup,
+            text="🔄 Run Diagnostics",
+            command=run_diagnostics,
+            bg='#3498db',
+            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            cursor='hand2',
+            padx=20,
+            pady=8
+        )
+        run_btn.pack(pady=10)
+        
+        # Run diagnostics on open
+        run_diagnostics()
+    
+    def show_live_diagnostics(self):
+        """Show live call diagnostics with timing breakdown"""
+        popup = tk.Toplevel(self.root)
+        popup.title("📊 Live Call Diagnostics")
+        popup.geometry("900x700")
+        popup.configure(bg='#2c3e50')
+        
+        # Header
+        header = tk.Label(
+            popup,
+            text="📊 Live Call Diagnostics - Real-Time Timing Analysis",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#2c3e50',
+            fg='white',
+            pady=15
+        )
+        header.pack()
+        
+        # Info text
+        info = tk.Label(
+            popup,
+            text="This analyzes your most recent phone call and shows where delays are occurring",
+            font=('Segoe UI', 9),
+            bg='#2c3e50',
+            fg='#bdc3c7'
+        )
+        info.pack()
+        
+        # Diagnostic output
+        diag_frame = tk.Frame(popup, bg='#2c3e50', padx=20, pady=10)
+        diag_frame.pack(fill=tk.BOTH, expand=True)
+        
+        diag_text = scrolledtext.ScrolledText(
+            diag_frame,
+            wrap=tk.WORD,
+            width=100,
+            height=30,
+            font=('Consolas', 10),
+            bg='#1e1e1e',
+            fg='#00ff00',
+            insertbackground='white'
+        )
+        diag_text.pack(fill=tk.BOTH, expand=True)
+        
+        def analyze_call():
+            """Analyze the most recent call from logs"""
+            diag_text.delete('1.0', tk.END)
+            diag_text.insert(tk.END, "Analyzing most recent call...\n\n")
+            diag_text.update()
+            
+            try:
+                import re
+                from datetime import datetime
+                
+                # Read log file
+                log_file = 'server_startup.log'
+                if not os.path.exists(log_file):
+                    diag_text.insert(tk.END, "❌ Log file not found. Make sure server is running.\n")
+                    return
+                
+                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    log_content = f.read()
+                
+                # Find all call UUIDs
+                call_pattern = r'\[([a-f0-9-]{36})\]'
+                calls = list(set(re.findall(call_pattern, log_content)))
+                
+                if not calls:
+                    diag_text.insert(tk.END, "❌ No calls found in logs.\n")
+                    diag_text.insert(tk.END, "   Make a test call first, then run diagnostics.\n")
+                    return
+                
+                # Get the last call
+                last_call = calls[-1]
+                diag_text.insert(tk.END, f"📞 Call UUID: {last_call}\n")
+                diag_text.insert(tk.END, "="*80 + "\n\n")
+                
+                # Extract lines for this call
+                call_lines = [line for line in log_content.split('\n') if last_call in line]
+                
+                # Parse events with timestamps
+                events = []
+                for line in call_lines:
+                    timestamp_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})', line)
+                    if not timestamp_match:
+                        continue
+                    
+                    ts_str = timestamp_match.group(1)
+                    try:
+                        ts = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S,%f')
+                    except:
+                        continue
+                    
+                    # Capture key events
+                    if 'VAD:' in line or 'VAD silence' in line:
+                        match = re.search(r'silence=(\d+)ms', line)
+                        if match:
+                            events.append(('vad_configured', ts, int(match.group(1)), line))
+                    elif 'Text delta:' in line:
+                        match = re.search(r'Text delta: (\d+) chars', line)
+                        if match:
+                            events.append(('text_delta', ts, int(match.group(1)), line))
+                    elif 'INSTANT:' in line or 'EARLY GEN' in line:
+                        match = re.search(r'started at (\d+) chars', line)
+                        if match:
+                            events.append(('early_gen', ts, int(match.group(1)), line))
+                    elif 'ElevenLabs' in line and 'generated' in line:
+                        match = re.search(r'in (\d+)ms', line)
+                        if match:
+                            events.append(('elevenlabs', ts, int(match.group(1)), line))
+                    elif 'TTS' in line and ('generated' in line or 'complete' in line):
+                        match = re.search(r'in (\d+)ms', line)
+                        if match:
+                            events.append(('tts', ts, int(match.group(1)), line))
+                    elif 'TEXT DONE' in line:
+                        events.append(('text_done', ts, None, line))
+                
+                if not events:
+                    diag_text.insert(tk.END, "⚠️  No timing events found for this call.\n\n")
+                    diag_text.insert(tk.END, "Recent call activity:\n")
+                    for line in call_lines[-20:]:
+                        diag_text.insert(tk.END, f"  {line}\n")
+                    return
+                
+                # Display timeline
+                diag_text.insert(tk.END, "⏱️  EVENT TIMELINE\n")
+                diag_text.insert(tk.END, "="*80 + "\n\n")
+                
+                start_time = events[0][1]
+                timing_data = {
+                    'vad_ms': None,
+                    'tts_ms': None,
+                    'early_gen': False,
+                    'early_gen_chars': 0
+                }
+                
+                for event_type, timestamp, value, line in events:
+                    elapsed = (timestamp - start_time).total_seconds() * 1000
+                    
+                    if event_type == 'vad_configured':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | 🎤 VAD configured: {value}ms silence detection\n")
+                        timing_data['vad_ms'] = value
+                    elif event_type == 'text_delta':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | 📝 Text received: {value} characters\n")
+                    elif event_type == 'early_gen':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | ⚡ EARLY GENERATION STARTED at {value} chars!\n")
+                        timing_data['early_gen'] = True
+                        timing_data['early_gen_chars'] = value
+                    elif event_type == 'text_done':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | ✅ Text generation complete\n")
+                    elif event_type == 'tts':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | 🔊 TTS: {value}ms\n")
+                        timing_data['tts_ms'] = value
+                    elif event_type == 'elevenlabs':
+                        diag_text.insert(tk.END, f"+{elapsed:6.0f}ms | 🔊 ElevenLabs TTS: {value}ms\n")
+                        timing_data['tts_ms'] = value
+                
+                # Analysis
+                diag_text.insert(tk.END, "\n" + "="*80 + "\n")
+                diag_text.insert(tk.END, "📊 PERFORMANCE ANALYSIS\n")
+                diag_text.insert(tk.END, "="*80 + "\n\n")
+                
+                issues = []
+                recommendations = []
+                
+                # Check VAD
+                if timing_data['vad_ms']:
+                    if timing_data['vad_ms'] < 300:
+                        diag_text.insert(tk.END, f"⚠️  VAD: {timing_data['vad_ms']}ms - TOO FAST (may interrupt user)\n")
+                        issues.append(f"VAD silence detection is {timing_data['vad_ms']}ms - this can cause AI to talk over user")
+                        recommendations.append("Increase VAD silence_duration_ms to 400-500ms")
+                    elif timing_data['vad_ms'] > 600:
+                        diag_text.insert(tk.END, f"⚠️  VAD: {timing_data['vad_ms']}ms - TOO SLOW (user waits too long)\n")
+                        issues.append(f"VAD silence detection is {timing_data['vad_ms']}ms - this makes response feel slow")
+                        recommendations.append("Decrease VAD silence_duration_ms to 400ms")
+                    else:
+                        diag_text.insert(tk.END, f"✅ VAD: {timing_data['vad_ms']}ms - GOOD\n")
+                
+                # Check early generation
+                if timing_data['early_gen']:
+                    diag_text.insert(tk.END, f"✅ Early Generation: ACTIVE at {timing_data['early_gen_chars']} chars\n")
+                else:
+                    diag_text.insert(tk.END, f"❌ Early Generation: NOT TRIGGERED\n")
+                    issues.append("Early audio generation did not trigger - TTS only started after full text")
+                    recommendations.append("Enable early audio generation to start TTS while OpenAI is still generating text")
+                
+                # Check TTS speed
+                if timing_data['tts_ms']:
+                    if timing_data['tts_ms'] > 1200:
+                        diag_text.insert(tk.END, f"❌ TTS Speed: {timing_data['tts_ms']}ms - VERY SLOW\n")
+                        issues.append(f"TTS generation takes {timing_data['tts_ms']}ms - this is the main bottleneck")
+                        recommendations.append("Consider switching to a faster TTS provider (OpenAI built-in voice or ElevenLabs)")
+                    elif timing_data['tts_ms'] > 700:
+                        diag_text.insert(tk.END, f"⚠️  TTS Speed: {timing_data['tts_ms']}ms - SLOW\n")
+                        issues.append(f"TTS generation takes {timing_data['tts_ms']}ms")
+                        recommendations.append("TTS is slower than optimal - consider OpenAI's built-in voice")
+                    else:
+                        diag_text.insert(tk.END, f"✅ TTS Speed: {timing_data['tts_ms']}ms - GOOD\n")
+                
+                # Store for AI analysis
+                self.diagnostic_data = {
+                    'issues': issues,
+                    'recommendations': recommendations,
+                    'timing_data': timing_data
+                }
+                
+                diag_text.insert(tk.END, "\n" + "="*80 + "\n\n")
+                
+                if issues:
+                    diag_text.insert(tk.END, "🔴 ISSUES FOUND:\n\n")
+                    for i, issue in enumerate(issues, 1):
+                        diag_text.insert(tk.END, f"  {i}. {issue}\n")
+                else:
+                    diag_text.insert(tk.END, "✅ No major issues detected!\n")
+                
+            except Exception as e:
+                diag_text.insert(tk.END, f"\n❌ Error: {e}\n")
+                import traceback
+                diag_text.insert(tk.END, f"\n{traceback.format_exc()}\n")
+        
+        def ai_analysis():
+            """Use DeepSeek AI to analyze the diagnostics"""
+            if not hasattr(self, 'diagnostic_data'):
+                diag_text.insert(tk.END, "\n❌ Please run diagnostics first!\n")
+                return
+            
+            diag_text.insert(tk.END, "\n" + "="*80 + "\n")
+            diag_text.insert(tk.END, "🤖 AI ANALYSIS (DeepSeek)\n")
+            diag_text.insert(tk.END, "="*80 + "\n\n")
+            diag_text.insert(tk.END, "Analyzing with DeepSeek AI...\n\n")
+            diag_text.update()
+            
+            try:
+                import requests
+                
+                # Read config to get DeepSeek API key
+                try:
+                    import sys
+                    sys.path.insert(0, '.')
+                    from vonage_agent import CONFIG
+                    deepseek_key = CONFIG.get('DEEPSEEK_API_KEY', '')
+                except:
+                    deepseek_key = ''
+                
+                if not deepseek_key:
+                    diag_text.insert(tk.END, "❌ DeepSeek API key not configured.\n")
+                    return
+                
+                # Prepare prompt
+                issues_text = "\n".join(f"- {issue}" for issue in self.diagnostic_data['issues'])
+                timing_text = f"VAD: {self.diagnostic_data['timing_data'].get('vad_ms', 'N/A')}ms, TTS: {self.diagnostic_data['timing_data'].get('tts_ms', 'N/A')}ms, Early Gen: {self.diagnostic_data['timing_data'].get('early_gen', False)}"
+                
+                prompt = "You are analyzing voice call performance issues. Here is the diagnostic data:\n\n"
+                prompt += f"TIMING DATA:\n{timing_text}\n\n"
+                prompt += f"ISSUES FOUND:\n{issues_text}\n\n"
+                prompt += "Please provide:\n"
+                prompt += "1. A simple explanation (2-3 sentences) of what is causing the slow response\n"
+                prompt += "2. The #1 most important fix to make it faster\n"
+                prompt += "3. Expected improvement after the fix\n\n"
+                prompt += "Keep the language simple and non-technical."
+                
+                response = requests.post(
+                    'https://api.deepseek.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {deepseek_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': 'deepseek-chat',
+                        'messages': [{'role': 'user', 'content': prompt}],
+                        'temperature': 0.7,
+                        'max_tokens': 500
+                    },
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_response = result['choices'][0]['message']['content']
+                    diag_text.insert(tk.END, ai_response + "\n\n")
+                else:
+                    diag_text.insert(tk.END, f"❌ DeepSeek API error: {response.status_code}\n")
+                    diag_text.insert(tk.END, f"{response.text}\n")
+                
+            except Exception as e:
+                diag_text.insert(tk.END, f"❌ AI analysis failed: {e}\n")
+                import traceback
+                diag_text.insert(tk.END, f"\n{traceback.format_exc()}\n")
+        
+        # Buttons frame
+        btn_frame = tk.Frame(popup, bg='#2c3e50')
+        btn_frame.pack(pady=10)
+        
+        analyze_btn = tk.Button(
+            btn_frame,
+            text="🔄 Analyze Last Call",
+            command=analyze_call,
+            bg='#3498db',
+            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            cursor='hand2',
+            padx=20,
+            pady=8
+        )
+        analyze_btn.pack(side=tk.LEFT, padx=5)
+        
+        ai_btn = tk.Button(
+            btn_frame,
+            text="🤖 AI Analysis (DeepSeek)",
+            command=ai_analysis,
+            bg='#9b59b6',
+            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            cursor='hand2',
+            padx=20,
+            pady=8
+        )
+        ai_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Auto-run on open
+        analyze_call()
 
 if __name__ == "__main__":
     # Check dependencies
