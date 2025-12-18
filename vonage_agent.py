@@ -1292,6 +1292,20 @@ class CallSession:
         # Increment to invalidate any in-flight Speechmatics stream (barge-in).
         self._speechmatics_output_generation: int = 0
 
+        # Vonage websocket framing varies by integration; default to binary.
+        # If we detect JSON base64 audio inbound, we mirror it outbound.
+        self._vonage_audio_mode: str = "bytes"  # "bytes" | "json"
+        self._vonage_audio_mode_logged: bool = False
+
+    async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
+        if not self.vonage_ws or not self.is_active or not pcm_bytes:
+            return
+
+        if getattr(self, "_vonage_audio_mode", "bytes") == "json":
+            await self.vonage_ws.send_text(json.dumps({"audio": base64.b64encode(pcm_bytes).decode()}))
+        else:
+            await self.vonage_ws.send_bytes(pcm_bytes)
+
     def _barge_in_stop_speechmatics(self) -> None:
         """Immediately stop any Speechmatics output and drop queued sentences."""
         self._speechmatics_output_generation += 1
@@ -1364,7 +1378,7 @@ class CallSession:
                     chunk = wf.readframes(chunk_size // 2)  # readframes takes sample count
                     if not chunk:
                         break
-                    await self.vonage_ws.send_bytes(chunk)
+                    await self._send_vonage_audio_bytes(chunk)
                     # No sleep - stream continuously for best quality
 
             return True
@@ -1412,7 +1426,7 @@ class CallSession:
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": msg}]
+                    "content": [{"type": "text", "text": msg}]
                 }
             }))
         except Exception as e:
@@ -1579,7 +1593,7 @@ Provide your analysis."""
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
+                    "content": [{"type": "text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
                 }
             }))
             
@@ -1862,7 +1876,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "user",
-                                "content": [{"type": "input_text", "text": global_context}]
+                                "content": [{"type": "text", "text": global_context}]
                             }
                         }))
                         
@@ -1871,7 +1885,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "assistant",
-                                "content": [{"type": "input_text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
+                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
                             }
                         }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
@@ -1891,7 +1905,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "user",
-                            "content": [{"type": "input_text", "text": business_context}]
+                            "content": [{"type": "text", "text": business_context}]
                         }
                     }))
                     
@@ -1900,7 +1914,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "assistant",
-                            "content": [{"type": "input_text", "text": "Understood. I will refer to this business information for all responses."}]
+                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
@@ -2313,7 +2327,7 @@ You must use ONLY this information when answering questions about services, area
             audio_bytes = (audio_16k * 32767).astype(np.int16).tobytes()
             
             # Send to Vonage WebSocket
-            await self.vonage_ws.send_bytes(audio_bytes)
+            await self._send_vonage_audio_bytes(audio_bytes)
             
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Error sending audio to Vonage: {e}")
@@ -2541,12 +2555,12 @@ You must use ONLY this information when answering questions about services, area
                     while len(buffered) >= chunk_size:
                         chunk = buffered[:chunk_size]
                         buffered = buffered[chunk_size:]
-                        await self.vonage_ws.send_bytes(chunk)
+                        await self._send_vonage_audio_bytes(chunk)
                         chunks_sent += 1
 
                 # Flush any remainder
                 if buffered and self.is_active and self.vonage_ws and my_generation == self._speechmatics_output_generation:
-                    await self.vonage_ws.send_bytes(buffered)
+                    await self._send_vonage_audio_bytes(buffered)
                     chunks_sent += 1
             
             total_time = (time.time() - start_time) * 1000
@@ -6463,13 +6477,53 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
         while True:
             # Receive audio from Vonage
             data = await websocket.receive()
+
+            # Starlette may deliver a disconnect message instead of raising immediately.
+            if data.get("type") == "websocket.disconnect":
+                break
             
             if "bytes" in data:
                 # Audio data from caller
+                if not session._vonage_audio_mode_logged:
+                    session._vonage_audio_mode_logged = True
+                    logger.info(f"[{call_uuid}] Vonage audio mode: bytes")
                 await session.send_audio_to_openai(data["bytes"])
             elif "text" in data:
-                # Could be metadata
-                logger.debug(f"[{call_uuid}] Received text: {data['text']}")
+                # Could be metadata or base64 audio depending on integration.
+                text = data.get("text")
+                if not text:
+                    continue
+
+                try:
+                    msg = json.loads(text)
+                except Exception:
+                    logger.debug(f"[{call_uuid}] Received text: {text}")
+                    continue
+
+                audio_b64 = None
+                if isinstance(msg, dict):
+                    # Common pattern: {"audio": "<base64>"}
+                    if isinstance(msg.get("audio"), str):
+                        audio_b64 = msg.get("audio")
+                    # Twilio-style fallback: {"event":"media","media":{"payload":"<base64>"}}
+                    media = msg.get("media") if isinstance(msg.get("media"), dict) else None
+                    if audio_b64 is None and media and isinstance(media.get("payload"), str):
+                        audio_b64 = media.get("payload")
+
+                if audio_b64:
+                    try:
+                        pcm = base64.b64decode(audio_b64)
+                    except Exception:
+                        continue
+
+                    if session._vonage_audio_mode != "json":
+                        session._vonage_audio_mode = "json"
+                    if not session._vonage_audio_mode_logged:
+                        session._vonage_audio_mode_logged = True
+                        logger.info(f"[{call_uuid}] Vonage audio mode: json")
+                    await session.send_audio_to_openai(pcm)
+                else:
+                    logger.debug(f"[{call_uuid}] Received JSON text: {msg}")
                 
     except WebSocketDisconnect:
         logger.info(f"[{call_uuid}] 🔌 WebSocket disconnected")
