@@ -27,6 +27,121 @@ import io
 
 import numpy as np
 
+# --- Secret handling (encryption at rest) -----------------------------------
+# We encrypt API keys stored in SQLite (global_settings) using Fernet.
+# The Fernet master key is stored in the OS credential store via `keyring`
+# (Windows Credential Manager on this machine). This prevents plaintext keys
+# from being stored in the repo or in the local DB file.
+try:
+    import keyring  # type: ignore
+except Exception:
+    keyring = None
+
+try:
+    from cryptography.fernet import Fernet, InvalidToken  # type: ignore
+except Exception:
+    Fernet = None  # type: ignore
+    InvalidToken = Exception  # type: ignore
+
+
+_SECRET_PREFIX = "enc:v1:"
+_KEYRING_SERVICE = "website33"
+_KEYRING_MASTER_KEY_NAME = "MASTER_FERNET_KEY"
+
+
+def _get_or_create_master_fernet_key() -> Optional[bytes]:
+    """Return the Fernet master key.
+
+    Priority:
+    1) env `WEBSITE33_MASTER_KEY` (base64-encoded Fernet key)
+    2) OS keyring (Windows Credential Manager)
+    3) generate + store in keyring
+    """
+    env_key = (os.getenv("WEBSITE33_MASTER_KEY") or "").strip()
+    if env_key:
+        return env_key.encode("utf-8")
+
+    if keyring is None:
+        return None
+
+    try:
+        stored = keyring.get_password(_KEYRING_SERVICE, _KEYRING_MASTER_KEY_NAME)
+        if stored:
+            return stored.encode("utf-8")
+    except Exception:
+        # If keyring backend isn't available, fall back to env-only.
+        return None
+
+    if Fernet is None:
+        return None
+
+    try:
+        new_key = Fernet.generate_key().decode("utf-8")
+        keyring.set_password(_KEYRING_SERVICE, _KEYRING_MASTER_KEY_NAME, new_key)
+        return new_key.encode("utf-8")
+    except Exception:
+        return None
+
+
+def _get_fernet() -> Optional["Fernet"]:
+    if Fernet is None:
+        return None
+    master_key = _get_or_create_master_fernet_key()
+    if not master_key:
+        return None
+    try:
+        return Fernet(master_key)
+    except Exception:
+        return None
+
+
+def _encrypt_secret(plaintext: str) -> str:
+    plaintext = (plaintext or "").strip()
+    if not plaintext:
+        return ""
+    if plaintext.startswith(_SECRET_PREFIX):
+        return plaintext
+
+    f = _get_fernet()
+    if f is None:
+        # No encryption backend available; return plaintext.
+        # (We still avoid committing keys to git, and prefer keyring/env.)
+        return plaintext
+
+    token = f.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+    return f"{_SECRET_PREFIX}{token}"
+
+
+def _decrypt_secret(value: Optional[str]) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+
+    if not raw.startswith(_SECRET_PREFIX):
+        return raw
+
+    f = _get_fernet()
+    if f is None:
+        # Can't decrypt without master key; treat as missing.
+        return ""
+
+    token = raw[len(_SECRET_PREFIX):]
+    try:
+        return f.decrypt(token.encode("utf-8")).decode("utf-8")
+    except InvalidToken:
+        return ""
+    except Exception:
+        return ""
+
+
+def _secret_preview(value: str) -> str:
+    v = (value or "").strip()
+    if not v:
+        return ""
+    if len(v) <= 8:
+        return "****"
+    return f"{v[:4]}...{v[-4:]}"
+
 # SciPy is optional. On Python 3.13, some SciPy wheels can fail to import.
 # We only used it for resampling, so we provide a NumPy fallback.
 try:
@@ -86,29 +201,30 @@ import base64
 # ============================================================================
 
 CONFIG = {
-    # OpenAI - hardcoded to avoid environment variable conflicts
-    "OPENAI_API_KEY": "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",
+    # API keys MUST NOT be hardcoded. They are loaded from the encrypted DB
+    # (global_settings), from Windows Credential Manager, or from environment.
+    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
     
     # DeepSeek API Keys (with fallback)
-    "DEEPSEEK_API_KEY": "sk-5892b01daa764aa9869c77a6b23ce271",
-    "DEEPSEEK_API_KEY_FALLBACK": "sk-ea0deb6b6e7d49a28facff939fbf08ce",
+    "DEEPSEEK_API_KEY": os.getenv("DEEPSEEK_API_KEY", ""),
+    "DEEPSEEK_API_KEY_FALLBACK": os.getenv("DEEPSEEK_API_KEY_FALLBACK", ""),
     
     # ElevenLabs API Key and Voice ID
-    "ELEVENLABS_API_KEY": "sk_ed0fdc5eb5acd0a634bca953582f7cf9aa750424809900a4",
+    "ELEVENLABS_API_KEY": os.getenv("ELEVENLABS_API_KEY", ""),
     "ELEVENLABS_VOICE_ID": "EXAVITQu4vr4xnSDxMaL",  # Bella - UK female
     "USE_ELEVENLABS": True,  # Initialize ElevenLabs client (per-user setting controls actual usage)
     
     # Google Cloud TTS
-    "GOOGLE_CREDENTIALS_PATH": "google-credentials.json",
+    "GOOGLE_CREDENTIALS_PATH": os.getenv("GOOGLE_CREDENTIALS_PATH", "google-credentials.json"),
     "USE_GOOGLE_TTS": True,
     
     # PlayHT TTS
-    "PLAYHT_USER_ID": "GWETgXJZFSVPJbeiMxlszGLzsxl1",
-    "PLAYHT_API_KEY": "ak-196aec2768b044789ba6fbcb52afb1f9",
+    "PLAYHT_USER_ID": os.getenv("PLAYHT_USER_ID", ""),
+    "PLAYHT_API_KEY": os.getenv("PLAYHT_API_KEY", ""),
     "USE_PLAYHT": True,  # Re-enabled with updated API
     
     # Cartesia AI (real-time streaming, 100+ voices, low latency)
-    "CARTESIA_API_KEY": "sk_car_5S1GHCuxH1zeN2UEY3Mz9u",
+    "CARTESIA_API_KEY": os.getenv("CARTESIA_API_KEY", ""),
     "USE_CARTESIA": True,  # ✅ ENABLED - Fastest option with 100+ voices
     
     # Summary model - which AI to use for call summaries
@@ -120,8 +236,8 @@ CONFIG = {
     # Vonage (optional - only needed for outbound calls)
     "VONAGE_APPLICATION_ID": os.getenv("VONAGE_APPLICATION_ID", ""),
     "VONAGE_PRIVATE_KEY_PATH": os.getenv("VONAGE_PRIVATE_KEY_PATH", "private.key"),
-    "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", "b5d8ed31"),
-    "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", "1D@X(NoflDKvv9Uy14"),
+    "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", ""),
+    "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", ""),
     
     # Server
     "HOST": "0.0.0.0",
@@ -530,16 +646,42 @@ def load_global_api_keys():
         cursor = conn.cursor()
         cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, vonage_api_key, vonage_api_secret, ai_brain_provider FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
-        conn.close()
-        
+
         if result:
-            speechmatics_key, openai_key, deepseek_key, vonage_key, vonage_secret, brain_provider = result
-            
-            # Update CONFIG with keys from database if they exist
+            speechmatics_key_raw, openai_key_raw, deepseek_key_raw, vonage_key_raw, vonage_secret_raw, brain_provider = result
+
+            speechmatics_key = _decrypt_secret(speechmatics_key_raw)
+            openai_key = _decrypt_secret(openai_key_raw)
+            deepseek_key = _decrypt_secret(deepseek_key_raw)
+            vonage_key = _decrypt_secret(vonage_key_raw)
+            vonage_secret = _decrypt_secret(vonage_secret_raw)
+
+            # Opportunistic migration: if DB contains plaintext keys and we have
+            # an encryption backend, replace them with encrypted values.
+            updates = {}
+            if speechmatics_key_raw and not str(speechmatics_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["speechmatics_api_key"] = _encrypt_secret(str(speechmatics_key_raw))
+            if openai_key_raw and not str(openai_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["openai_api_key"] = _encrypt_secret(str(openai_key_raw))
+            if deepseek_key_raw and not str(deepseek_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["deepseek_api_key"] = _encrypt_secret(str(deepseek_key_raw))
+            if vonage_key_raw and not str(vonage_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["vonage_api_key"] = _encrypt_secret(str(vonage_key_raw))
+            if vonage_secret_raw and not str(vonage_secret_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["vonage_api_secret"] = _encrypt_secret(str(vonage_secret_raw))
+
+            if updates:
+                set_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
+                params = list(updates.values())
+                cursor.execute(f"UPDATE global_settings SET {set_clause} WHERE id = 1", params)
+                conn.commit()
+                logger.info("🔐 Encrypted plaintext API keys in database (migration)")
+
+            # Update CONFIG with decrypted keys from database if they exist
             if speechmatics_key:
                 CONFIG["SPEECHMATICS_API_KEY"] = speechmatics_key
                 logger.info("✅ Loaded Speechmatics API key from database")
-            
+
             if openai_key:
                 CONFIG["OPENAI_API_KEY"] = openai_key
                 logger.info("✅ Loaded OpenAI API key from database")
@@ -548,7 +690,6 @@ def load_global_api_keys():
                 CONFIG["DEEPSEEK_API_KEY"] = deepseek_key
                 logger.info("✅ Loaded DeepSeek API key from database")
 
-            # Vonage credentials (prefer DB values if set)
             if vonage_key:
                 CONFIG["VONAGE_API_KEY"] = vonage_key
                 logger.info("✅ Loaded Vonage API key from database")
@@ -557,12 +698,13 @@ def load_global_api_keys():
                 CONFIG["VONAGE_API_SECRET"] = vonage_secret
                 logger.info("✅ Loaded Vonage API secret from database")
 
-            # Load brain provider selection
             if brain_provider:
                 CONFIG["AI_BRAIN_PROVIDER"] = brain_provider
                 logger.info(f"✅ AI Brain Provider set to: {brain_provider}")
         else:
             logger.warning("⚠️ No global settings found in database")
+
+        conn.close()
     except Exception as e:
         logger.error(f"Failed to load global API keys: {e}")
 
@@ -7083,13 +7225,13 @@ async def get_speechmatics_key_status():
         result = cursor.fetchone()
         conn.close()
         
-        configured = bool(result and result[0])
-        api_key = result[0] if result and result[0] else None
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
         
         return {
             "success": True,
             "configured": configured,
-            "api_key": api_key
+            "api_key_preview": _secret_preview(decrypted) if configured else ""
         }
     except Exception as e:
         logger.error(f"Failed to get Speechmatics key status: {e}")
@@ -7116,7 +7258,7 @@ async def save_speechmatics_key(request: Request):
                 last_updated = CURRENT_TIMESTAMP,
                 updated_by = ?
             WHERE id = 1
-        ''', (api_key, updated_by))
+        ''', (_encrypt_secret(api_key), updated_by))
         
         conn.commit()
         conn.close()
@@ -7143,14 +7285,14 @@ async def get_openai_key_status():
         cursor.execute('SELECT openai_api_key FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
         conn.close()
-        
-        configured = bool(result and result[0])
-        api_key = result[0] if result and result[0] else None
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
         
         return {
             "success": True,
             "configured": configured,
-            "api_key": api_key
+            "api_key_preview": _secret_preview(decrypted) if configured else ""
         }
     except Exception as e:
         logger.error(f"Failed to get OpenAI key status: {e}")
@@ -7177,7 +7319,7 @@ async def save_openai_key(request: Request):
                 last_updated = CURRENT_TIMESTAMP,
                 updated_by = ?
             WHERE id = 1
-        ''', (api_key, updated_by))
+        ''', (_encrypt_secret(api_key), updated_by))
         
         conn.commit()
         conn.close()
@@ -7204,12 +7346,14 @@ async def get_deepseek_key_status():
         cursor.execute('SELECT deepseek_api_key FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
         conn.close()
-        
-        configured = bool(result and result[0])
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
         
         return {
             "success": True,
-            "configured": configured
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else ""
         }
     except Exception as e:
         logger.error(f"Failed to get DeepSeek key status: {e}")
@@ -7236,7 +7380,7 @@ async def save_deepseek_key(request: Request):
                 last_updated = CURRENT_TIMESTAMP,
                 updated_by = ?
             WHERE id = 1
-        ''', (api_key, updated_by))
+        ''', (_encrypt_secret(api_key), updated_by))
         
         conn.commit()
         conn.close()
@@ -7263,12 +7407,16 @@ async def get_vonage_keys_status():
         cursor.execute('SELECT vonage_api_key, vonage_api_secret FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
         conn.close()
-        
-        configured = bool(result and result[0] and result[1])
+
+        vonage_key = _decrypt_secret(result[0] if result else None)
+        vonage_secret = _decrypt_secret(result[1] if result else None)
+        configured = bool(vonage_key and vonage_secret)
         
         return {
             "success": True,
-            "configured": configured
+            "configured": configured,
+            "api_key_preview": _secret_preview(vonage_key) if vonage_key else "",
+            "api_secret_preview": _secret_preview(vonage_secret) if vonage_secret else ""
         }
     except Exception as e:
         logger.error(f"Failed to get Vonage keys status: {e}")
@@ -7297,7 +7445,7 @@ async def save_vonage_keys(request: Request):
                 last_updated = CURRENT_TIMESTAMP,
                 updated_by = ?
             WHERE id = 1
-        ''', (api_key, api_secret, updated_by))
+        ''', (_encrypt_secret(api_key), _encrypt_secret(api_secret), updated_by))
         
         conn.commit()
         conn.close()
