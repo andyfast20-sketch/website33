@@ -1605,6 +1605,7 @@ Provide your analysis."""
             try:
                 # Import here to handle missing dependency gracefully
                 from websockets import connect
+                import inspect
                 
                 url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17"
                 api_key = CONFIG['OPENAI_API_KEY']
@@ -1615,10 +1616,16 @@ Provide your analysis."""
                 
                 logger.info(f"[{self.call_uuid}] Connecting to OpenAI Realtime API (attempt {attempt + 1})...")
                 logger.info(f"[{self.call_uuid}] API Key starts with: {api_key[:20]}... ends with: ...{api_key[-10:]}")
-                self.openai_ws = await asyncio.wait_for(
-                    connect(url, extra_headers=headers),
-                    timeout=10.0
-                )
+                connect_sig = inspect.signature(connect)
+                connect_kwargs = {}
+                if "extra_headers" in connect_sig.parameters:
+                    connect_kwargs["extra_headers"] = headers
+                elif "additional_headers" in connect_sig.parameters:
+                    connect_kwargs["additional_headers"] = headers
+                else:
+                    connect_kwargs["extra_headers"] = headers
+
+                self.openai_ws = await asyncio.wait_for(connect(url, **connect_kwargs), timeout=10.0)
                 
                 # Configure the session with current instructions
                 # Build comprehensive instructions from all config fields
@@ -6218,6 +6225,7 @@ async def run_diagnostics():
 async def test_openai():
     """Test OpenAI connection from within the FastAPI context"""
     from websockets import connect
+    import inspect
     
     try:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17"
@@ -6230,7 +6238,16 @@ async def test_openai():
         logger.info(f"Testing OpenAI connection...")
         logger.info(f"API Key: {api_key[:20]}...{api_key[-10:]}")
         
-        ws = await asyncio.wait_for(connect(url, extra_headers=headers), timeout=10.0)
+        connect_sig = inspect.signature(connect)
+        connect_kwargs = {}
+        if "extra_headers" in connect_sig.parameters:
+            connect_kwargs["extra_headers"] = headers
+        elif "additional_headers" in connect_sig.parameters:
+            connect_kwargs["additional_headers"] = headers
+        else:
+            connect_kwargs["extra_headers"] = headers
+
+        ws = await asyncio.wait_for(connect(url, **connect_kwargs), timeout=10.0)
         await ws.close()
         return {"status": "success", "message": "Connected to OpenAI OK!"}
     except Exception as e:
@@ -6254,9 +6271,29 @@ async def answer_call(request: Request):
     except:
         data = dict(request.query_params)
     
-    call_uuid = data.get("uuid", "unknown")
-    caller = data.get("from", "unknown")
-    called = data.get("to", "unknown")
+    def _extract_number(v) -> str:
+        if isinstance(v, dict):
+            # Vonage JSON POST format: {"number": "+1555..."}
+            num = v.get("number") or v.get("msisdn")
+            return str(num) if num is not None else "unknown"
+        if v is None:
+            return "unknown"
+        return str(v)
+
+    call_uuid = str(data.get("uuid", "unknown"))
+    caller = _extract_number(data.get("from"))
+    called = _extract_number(data.get("to"))
+
+    # Normalize for DB lookup: stored phone numbers are digits-only in many installs.
+    called_digits = "".join(ch for ch in called if ch.isdigit())
+    called_candidates = []
+    for c in [called, called.lstrip("+"), called_digits, ("+" + called_digits if called_digits else "")]:
+        c = (c or "").strip()
+        if c and c not in called_candidates:
+            called_candidates.append(c)
+    # Ensure we always have 4 params for the IN query.
+    while len(called_candidates) < 4:
+        called_candidates.append(called_candidates[-1] if called_candidates else "")
     
     logger.info(f"📞 Incoming call: {caller} -> {called} (UUID: {call_uuid})")
     
@@ -6269,8 +6306,8 @@ async def answer_call(request: Request):
         SELECT a.user_id, a.minutes_remaining, u.name 
         FROM account_settings a 
         JOIN users u ON a.user_id = u.id 
-        WHERE a.phone_number = ?
-    ''', (called,))
+        WHERE a.phone_number IN (?, ?, ?, ?)
+    ''', tuple(called_candidates[:4]))
     result = cursor.fetchone()
     
     if not result:
