@@ -2370,11 +2370,15 @@ You must use ONLY this information when answering questions about services, area
                         logger.info(f"[{self.call_uuid}] ⚡ Audio already streaming, skipping duplicate generation")
 
                     # If Speechmatics is doing early sentence TTS, flush any remaining tail.
-                    if voice_provider == 'speechmatics':
+                    # Only do this if we already started sentence-by-sentence generation
+                    if voice_provider == 'speechmatics' and audio_already_started:
                         tail = getattr(self, '_speechmatics_pending_text', '').strip()
                         if tail:
-                            self._audio_generation_started = True
+                            logger.info(f"[{self.call_uuid}] 📝 Flushing remaining Speechmatics tail: {tail[:50]}...")
                             await self._enqueue_speechmatics_tts(tail)
+                    
+                    # Always clear pending text buffer
+                    if voice_provider == 'speechmatics':
                         self._speechmatics_pending_text = ""
                     
                     # Reset buffer
@@ -2383,6 +2387,13 @@ You must use ONLY this information when answering questions about services, area
                     
                 elif event_type == "response.audio_transcript.done":
                     # Audio response when in audio mode (OpenAI voice)
+                    # Skip if we're in text-only mode (using external TTS like Speechmatics)
+                    modalities = getattr(self, 'modalities', ["text", "audio"])
+                    logger.info(f"[{self.call_uuid}] 📊 audio_transcript.done - modalities: {modalities}")
+                    if modalities == ["text"]:
+                        logger.info(f"[{self.call_uuid}] ⚡ Skipping audio_transcript.done - text-only mode")
+                        continue
+                    
                     transcript = event.get("transcript", "")
                     logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']}: {transcript}")
                     self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {transcript}")
@@ -6644,17 +6655,6 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
                 logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting")
             # Use the session's configured modalities for the greeting
             greeting_modalities = getattr(session, 'modalities', ["text", "audio"])
-            await session.openai_ws.send(json.dumps({
-                "type": "conversation.item.create",
-                "item": {
-                    "type": "message",
-                    "role": "user",
-                    "content": [{
-                        "type": "input_text",
-                        "text": "Please greet the caller now."
-                    }]
-                }
-            }))
             await session.openai_ws.send(json.dumps({
                 "type": "response.create",
                 "response": {
