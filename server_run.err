@@ -1,0 +1,37 @@
+C:\website33new\website33-main\website33-main\.venv\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+2025-12-19 13:02:22,666 - VonageAgent - INFO - ElevenLabs client initialized
+2025-12-19 13:02:22,733 - VonageAgent - INFO - Google Cloud TTS client initialized
+2025-12-19 13:02:22,734 - VonageAgent - INFO - PlayHT TTS configured with API key
+2025-12-19 13:02:22,887 - VonageAgent - INFO - \u2705 Loaded Speechmatics API key from database
+2025-12-19 13:02:22,889 - VonageAgent - INFO - \u2705 Loaded OpenAI API key from database
+2025-12-19 13:02:22,890 - VonageAgent - INFO - \u2705 Loaded DeepSeek API key from database
+2025-12-19 13:02:22,890 - VonageAgent - INFO - \u2705 Loaded Vonage API key from database
+2025-12-19 13:02:22,890 - VonageAgent - INFO - \u2705 Loaded Vonage API secret from database
+2025-12-19 13:02:22,891 - VonageAgent - INFO - \u2705 AI Brain Provider set to: openai
+INFO:     Started server process [32924]
+INFO:     Waiting for application startup.
+2025-12-19 13:02:22,954 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
+2025-12-19 13:02:22,955 - VonageAgent - INFO - \U0001f4de Answer URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/answer
+2025-12-19 13:02:22,955 - VonageAgent - INFO - \U0001f4cb Event URL: https://unfasciate-unsurlily-suzanna.ngrok-free.dev/webhooks/events
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5004 (Press CTRL+C to quit)
+2025-12-19 13:02:25,846 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:27,929 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:27,944 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:35,819 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:37,894 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:37,914 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:45,842 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:47,890 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:47,902 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:55,816 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:57,857 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:02:57,869 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:03:05,811 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:03:07,881 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:03:07,909 - VonageAgent - ERROR - Health check failed: No module named 'psutil'
+2025-12-19 13:03:07,928 - VonageAgent - INFO - Fetched 9 appointments for user 4
+2025-12-19 13:03:08,882 - VonageAgent - INFO - \U0001f504 Server restart requested by super-admin
+2025-12-19 13:03:08,884 - VonageAgent - INFO - \U0001f504 Cleared 0 active sessions before restart
+2025-12-19 13:03:09,397 - VonageAgent - INFO - \U0001f504 Executing server restart now...

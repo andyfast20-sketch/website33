@@ -24,16 +24,17 @@
         .btn-logout:hover { background: rgba(255, 255, 255, 0.3); }
         .panel { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 16px; padding: 30px; margin-bottom: 20px; color: white; }
         .panel h2 { font-size: 22px; font-weight: 700; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
-        .api-key-section { background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 25px; margin-bottom: 20px; border-left: 4px solid #667eea; }
-        .api-key-section h3 { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; display: flex; align-items: center; gap: 10px; }
-        .api-key-section .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 12px; border-radius: 6px; font-weight: 600; margin-left: auto; }
+        .api-keys-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .api-key-section { background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 20px; border-left: 4px solid #667eea; }
+        .api-key-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: white; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .api-key-section .status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
         .status.configured { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
         .status.not-configured { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
-        .input-wrapper { position: relative; margin-bottom: 15px; }
-        .input-wrapper input { width: 100%; padding: 14px 18px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-family: 'Courier New', monospace; transition: all 0.3s; }
+        .input-wrapper { position: relative; margin-bottom: 10px; }
+        .input-wrapper input { width: 100%; padding: 10px 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 13px; font-family: 'Courier New', monospace; transition: all 0.3s; }
         .input-wrapper input::placeholder { color: rgba(255, 255, 255, 0.4); }
         .input-wrapper input:focus { outline: none; border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.15); }
-        .btn-save { padding: 12px 28px; border: none; border-radius: 8px; background: #2ecc71; color: white; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.3s; }
+        .btn-save { padding: 8px 16px; border: none; border-radius: 6px; background: #2ecc71; color: white; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s; width: 100%; }
         .btn-save:hover { background: #27ae60; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4); }
         .brain-selector { background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
         .brain-selector h3 { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; }
@@ -68,15 +69,25 @@
         .btn-slot.delete { background: rgba(231, 76, 60, 0.8); color: white; }
         .btn-slot:hover { transform: translateY(-1px); opacity: 1; }
         .btn-slot:disabled { opacity: 0.5; cursor: not-allowed; }
-        .account-card { background: rgba(0, 0, 0, 0.3); border-radius: 10px; padding: 18px; margin-bottom: 12px; border-left: 4px solid #667eea; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
-        .account-card:hover { background: rgba(0, 0, 0, 0.4); border-left-color: #2ecc71; }
+        .accounts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        @media (max-width: 1200px) { .accounts-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .accounts-grid { grid-template-columns: 1fr; } }
+        .account-card { background: rgba(0, 0, 0, 0.3); border-radius: 10px; padding: 18px; border-left: 4px solid #667eea; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s; height: 100%; }
+        .account-card:hover { background: rgba(0, 0, 0, 0.4); border-left-color: #2ecc71; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
         .account-info { flex: 1; }
-        .account-name { font-size: 16px; font-weight: 700; color: white; margin-bottom: 5px; }
-        .account-email { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-bottom: 5px; }
-        .account-phone { font-size: 13px; color: rgba(255, 255, 255, 0.7); }
-        .account-credits { text-align: right; }
-        .credits-amount { font-size: 28px; font-weight: 800; color: #2ecc71; }
-        .credits-label { font-size: 12px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 1px; }
+        .account-name { font-size: 15px; font-weight: 700; color: white; margin-bottom: 8px; }
+        .account-email { font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-bottom: 5px; }
+        .account-phone { font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 8px; }
+        .account-credits { text-align: center; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .credits-amount { font-size: 24px; font-weight: 800; color: #2ecc71; }
+        .credits-label { font-size: 11px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+        .credit-actions { display: flex; gap: 6px; margin-top: 10px; justify-content: center; }
+        .credit-btn { padding: 6px 12px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; color: white; }
+        .credit-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .credit-btn.add { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .credit-btn.add:hover { background: linear-gradient(135deg, #27ae60, #229954); }
+        .credit-btn.remove { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .credit-btn.remove:hover { background: linear-gradient(135deg, #c0392b, #a93226); }
         .call-analysis-section { margin-top: 20px; }
         .call-selector { background: rgba(0, 0, 0, 0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px; }
         .call-item { background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 15px; margin-bottom: 8px; cursor: pointer; transition: all 0.3s; border-left: 3px solid transparent; }
@@ -125,6 +136,8 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
             z-index: 1000;
             border: 2px solid rgba(255, 255, 255, 0.2);
+            cursor: move;
+            user-select: none;
         }
         .streaming-indicator {
             width: 12px;
@@ -160,50 +173,51 @@
         .health-monitor {
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(15px);
-            border-radius: 16px;
-            padding: 25px 30px;
-            margin-bottom: 25px;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
             border: 2px solid rgba(255, 255, 255, 0.15);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         .health-monitor-title {
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 700;
             color: white;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
             text-transform: uppercase;
             letter-spacing: 1px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         .health-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
         }
         .health-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 4px;
             cursor: pointer;
             transition: all 0.3s;
-            padding: 15px;
-            border-radius: 12px;
+            padding: 8px;
+            border-radius: 8px;
             background: rgba(255, 255, 255, 0.03);
         }
         .health-item:hover {
             background: rgba(255, 255, 255, 0.08);
-            transform: translateY(-3px);
+            transform: translateY(-2px);
         }
         .health-circle {
-            width: 50px;
-            height: 50px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             position: relative;
             transition: all 0.3s;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
         }
         .health-circle::before {
             content: '';
@@ -254,23 +268,25 @@
             50% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
         }
         .health-icon {
-            font-size: 24px;
+            font-size: 16px;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
         }
         .health-label {
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 600;
             color: white;
             text-align: center;
-            line-height: 1.3;
+            line-height: 1.2;
+            white-space: nowrap;
         }
         .health-status {
-            font-size: 10px;
+            font-size: 8px;
             color: rgba(255, 255, 255, 0.7);
             text-align: center;
+            white-space: nowrap;
         }
         
         /* Modal for Health Details */
@@ -295,11 +311,274 @@
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
             border-radius: 20px;
             padding: 30px;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
+        }
+        
+        /* Global Instructions Modal */
+        .instructions-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .instructions-modal.show {
+            display: flex;
+            animation: fadeIn 0.3s;
+        }
+        .instructions-modal-content {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            position: relative;
+        }
+        .instructions-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .instructions-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+        .instructions-modal-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 10px;
+        }
+        .instructions-modal-desc {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+        .instructions-modal-textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        .instructions-modal-textarea:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.4);
+        }
+        .instructions-modal-hint {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .btn-open-instructions {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-open-instructions:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(155, 89, 182, 0.4);
+        }
+        
+        /* Diagnostics Modal */
+        .diagnostics-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+        }
+        .diagnostics-modal.show {
+            display: flex;
+            animation: fadeIn 0.3s;
+        }
+        .diagnostics-modal-content {
+            background: linear-gradient(135deg, rgba(44, 62, 80, 0.98) 0%, rgba(52, 73, 94, 0.98) 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(52, 152, 219, 0.3);
+        }
+        .diagnostics-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(231, 76, 60, 0.3);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1;
+        }
+        .diagnostics-modal-close:hover {
+            background: rgba(231, 76, 60, 0.6);
+            transform: rotate(90deg);
+        }
+        .diagnostics-modal-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .diagnostics-modal-desc {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 20px;
+        }
+        .console-logs {
+            background: #000;
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .console-log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #ddd;
+        }
+        .console-log-entry.error {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+        .console-log-entry.warn {
+            color: #f39c12;
+        }
+        .console-log-entry.info {
+            color: #3498db;
+        }
+        .console-log-timestamp {
+            color: #888;
+            margin-right: 8px;
+        }
+        .error-analysis {
+            background: rgba(52, 152, 219, 0.1);
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            display: none;
+        }
+        .error-analysis.show {
+            display: block;
             animation: slideUp 0.3s;
+        }
+        .error-analysis-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .error-analysis-content {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            color: white;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .btn-analyze-errors {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        .btn-analyze-errors:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        .btn-analyze-errors:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-copy-analysis {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-copy-analysis:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -417,7 +696,12 @@
         
         <div class="header">
             <h1>🔧 Super Admin - System Configuration</h1>
-            <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-logout" onclick="window.open('/', '_blank')" style="background: rgba(52, 152, 219, 0.3);">
+                    🌐 Open Website
+                </button>
+                <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+            </div>
         </div>
 
         <!-- Service Health Monitor -->
@@ -430,59 +714,132 @@
                     <div class="health-circle checking" id="health-openai">
                         <div class="health-icon">🧠</div>
                     </div>
-                    <div class="health-label">OpenAI<br>Connection</div>
+                    <div class="health-label">OpenAI</div>
                     <div class="health-status" id="status-openai">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('speechmatics')">
                     <div class="health-circle checking" id="health-speechmatics">
                         <div class="health-icon">🎙️</div>
                     </div>
-                    <div class="health-label">Speechmatics<br>TTS</div>
+                    <div class="health-label">Speechmatics</div>
                     <div class="health-status" id="status-speechmatics">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('vonage')">
                     <div class="health-circle checking" id="health-vonage">
                         <div class="health-icon">📞</div>
                     </div>
-                    <div class="health-label">Vonage<br>Telephony</div>
+                    <div class="health-label">Vonage</div>
                     <div class="health-status" id="status-vonage">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('database')">
                     <div class="health-circle checking" id="health-database">
                         <div class="health-icon">💾</div>
                     </div>
-                    <div class="health-label">Database<br>Access</div>
+                    <div class="health-label">Database</div>
                     <div class="health-status" id="status-database">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('webhook')">
                     <div class="health-circle checking" id="health-webhook">
                         <div class="health-icon">🌐</div>
                     </div>
-                    <div class="health-label">Ngrok<br>Webhook</div>
+                    <div class="health-label">Webhook</div>
                     <div class="health-status" id="status-webhook">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('deepseek')">
                     <div class="health-circle checking" id="health-deepseek">
                         <div class="health-icon">🔮</div>
                     </div>
-                    <div class="health-label">DeepSeek<br>API</div>
+                    <div class="health-label">DeepSeek</div>
                     <div class="health-status" id="status-deepseek">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('credits')">
                     <div class="health-circle checking" id="health-credits">
                         <div class="health-icon">💳</div>
                     </div>
-                    <div class="health-label">Account<br>Credits</div>
+                    <div class="health-label">Credits</div>
                     <div class="health-status" id="status-credits">Checking...</div>
                 </div>
                 <div class="health-item" onclick="showHealthDetails('server')">
                     <div class="health-circle checking" id="health-server">
                         <div class="health-icon">🖥️</div>
                     </div>
-                    <div class="health-label">Server<br>Health</div>
+                    <div class="health-label">Server</div>
                     <div class="health-status" id="status-server">Checking...</div>
                 </div>
+                <div class="health-item" onclick="showHealthDetails('ngrok')">
+                    <div class="health-circle checking" id="health-ngrok">
+                        <div class="health-icon">🌉</div>
+                    </div>
+                    <div class="health-label">Ngrok Tunnel</div>
+                    <div class="health-status" id="status-ngrok">Checking...</div>
+                </div>
+                <div class="health-item" onclick="showHealthDetails('activecalls')">
+                    <div class="health-circle checking" id="health-activecalls">
+                        <div class="health-icon">📞</div>
+                    </div>
+                    <div class="health-label">Active Calls</div>
+                    <div class="health-status" id="status-activecalls">Checking...</div>
+                </div>
+                <div class="health-item" onclick="showHealthDetails('resources')">
+                    <div class="health-circle checking" id="health-resources">
+                        <div class="health-icon">⚡</div>
+                    </div>
+                    <div class="health-label">Resources</div>
+                    <div class="health-status" id="status-resources">Checking...</div>
+                </div>
             </div>
+        </div>
+
+        <!-- System Controls Panel -->
+        <div class="panel" style="margin-bottom: 25px;">
+            <div class="panel-header">
+                <h2>🛠️ System Controls</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Quick diagnostic and recovery tools</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <button class="btn" style="background: linear-gradient(135deg, #3498db, #2980b9);" onclick="testCall()">
+                    📞 Test Call Sarah
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #ff6b6b, #ee5a6f);" onclick="testVoicePipeline()">
+                    🔬 Diagnose Voice Issues
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #10ac84, #01a3a4);" onclick="autoFixVoice()">
+                    🤖 Auto-Fix Voice Issues
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #e74c3c, #c0392b);" onclick="restartVoiceEngine()">
+                    🔄 Restart Voice Engine
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #ff4757, #c23616);" onclick="restartServer()">
+                    🔁 Restart Server
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #f39c12, #e67e22);" onclick="clearCallCache()">
+                    🗑️ Clear Call Cache
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);" onclick="checkWebhooks()">
+                    🌐 Verify Webhooks
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #1abc9c, #16a085);" onclick="testOpenAI()">
+                    🧠 Test OpenAI Connection
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #34495e, #2c3e50);" onclick="viewServerLogs()">
+                    📋 View Recent Logs
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #e74c3c, #c0392b);" onclick="openDiagnostics()">
+                    🔍 Console Diagnostics
+                </button>
+                <button class="btn" id="reloadConfigBtn" style="background: linear-gradient(135deg, #f39c12, #e67e22); display: none;" onclick="reloadConfiguration()">
+                    🔄 Reload Configuration
+                </button>
+            </div>
+        </div>
+
+        <!-- Configuration Warning Banner -->
+        <div id="configWarningBanner" style="display: none; background: linear-gradient(135deg, #e74c3c, #c0392b); padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+            <div style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">⚠️ Configuration Issue Detected</div>
+            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 15px;">API keys are stored in the database but not loading correctly. Click below to reload configuration.</div>
+            <button class="btn" style="background: white; color: #e74c3c; padding: 12px 24px; font-weight: 700;" onclick="reloadConfiguration()">
+                🔄 Fix Configuration Now
+            </button>
         </div>
 
         <!-- Health Details Modal -->
@@ -498,6 +855,71 @@
         </div>
 
         <div id="alertBox" class="alert"></div>
+
+        <!-- Diagnostics Modal -->
+        <div class="diagnostics-modal" id="diagnosticsModal" onclick="closeDiagnosticsModal(event)">
+            <div class="diagnostics-modal-content" onclick="event.stopPropagation()" style="position: relative;">
+                <button class="diagnostics-modal-close" onclick="closeDiagnosticsModal()">✕</button>
+                <div class="diagnostics-modal-title">
+                    🔍 Console Diagnostics
+                </div>
+                <div class="diagnostics-modal-desc">Monitor console activity and analyze errors with AI</div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="font-size: 16px; color: white; font-weight: 600;">📊 Console Logs</h3>
+                        <div>
+                            <button class="btn-analyze-errors" id="analyzeBtn" onclick="analyzeErrors()" disabled>
+                                🤖 Analyze Errors
+                            </button>
+                            <button onclick="clearConsoleLogs()" style="padding: 8px 16px; background: rgba(231, 76, 60, 0.2); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
+                                🗑️ Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="console-logs" id="consoleLogs">
+                        <div style="color: #888; text-align: center; padding: 20px;">Capturing console activity...</div>
+                    </div>
+                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 5px;">
+                        <span id="logCount">0</span> logs | <span id="errorCount" style="color: #ff6b6b;">0</span> errors
+                    </div>
+                </div>
+                
+                <div class="error-analysis" id="errorAnalysis">
+                    <div class="error-analysis-title">
+                        🤖 AI Error Analysis
+                        <button class="btn-copy-analysis" onclick="copyAnalysisToClipboard()" style="margin-left: auto; font-size: 12px; padding: 6px 12px;">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <div class="error-analysis-content" id="analysisContent">
+                        Analysis will appear here...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Number Management Panel -->
+        <div class="panel">
+            <h2>📞 Vonage Number Management</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">View and manage all Vonage phone numbers, their assignments, and availability status.</p>
+            
+            <div style="margin-bottom: 20px;">
+                <button class="btn" style="background: linear-gradient(135deg, #3498db, #2980b9);" onclick="syncVonageNumbers()">
+                    🔄 Sync from Vonage
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #27ae60, #229954);" onclick="loadVonageNumbers()">
+                    🔍 Refresh List
+                </button>
+            </div>
+
+            <div id="numbersContainer" style="margin-top: 20px;">
+                <div style="text-align: center; padding: 40px; opacity: 0.6;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📞</div>
+                    <div>Click "Sync from Vonage" or "Refresh List" to load your numbers</div>
+                </div>
+            </div>
+        </div>
 
         <div class="panel">
             <h2>🧠 AI Brain Provider</h2>
@@ -520,58 +942,77 @@
 
         <div class="panel">
             <h2>🔑 API Keys Configuration</h2>
-            <p style="margin-bottom: 25px; opacity: 0.8; font-size: 14px;">Manage all API keys securely. Keys are encrypted and stored in the database.</p>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Manage all API keys securely. Keys are encrypted and stored in the database.</p>
 
-            <div class="api-key-section">
-                <h3>OpenAI API Key <span class="status not-configured" id="statusOpenAI">⚠️ Not Configured</span></h3>
-                <div class="input-wrapper">
-                    <input type="password" id="inputOpenAI" placeholder="sk-...">
+            <div class="api-keys-grid">
+                <div class="api-key-section">
+                    <h3>OpenAI <span class="status not-configured" id="statusOpenAI">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputOpenAI" placeholder="sk-...">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('openai')">💾 Save</button>
                 </div>
-                <button class="btn-save" onclick="saveAPIKey('openai')">💾 Save OpenAI Key</button>
-            </div>
 
-            <div class="api-key-section">
-                <h3>DeepSeek API Key <span class="status not-configured" id="statusDeepSeek">⚠️ Not Configured</span></h3>
-                <div class="input-wrapper">
-                    <input type="password" id="inputDeepSeek" placeholder="Enter DeepSeek API key">
+                <div class="api-key-section">
+                    <h3>DeepSeek <span class="status not-configured" id="statusDeepSeek">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputDeepSeek" placeholder="Enter API key">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('deepseek')">💾 Save</button>
                 </div>
-                <button class="btn-save" onclick="saveAPIKey('deepseek')">💾 Save DeepSeek Key</button>
-            </div>
 
-            <div class="api-key-section">
-                <h3>Speechmatics API Key <span class="status not-configured" id="statusSpeechmatics">⚠️ Not Configured</span></h3>
-                <div class="input-wrapper">
-                    <input type="password" id="inputSpeechmatics" placeholder="Enter Speechmatics API key">
+                <div class="api-key-section">
+                    <h3>Speechmatics <span class="status not-configured" id="statusSpeechmatics">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputSpeechmatics" placeholder="Enter API key">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('speechmatics')">💾 Save</button>
                 </div>
-                <button class="btn-save" onclick="saveAPIKey('speechmatics')">💾 Save Speechmatics Key</button>
-            </div>
 
-            <div class="api-key-section">
-                <h3>Vonage API Credentials <span class="status not-configured" id="statusVonage">⚠️ Not Configured</span></h3>
-                <div class="input-wrapper">
-                    <input type="password" id="inputVonageKey" placeholder="Vonage API Key">
+                <div class="api-key-section">
+                    <h3>Vonage <span class="status not-configured" id="statusVonage">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputVonageKey" placeholder="API Key">
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputVonageSecret" placeholder="API Secret">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('vonage')">💾 Save</button>
                 </div>
-                <div class="input-wrapper">
-                    <input type="password" id="inputVonageSecret" placeholder="Vonage API Secret">
-                </div>
-                <button class="btn-save" onclick="saveAPIKey('vonage')">💾 Save Vonage Credentials</button>
             </div>
         </div>
 
         <div class="panel">
             <h2>� Global Instructions</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">These instructions override all individual account settings and apply to EVERY call across all accounts. Use this to set system-wide rules.</p>
-            <div class="filler-section">
-                <textarea id="globalInstructions" placeholder="Example:\n- Never be rude or aggressive\n- Always remain professional\n- Do not discuss pricing unless asked\n- Protect customer privacy" style="min-height: 200px;"></textarea>
-                <div class="hint">These override individual account configurations</div>
+            
+            <div class="filler-section" style="margin-bottom: 20px;">
+                <h3 style="color: #667eea; margin-bottom: 10px; font-size: 16px;">📝 General Instructions</h3>
+                <textarea id="globalInstructions" placeholder="Example:\n- Always remain professional\n- Verify caller identity before discussing account details\n- Follow GDPR compliance rules" style="min-height: 150px;"></textarea>
+                <div class="hint">Base instructions for all calls</div>
             </div>
-            <button class="btn-save" onclick="saveGlobalInstructions()" style="margin-top: 15px;">💾 Save Global Instructions</button>
+
+            <div class="filler-section" style="margin-bottom: 20px; border-left: 4px solid #e74c3c;">
+                <h3 style="color: #e74c3c; margin-bottom: 10px; font-size: 16px;">🚫 CRITICAL: NEVER DO (10 Rules)</h3>
+                <p style="font-size: 13px; opacity: 0.9; margin-bottom: 10px; color: #ff6b6b;">These are ABSOLUTE restrictions. The AI must NEVER violate these under any circumstances.</p>
+                <textarea id="globalNeverDo" placeholder="Example:\n1. NEVER discuss competitor pricing or products\n2. NEVER share confidential company information\n3. NEVER make unauthorized promises or commitments\n4. NEVER discuss topics outside our service scope\n5. NEVER use offensive or unprofessional language\n6. NEVER share personal data of other customers\n7. NEVER provide medical or legal advice\n8. NEVER bypass security verification procedures\n9. NEVER discuss internal company policies\n10. NEVER transfer calls without proper authorization" style="min-height: 200px; border: 2px solid #e74c3c; background: rgba(231, 76, 60, 0.05);"></textarea>
+                <div class="hint" style="color: #e74c3c; font-weight: 600;">⚠️ HIGHEST PRIORITY - These rules override everything else</div>
+            </div>
+
+            <div class="filler-section" style="margin-bottom: 20px; border-left: 4px solid #27ae60;">
+                <h3 style="color: #27ae60; margin-bottom: 10px; font-size: 16px;">✅ CRITICAL: MUST DO (5 Rules)</h3>
+                <p style="font-size: 13px; opacity: 0.9; margin-bottom: 10px; color: #2ecc71;">These are MANDATORY actions. The AI must ALWAYS follow these rules.</p>
+                <textarea id="globalMustDo" placeholder="Example:\n1. MUST verify caller identity before sharing any account information\n2. MUST log all appointment bookings in the system immediately\n3. MUST offer to escalate if unable to resolve the issue\n4. MUST confirm important details back to the caller\n5. MUST end calls professionally with a summary of next steps" style="min-height: 150px; border: 2px solid #27ae60; background: rgba(39, 174, 96, 0.05);"></textarea>
+                <div class="hint" style="color: #27ae60; font-weight: 600;">✓ MANDATORY - These must be followed on every call</div>
+            </div>
+
+            <button class="btn-save" onclick="saveGlobalInstructions()" style="margin-top: 15px;">💾 Save All Global Instructions</button>
         </div>
 
         <div class="panel">
             <h2>👥 Active Accounts</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">All accounts with their current credit balances.</p>
-            <div id="accountsList" style="max-height: 400px; overflow-y: auto;"></div>
+            <div id="accountsList" class="accounts-grid" style="max-height: 600px; overflow-y: auto;"></div>
         </div>
 
         <div class="panel">            <h2>📊 Call Performance Analysis</h2>
@@ -614,34 +1055,130 @@
     </div>
 
     <script>
+        // Global variables - declare at top to avoid hoisting issues
+        let streamingStatusInterval = null;
+        let healthCheckInterval = null;
+        let healthData = {};
+        let selectedCallUuid = null;
+        
         const CORRECT_PASSWORD = '2389';
         if (sessionStorage.getItem('superAdminAuth') === 'true') showDashboard();
         document.getElementById('passwordInput')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') attemptLogin(); });
         function attemptLogin() { const pwd = document.getElementById('passwordInput').value; const err = document.getElementById('errorMessage'); if (pwd === CORRECT_PASSWORD) { sessionStorage.setItem('superAdminAuth', 'true'); err.style.display = 'none'; showDashboard(); } else { err.style.display = 'block'; document.getElementById('passwordInput').value = ''; } }
-        function showDashboard() { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block'; loadAllSettings(); startStreamingStatusPolling(); }
+        function showDashboard() { 
+            document.getElementById('loginScreen').style.display = 'none'; 
+            document.getElementById('mainDashboard').style.display = 'block'; 
+            loadAllSettings(); 
+            startStreamingStatusPolling(); 
+            // Delay health monitoring start by 1 second to ensure server is ready after restart
+            setTimeout(() => {
+                startHealthMonitoring();
+            }, 1000);
+        }
         function logout() { stopStreamingStatusPolling(); sessionStorage.removeItem('superAdminAuth'); location.reload(); }
         async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadAccountsList(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
         async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
         function selectBrain(provider) { document.getElementById('brainOpenAI').classList.remove('selected'); document.getElementById('brainDeepSeek').classList.remove('selected'); if (provider === 'openai') { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; } else { document.getElementById('brainDeepSeek').classList.add('selected'); document.querySelector('input[value="deepseek"]').checked = true; } saveBrainProvider(provider); }
         async function saveBrainProvider(provider) { try { const response = await fetch('/api/super-admin/brain-provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert(data.message, 'success'); else showAlert('Failed to update brain provider', 'error'); } catch (error) { console.error('Error saving brain provider:', error); showAlert('Error saving brain provider', 'error'); } }
         async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); if (!apiKey || !apiSecret) { showAlert('Please enter both Vonage API key and secret', 'error'); return; } body = { api_key: apiKey, api_secret: apiSecret, updated_by: 'super-admin' }; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
-        async function loadGlobalInstructions() { try { const response = await fetch('/api/super-admin/global-instructions'); const data = await response.json(); if (data.success) { document.getElementById('globalInstructions').value = data.instructions || ''; } } catch (error) { console.error('Error loading global instructions:', error); } }
+        async function loadGlobalInstructions() { 
+            try { 
+                const response = await fetch('/api/super-admin/global-instructions'); 
+                const data = await response.json(); 
+                if (data.success) { 
+                    const instructions = data.instructions || '';
+                    console.log('Loaded instructions length:', instructions.length);
+                    
+                    // Split sections using the header markers
+                    let baseInstructions = instructions;
+                    let neverDoText = '';
+                    let mustDoText = '';
+                    
+                    // Find the NEVER DO section
+                    const neverDoStart = instructions.indexOf('🚫 CRITICAL: NEVER DO');
+                    if (neverDoStart !== -1) {
+                        // Base instructions is everything before the NEVER DO marker
+                        baseInstructions = instructions.substring(0, neverDoStart).trim();
+                        
+                        // Find where MUST DO section starts (or end of string)
+                        const mustDoStart = instructions.indexOf('✅ CRITICAL: MUST DO', neverDoStart);
+                        
+                        if (mustDoStart !== -1) {
+                            // Extract NEVER DO text (skip the header line)
+                            const neverDoSection = instructions.substring(neverDoStart, mustDoStart);
+                            const neverDoLines = neverDoSection.split('\n');
+                            neverDoText = neverDoLines.slice(1).join('\n').trim(); // Skip first line (header)
+                            
+                            // Extract MUST DO text (skip the header line)
+                            const mustDoSection = instructions.substring(mustDoStart);
+                            const mustDoLines = mustDoSection.split('\n');
+                            mustDoText = mustDoLines.slice(1).join('\n').trim(); // Skip first line (header)
+                        } else {
+                            // No MUST DO section, everything after NEVER DO is part of NEVER DO
+                            const neverDoSection = instructions.substring(neverDoStart);
+                            const neverDoLines = neverDoSection.split('\n');
+                            neverDoText = neverDoLines.slice(1).join('\n').trim();
+                        }
+                    } else {
+                        // Check if there's a MUST DO section without NEVER DO
+                        const mustDoStart = instructions.indexOf('✅ CRITICAL: MUST DO');
+                        if (mustDoStart !== -1) {
+                            baseInstructions = instructions.substring(0, mustDoStart).trim();
+                            const mustDoSection = instructions.substring(mustDoStart);
+                            const mustDoLines = mustDoSection.split('\n');
+                            mustDoText = mustDoLines.slice(1).join('\n').trim();
+                        }
+                    }
+                    
+                    document.getElementById('globalInstructions').value = baseInstructions;
+                    document.getElementById('globalNeverDo').value = neverDoText;
+                    document.getElementById('globalMustDo').value = mustDoText;
+                    
+                    console.log('✅ Parsed sections - Base:', baseInstructions.length, 'chars, NeverDo:', neverDoText.length, 'chars, MustDo:', mustDoText.length, 'chars');
+                } 
+            } catch (error) { 
+                console.error('Error loading global instructions:', error); 
+            } 
+        }
         async function saveGlobalInstructions() { 
             try { 
                 const instructionsTextarea = document.getElementById('globalInstructions');
-                if (!instructionsTextarea) {
-                    console.error('Global instructions textarea not found');
-                    showAlert('Error: Instructions field not found', 'error');
+                const neverDoTextarea = document.getElementById('globalNeverDo');
+                const mustDoTextarea = document.getElementById('globalMustDo');
+                
+                if (!instructionsTextarea || !neverDoTextarea || !mustDoTextarea) {
+                    console.error('Global instructions textareas not found');
+                    showAlert('Error: Instructions fields not found', 'error');
                     return;
                 }
                 
-                const instructions = instructionsTextarea.value.trim(); 
-                console.log('Saving global instructions:', instructions.substring(0, 100) + '...');
+                // Get all three sections
+                const baseInstructions = instructionsTextarea.value.trim();
+                const neverDo = neverDoTextarea.value.trim();
+                const mustDo = mustDoTextarea.value.trim();
+                
+                console.log('Saving sections:');
+                console.log('Base:', baseInstructions.substring(0, 50));
+                console.log('NeverDo:', neverDo.substring(0, 50));
+                console.log('MustDo:', mustDo.substring(0, 50));
+                
+                // Combine all sections with clear formatting
+                let combinedInstructions = baseInstructions;
+                
+                if (neverDo) {
+                    combinedInstructions += '\n\n🚫 CRITICAL: NEVER DO - ABSOLUTE RESTRICTIONS (HIGHEST PRIORITY):\n' + neverDo;
+                }
+                
+                if (mustDo) {
+                    combinedInstructions += '\n\n✅ CRITICAL: MUST DO - MANDATORY ACTIONS (REQUIRED ON EVERY CALL):\n' + mustDo;
+                }
+                
+                console.log('Combined instructions (first 200 chars):', combinedInstructions.substring(0, 200));
                 
                 const response = await fetch('/api/super-admin/global-instructions', { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ instructions, updated_by: 'super-admin' }) 
+                    body: JSON.stringify({ instructions: combinedInstructions, updated_by: 'super-admin' }) 
                 }); 
                 
                 if (!response.ok) {
@@ -652,7 +1189,8 @@
                 console.log('Save response:', data);
                 
                 if (data.success) {
-                    showAlert('✅ Global instructions saved successfully!', 'success');
+                    showAlert('✅ All global instructions saved successfully!', 'success');
+                    // Don't call closeInstructionsModal() - we're not using a modal, instructions are on the page
                 } else {
                     showAlert('❌ Failed to save: ' + (data.error || 'Unknown error'), 'error');
                 }
@@ -661,19 +1199,75 @@
                 showAlert('❌ Error saving global instructions: ' + error.message, 'error'); 
             } 
         }
-        async function loadAccountsList() { try { const response = await fetch('/api/super-admin/accounts'); const data = await response.json(); const container = document.getElementById('accountsList'); if (!data.success || !data.accounts || data.accounts.length === 0) { container.innerHTML = '<div style="text-align: center; padding: 30px; color: rgba(255,255,255,0.5);">No accounts found</div>'; return; } container.innerHTML = data.accounts.map(acc => `
-                <div class="account-card">
-                    <div class="account-info">
-                        <div class="account-name">👤 ${acc.name || 'Unknown'}</div>
-                        <div class="account-phone">📞 ${acc.phone_number || 'No number assigned'}</div>
-                        <div style="font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-top: 5px;">📊 ${acc.calls_today || 0} calls today</div>
+        async function loadAccountsList() { 
+            try { 
+                const response = await fetch('/api/super-admin/accounts'); 
+                const data = await response.json(); 
+                const container = document.getElementById('accountsList'); 
+                if (!data.success || !data.accounts || data.accounts.length === 0) { 
+                    container.innerHTML = '<div style="text-align: center; padding: 30px; color: rgba(255,255,255,0.5); grid-column: 1 / -1;">No accounts found</div>'; 
+                    return; 
+                } 
+                container.innerHTML = data.accounts.map(acc => `
+                    <div class="account-card">
+                        <div class="account-info">
+                            <div class="account-name">👤 ${acc.name || 'Unknown'}</div>
+                            <div class="account-phone">📞 ${acc.phone_number || 'No number assigned'}</div>
+                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 5px;">📊 ${acc.calls_today || 0} calls today</div>
+                        </div>
+                        <div class="account-credits">
+                            <div class="credits-amount">${acc.credits || 0}</div>
+                            <div class="credits-label">Minutes</div>
+                            <div class="credit-actions">
+                                <button class="credit-btn add" onclick="manageCredits(${acc.user_id}, '${acc.name}', 'add')" title="Add Credits">➕ Add</button>
+                                <button class="credit-btn remove" onclick="manageCredits(${acc.user_id}, '${acc.name}', 'remove')" title="Remove Credits">➖ Remove</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="account-credits">
-                        <div class="credits-amount">${acc.credits || 0}</div>
-                        <div class="credits-label">Minutes</div>
-                    </div>
-                </div>
-            `).join(''); } catch (error) { console.error('Error loading accounts:', error); document.getElementById('accountsList').innerHTML = '<div style="text-align: center; padding: 30px; color: #e74c3c;">Error loading accounts</div>'; } }
+                `).join(''); 
+            } catch (error) { 
+                console.error('Error loading accounts:', error); 
+                document.getElementById('accountsList').innerHTML = '<div style="text-align: center; padding: 30px; color: #e74c3c; grid-column: 1 / -1;">Error loading accounts</div>'; 
+            } 
+        }
+        
+        async function manageCredits(userId, userName, action) {
+            const actionText = action === 'add' ? 'Add' : 'Remove';
+            const minutes = prompt(`${actionText} Credits for ${userName}\n\nEnter number of minutes to ${action === 'add' ? 'add' : 'remove'}:`, '60');
+            
+            if (minutes === null || minutes === '') return;
+            
+            const minutesNum = parseInt(minutes);
+            if (isNaN(minutesNum) || minutesNum <= 0) {
+                showAlert('Please enter a valid number', 'error');
+                return;
+            }
+            
+            try {
+                const endpoint = action === 'add' ? 'add-minutes' : 'remove-minutes';
+                const response = await fetch(`/api/super-admin/account/${userId}/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minutes: minutesNum })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const message = action === 'add' 
+                        ? `✅ Added ${data.minutes_added} minutes to ${userName}` 
+                        : `✅ Removed ${data.minutes_removed} minutes from ${userName}. New balance: ${data.new_balance} minutes`;
+                    showAlert(message, 'success');
+                    await loadAccountsList(); // Reload to show updated credits
+                } else {
+                    showAlert(`Failed to ${action} credits: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error(`Error ${action}ing credits:`, error);
+                showAlert(`Error ${action}ing credits`, 'error');
+            }
+        }
+        
         async function saveFillerWords() { try { const fillerWords = document.getElementById('fillerWords').value.trim(); const response = await fetch('/api/super-admin/filler-words', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filler_words: fillerWords, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert('Filler words saved successfully', 'success'); else showAlert('Failed to save filler words', 'error'); } catch (error) { console.error('Error saving filler words:', error); showAlert('Error saving filler words', 'error'); } }
         async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; card.innerHTML = `
                     <div class="filler-slot-header">
@@ -717,10 +1311,10 @@
         }
         
         // Call Performance Analysis Functions
-        let selectedCallUuid = null;
+        // (selectedCallUuid declared at top of script)
         
         // Speechmatics Streaming Status Polling
-        let streamingStatusInterval;
+        // (streamingStatusInterval declared at top of script)
         
         async function updateStreamingStatus() {
             try {
@@ -743,6 +1337,12 @@
                 }
                 
                 statusDiv.style.display = 'flex';
+                
+                // Make draggable after showing
+                if (!statusDiv.classList.contains('draggable-initialized')) {
+                    makeStreamingStatusDraggable();
+                    statusDiv.classList.add('draggable-initialized');
+                }
             } catch (error) {
                 console.error('Error fetching streaming status:', error);
             }
@@ -750,12 +1350,14 @@
         
         function startStreamingStatusPolling() {
             updateStreamingStatus(); // Initial update
+            if (streamingStatusInterval) clearInterval(streamingStatusInterval);
             streamingStatusInterval = setInterval(updateStreamingStatus, 2000); // Poll every 2 seconds
         }
         
         function stopStreamingStatusPolling() {
             if (streamingStatusInterval) {
                 clearInterval(streamingStatusInterval);
+                streamingStatusInterval = null;
             }
         }
         
@@ -839,8 +1441,56 @@
             const stagesDiv = document.getElementById('timingStages');
             const bottleneckDiv = document.getElementById('bottleneckInfo');
             
+            // Display quality score and analysis if available
+            let qualityHtml = '';
+            if (data.call_info.quality_score !== null && data.call_info.quality_score !== undefined) {
+                const score = data.call_info.quality_score;
+                let scoreColor = '#27ae60'; // Green
+                if (score < 50) scoreColor = '#e74c3c'; // Red
+                else if (score < 75) scoreColor = '#f39c12'; // Orange
+                
+                qualityHtml = `
+                    <div class="quality-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1)); border: 2px solid rgba(102, 126, 234, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+                            <div style="font-size: 48px; font-weight: 900; color: ${scoreColor};">${score}/100</div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 18px; font-weight: 700; color: white; margin-bottom: 5px;">Call Quality Score</div>
+                                <div style="font-size: 13px; opacity: 0.8;">${score >= 80 ? '✅ Excellent' : score >= 60 ? '⚠️ Good' : '🚨 Needs Improvement'}</div>
+                            </div>
+                            <button onclick="analyzeCallQuality('${data.call_info.call_uuid}')" class="btn-analyze" style="padding: 10px 20px;">
+                                🔄 Re-analyze Quality
+                            </button>
+                        </div>
+                        ${data.call_info.instruction_adherence ? `
+                            <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                <div style="font-weight: 600; color: #667eea; margin-bottom: 8px;">📋 Instruction Adherence:</div>
+                                <div style="font-size: 13px; line-height: 1.6; white-space: pre-wrap;">${data.call_info.instruction_adherence}</div>
+                            </div>
+                        ` : ''}
+                        ${data.call_info.performance_issues && data.call_info.performance_issues !== 'None detected' ? `
+                            <div style="margin-top: 15px; padding: 12px; background: rgba(231, 76, 60, 0.1); border-radius: 8px; border-left: 4px solid #e74c3c;">
+                                <div style="font-weight: 600; color: #e74c3c; margin-bottom: 8px;">⚠️ Performance Issues:</div>
+                                <div style="font-size: 13px; line-height: 1.6; white-space: pre-wrap;">${data.call_info.performance_issues}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                qualityHtml = `
+                    <div class="quality-card" style="background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center;">
+                        <div style="font-size: 16px; color: white; margin-bottom: 15px;">📊 No quality analysis yet for this call</div>
+                        <button onclick="analyzeCallQuality('${data.call_info.call_uuid}')" class="btn-analyze" style="padding: 12px 24px;">
+                            🤖 Analyze Call Quality with AI
+                        </button>
+                        <div style="font-size: 12px; opacity: 0.7; margin-top: 10px;">Uses DeepSeek AI to evaluate instruction adherence and performance</div>
+                    </div>
+                `;
+            }
+            
+            // Display quality section first
+            stagesDiv.innerHTML = qualityHtml;
+            
             // Display timing stages
-            stagesDiv.innerHTML = '';
             data.timing_analysis.stages.forEach(stage => {
                 const stageEl = document.createElement('div');
                 stageEl.className = `timing-stage ${stage.status}`;
@@ -894,9 +1544,38 @@
             resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        async function analyzeCallQuality(callUuid) {
+            if (!callUuid) return;
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading">🤖</span> Analyzing with AI...';
+            
+            try {
+                const response = await fetch(`/api/super-admin/analyze-call-quality/${callUuid}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('✅ Call quality analysis complete!', 'success');
+                    // Reload the analysis to show new scores
+                    await analyzeSelectedCall();
+                } else {
+                    showAlert('❌ Analysis failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error analyzing call quality:', error);
+                showAlert('❌ Error analyzing call quality', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
         // ===== SERVICE HEALTH MONITORING =====
-        let healthCheckInterval = null;
-        let healthData = {};
+        // (healthCheckInterval and healthData declared at top of script)
 
         // Health check definitions
         const healthChecks = {
@@ -1033,18 +1712,103 @@
                         return { status: 'error', message: 'Not responding' };
                     }
                 }
+            },
+            ngrok: {
+                icon: '🌉',
+                name: 'Ngrok Tunnel',
+                desc: 'Monitors ngrok tunnel status and public URL availability. If this is red, incoming calls from Vonage cannot reach your server.',
+                checkFn: async () => {
+                    try {
+                        const resp = await fetch('/api/admin/ngrok-status');
+                        if (!resp.ok) return { status: 'error', message: 'API error' };
+                        const data = await resp.json();
+                        if (data.running) {
+                            const url = data.url || '';
+                            const shortUrl = url.replace('https://', '').substring(0, 25);
+                            return { status: 'ok', message: `Active: ${shortUrl}...`, details: data };
+                        }
+                        return { status: 'error', message: data.message || 'Not running' };
+                    } catch (e) {
+                        return { status: 'error', message: 'Check failed' };
+                    }
+                }
+            },
+            activecalls: {
+                icon: '📞',
+                name: 'Active Calls',
+                desc: 'Shows current active call sessions. Turns green when calls are in progress. If always red, no calls are being handled.',
+                checkFn: async () => {
+                    try {
+                        const resp = await fetch('/api/active-calls');
+                        if (!resp.ok) return { status: 'error', message: 'API error' };
+                        const data = await resp.json();
+                        const count = data.count || 0;
+                        if (count > 0) {
+                            return { status: 'ok', message: `${count} active call${count > 1 ? 's' : ''}` };
+                        }
+                        return { status: 'checking', message: 'No active calls' };
+                    } catch (e) {
+                        return { status: 'error', message: 'Check failed' };
+                    }
+                }
+            },
+            resources: {
+                icon: '⚡',
+                name: 'System Resources',
+                desc: 'Monitors CPU and RAM usage. If this is red or yellow, the server is under heavy load and may experience performance issues.',
+                checkFn: async () => {
+                    try {
+                        const resp = await fetch('/api/health');
+                        if (!resp.ok) return { status: 'error', message: 'API error' };
+                        const data = await resp.json();
+                        const cpu = data.system?.cpu_percent || 0;
+                        const mem = data.system?.memory_percent || 0;
+                        
+                        // Critical thresholds
+                        if (cpu > 85 || mem > 90) {
+                            return { status: 'error', message: `CPU ${cpu.toFixed(0)}% | RAM ${mem.toFixed(0)}% - Critical!` };
+                        }
+                        // Warning thresholds
+                        if (cpu > 70 || mem > 75) {
+                            return { status: 'warning', message: `CPU ${cpu.toFixed(0)}% | RAM ${mem.toFixed(0)}% - High` };
+                        }
+                        // All good
+                        return { status: 'ok', message: `CPU ${cpu.toFixed(0)}% | RAM ${mem.toFixed(0)}%` };
+                    } catch (e) {
+                        return { status: 'error', message: 'Check failed' };
+                    }
+                }
             }
         };
 
         async function updateHealthStatus(serviceId) {
             const check = healthChecks[serviceId];
-            if (!check) return;
+            if (!check) {
+                console.error(`No health check found for: ${serviceId}`);
+                return;
+            }
 
             const circleEl = document.getElementById(`health-${serviceId}`);
             const statusEl = document.getElementById(`status-${serviceId}`);
             
+            if (!circleEl || !statusEl) {
+                console.error(`Elements not found for ${serviceId}`);
+                return;
+            }
+            
             try {
-                const result = await check.checkFn();
+                console.log(`Checking ${serviceId}...`);
+                
+                // Add timeout to prevent hanging
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Check timeout')), 8000)
+                );
+                
+                const result = await Promise.race([
+                    check.checkFn(),
+                    timeoutPromise
+                ]);
+                
                 healthData[serviceId] = result;
                 
                 // Update circle status
@@ -1053,26 +1817,95 @@
                 // Update status text
                 statusEl.textContent = result.message;
                 
+                console.log(`${serviceId}: ${result.status} - ${result.message}`);
+                
             } catch (error) {
                 console.error(`Health check failed for ${serviceId}:`, error);
-                healthData[serviceId] = { status: 'error', message: 'Check failed' };
+                const errorMsg = error.message === 'Check timeout' ? 'Timeout' : 'Check failed';
+                healthData[serviceId] = { status: 'error', message: errorMsg };
                 circleEl.className = 'health-circle error';
-                statusEl.textContent = 'Check failed';
+                statusEl.textContent = errorMsg;
             }
         }
 
         async function updateAllHealthStatuses() {
+            console.log('🔍 Running health checks for all services...');
             const services = Object.keys(healthChecks);
+            console.log('Services to check:', services);
+            
             await Promise.all(services.map(service => updateHealthStatus(service)));
+            
+            console.log('✅ All health checks completed');
+            
+            // Check if we need to show the configuration warning
+            checkConfigurationState();
+        }
+        
+        function checkConfigurationState() {
+            // Count API key errors
+            let apiKeyErrors = 0;
+            const apiKeyChecks = ['openai', 'speechmatics', 'vonage', 'deepseek'];
+            
+            for (const checkName of apiKeyChecks) {
+                const data = healthData[checkName];
+                if (data && data.status === 'error' && data.message && data.message.includes('not configured')) {
+                    apiKeyErrors++;
+                }
+            }
+            
+            // Show warning banner and reload button if 2+ API keys show as not configured
+            // (likely means they're in DB but not loaded into memory)
+            const warningBanner = document.getElementById('configWarningBanner');
+            const reloadBtn = document.getElementById('reloadConfigBtn');
+            if (apiKeyErrors >= 2) {
+                if (warningBanner) warningBanner.style.display = 'block';
+                if (reloadBtn) reloadBtn.style.display = 'block';
+            } else {
+                if (warningBanner) warningBanner.style.display = 'none';
+                if (reloadBtn) reloadBtn.style.display = 'none';
+            }
+        }
+        
+        async function reloadConfiguration() {
+            try {
+                showAlert('🔄 Reloading configuration from database...', 'info');
+                
+                const response = await fetch('/api/super-admin/reload-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('✅ ' + data.message + ' - Refreshing status indicators...', 'success');
+                    
+                    // Wait a moment for server to settle, then refresh status checks
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    
+                    // Force refresh all health statuses (runs all checks in parallel)
+                    await updateAllHealthStatuses();
+                    
+                    // Hide warning banner after successful reload
+                    checkConfigurationState();
+                } else {
+                    showAlert('❌ ' + (data.message || data.error || 'Failed to reload configuration'), 'error');
+                }
+            } catch (error) {
+                console.error('Error reloading configuration:', error);
+                showAlert('❌ Error: ' + error.message, 'error');
+            }
         }
 
         function startHealthMonitoring() {
+            console.log('Starting health monitoring...');
             // Initial check
             updateAllHealthStatuses();
             
-            // Poll every 30 seconds
+            // Poll every 10 seconds for live status updates
             if (healthCheckInterval) clearInterval(healthCheckInterval);
-            healthCheckInterval = setInterval(updateAllHealthStatuses, 30000);
+            healthCheckInterval = setInterval(updateAllHealthStatuses, 10000);
+            console.log('Health monitoring started, polling every 10 seconds');
         }
 
         function stopHealthMonitoring() {
@@ -1159,12 +1992,556 @@
             modal.classList.remove('show');
         }
 
-        // Update showDashboard to start health monitoring
-        const originalShowDashboard = showDashboard;
-        showDashboard = function() {
-            originalShowDashboard();
-            startHealthMonitoring();
-        };
+        // ===== SYSTEM CONTROLS =====
+        
+        async function testCall() {
+            showAlert('🔍 Testing call system...', 'info');
+            try {
+                const resp = await fetch('/api/admin/test-call', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(`✅ ${data.message}`, 'success');
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Test failed: ' + e.message, 'error');
+            }
+        }
+
+        async function restartVoiceEngine() {
+            if (!confirm('⚠️ This will restart the voice system. Active calls will be dropped. Continue?')) return;
+            showAlert('🔄 Restarting voice engine...', 'info');
+            try {
+                const resp = await fetch('/api/admin/restart-voice', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert('✅ Voice engine restarted successfully', 'success');
+                    setTimeout(() => updateAllHealthStatuses(), 2000);
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Restart failed: ' + e.message, 'error');
+            }
+        }
+
+        async function clearCallCache() {
+            if (!confirm('Clear cached call data? This may help if calls are stuck.')) return;
+            showAlert('🗑️ Clearing call cache...', 'info');
+            try {
+                const resp = await fetch('/api/admin/clear-cache', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert('✅ ' + data.message, 'success');
+                    setTimeout(() => updateAllHealthStatuses(), 2000);
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Clear cache failed: ' + e.message, 'error');
+            }
+        }
+
+        async function restartServer() {
+            if (!confirm('⚠️ RESTART SERVER: This will restart the entire server process. All active calls will be dropped and the page will reload. Continue?')) return;
+            
+            // Stop health monitoring to prevent errors during restart
+            stopHealthMonitoring();
+            
+            showAlert('🔁 Server restart initiated... Please wait.', 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/restart-server', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert('✅ Server is restarting... Waiting for it to come back online.', 'success');
+                }
+            } catch (e) {
+                // Server disconnected (expected during restart)
+                showAlert('🔁 Server is restarting... Waiting for it to come back online.', 'info');
+            }
+            
+            // Wait for server to come back online before reloading
+            let attempts = 0;
+            const maxAttempts = 30; // 30 seconds max wait
+            const checkInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    const healthResp = await fetch('/api/health', { method: 'GET', cache: 'no-cache' });
+                    if (healthResp.ok || healthResp.status === 500) {
+                        // Server is responding (even if unhealthy status, it's online)
+                        clearInterval(checkInterval);
+                        showAlert('✅ Server is back online! Reloading page...', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } catch (e) {
+                    // Server still down, keep waiting
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        showAlert('⚠️ Server restart timeout. Please refresh the page manually.', 'warning');
+                    }
+                }
+            }, 1000); // Check every second
+        }
+
+        async function checkWebhooks() {
+            showAlert('🌐 Checking webhook configuration...', 'info');
+            try {
+                const resp = await fetch('/api/admin/check-webhooks');
+                const data = await resp.json();
+                if (data.success) {
+                    const info = `
+                        <div style="text-align: left; line-height: 1.8;">
+                            <strong>Answer URL:</strong> ${data.answer_url}<br>
+                            <strong>Event URL:</strong> ${data.event_url}<br>
+                            <strong>Status:</strong> ${data.status}
+                        </div>
+                    `;
+                    showAlert(info, 'success');
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Check failed: ' + e.message, 'error');
+            }
+        }
+
+        async function testOpenAI() {
+            showAlert('🧠 Testing OpenAI connection...', 'info');
+            try {
+                const resp = await fetch('/api/admin/test-openai', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(`✅ OpenAI test passed: ${data.message}`, 'success');
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Test failed: ' + e.message, 'error');
+            }
+        }
+
+        async function testVoicePipeline() {
+            showAlert('🔬 Running comprehensive voice pipeline diagnostics...', 'info');
+            try {
+                const resp = await fetch('/api/super-admin/test-voice-pipeline', { method: 'POST' });
+                const data = await resp.json();
+                
+                if (data.success && data.report) {
+                    const report = data.report;
+                    
+                    // Build plain text report for clipboard
+                    let plainTextReport = `VOICE PIPELINE DIAGNOSTIC REPORT\n`;
+                    plainTextReport += `=================================\n\n`;
+                    plainTextReport += `${report.summary}\n\n`;
+                    plainTextReport += `Tests: ${report.test_counts.passed} passed, ${report.test_counts.failed} failed, ${report.test_counts.warned} warnings\n`;
+                    plainTextReport += `Timestamp: ${report.timestamp}\n\n`;
+                    
+                    if (report.critical_issues.length > 0) {
+                        plainTextReport += `CRITICAL ISSUES:\n`;
+                        report.critical_issues.forEach(issue => {
+                            plainTextReport += `  - ${issue}\n`;
+                        });
+                        plainTextReport += `\n`;
+                    }
+                    
+                    if (report.warnings.length > 0) {
+                        plainTextReport += `WARNINGS:\n`;
+                        report.warnings.forEach(warn => {
+                            plainTextReport += `  - ${warn}\n`;
+                        });
+                        plainTextReport += `\n`;
+                    }
+                    
+                    plainTextReport += `DETAILED TEST RESULTS:\n`;
+                    plainTextReport += `======================\n\n`;
+                    report.tests.forEach(test => {
+                        plainTextReport += `[${test.status}] ${test.name}\n`;
+                        plainTextReport += `    ${test.details}\n\n`;
+                    });
+                    
+                    // Copy to clipboard
+                    try {
+                        await navigator.clipboard.writeText(plainTextReport);
+                        console.log('Report copied to clipboard');
+                    } catch (e) {
+                        console.error('Failed to copy to clipboard:', e);
+                    }
+                    
+                    // Build detailed HTML report
+                    let reportHtml = `
+                        <div style="text-align: left; max-height: 500px; overflow-y: auto; line-height: 1.6;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="margin: 0; color: #2c3e50;">${report.summary}</h3>
+                                <button onclick="copyDiagnosticReport()" style="padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                                    📋 Copy Report
+                                </button>
+                            </div>
+                            <div style="margin-bottom: 20px; padding: 10px; background: #ecf0f1; border-radius: 8px;">
+                                <strong>Tests:</strong> ${report.test_counts.passed} passed, 
+                                ${report.test_counts.failed} failed, 
+                                ${report.test_counts.warned} warnings
+                            </div>
+                    `;
+                    
+                    // Show critical issues first
+                    if (report.critical_issues.length > 0) {
+                        reportHtml += `
+                            <div style="background: #ffe6e6; padding: 15px; border-left: 4px solid #e74c3c; margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #c0392b;">🚨 Critical Issues:</strong><br>
+                                ${report.critical_issues.map(issue => `• ${issue}`).join('<br>')}
+                            </div>
+                        `;
+                    }
+                    
+                    // Show warnings
+                    if (report.warnings.length > 0) {
+                        reportHtml += `
+                            <div style="background: #fff3cd; padding: 15px; border-left: 4px solid #f39c12; margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #e67e22;">⚠️ Warnings:</strong><br>
+                                ${report.warnings.map(warn => `• ${warn}`).join('<br>')}
+                            </div>
+                        `;
+                    }
+                    
+                    // Show all test results
+                    reportHtml += '<h4 style="margin-top: 20px; color: #34495e;">Detailed Test Results:</h4>';
+                    report.tests.forEach(test => {
+                        let icon = '';
+                        let color = '';
+                        if (test.status === 'PASS') {
+                            icon = '✅';
+                            color = '#27ae60';
+                        } else if (test.status === 'FAIL') {
+                            icon = '❌';
+                            color = '#e74c3c';
+                        } else if (test.status === 'WARN') {
+                            icon = '⚠️';
+                            color = '#f39c12';
+                        } else {
+                            icon = 'ℹ️';
+                            color = '#3498db';
+                        }
+                        
+                        reportHtml += `
+                            <div style="margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid ${color};">
+                                <div style="font-weight: 600; color: ${color};">
+                                    ${icon} ${test.name}
+                                </div>
+                                <div style="font-size: 13px; color: #555; margin-top: 5px;">
+                                    ${test.details}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    reportHtml += `
+                            <div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 8px; font-size: 13px; color: #155724;">
+                                <strong>✅ Report copied to clipboard!</strong><br>
+                                You can paste it directly to share with support.
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Store report for copy button
+                    window.lastDiagnosticReport = plainTextReport;
+                    
+                    showAlert(reportHtml, 'info');
+                } else {
+                    showAlert(`❌ Diagnostic failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Diagnostic test failed: ' + e.message, 'error');
+            }
+        }
+
+        function copyDiagnosticReport() {
+            if (window.lastDiagnosticReport) {
+                navigator.clipboard.writeText(window.lastDiagnosticReport).then(() => {
+                    showAlert('✅ Report copied to clipboard!', 'success');
+                }).catch(err => {
+                    showAlert('❌ Failed to copy: ' + err.message, 'error');
+                });
+            }
+        }
+
+        async function autoFixVoice() {
+            showAlert('🤖 Running auto-fix... This will diagnose and automatically apply known solutions.', 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/auto-fix-voice', { method: 'POST' });
+                const data = await resp.json();
+                
+                if (data.success) {
+                    // Build detailed report
+                    let reportHtml = `
+                        <div style="text-align: left; max-height: 500px; overflow-y: auto; line-height: 1.6;">
+                            <h3 style="margin-top: 0; color: #2c3e50;">${data.message}</h3>
+                    `;
+                    
+                    if (data.fixes_applied && data.fixes_applied.length > 0) {
+                        reportHtml += `
+                            <div style="margin: 15px 0; padding: 15px; background: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
+                                <strong style="color: #155724;">✅ Fixes Applied (${data.fixes_applied.length}):</strong><br>
+                        `;
+                        data.fixes_applied.forEach(fix => {
+                            reportHtml += `
+                                <div style="margin-top: 10px; padding: 8px; background: white; border-radius: 4px;">
+                                    <strong>${fix.fix}</strong><br>
+                                    <span style="font-size: 13px; color: #666;">${fix.description}</span>
+                                </div>
+                            `;
+                        });
+                        reportHtml += `</div>`;
+                    }
+                    
+                    if (data.log) {
+                        reportHtml += `
+                            <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap;">
+                                ${data.log.replace(/\n/g, '<br>')}
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.verification && data.verification.critical_issues && data.verification.critical_issues.length > 0) {
+                        reportHtml += `
+                            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                                <strong style="color: #856404;">⚠️ Remaining Issues:</strong><br>
+                                ${data.verification.critical_issues.map(issue => `• ${issue}`).join('<br>')}
+                            </div>
+                        `;
+                    }
+                    
+                    reportHtml += `
+                            <div style="margin-top: 20px; padding: 15px; background: #e8f4f8; border-radius: 8px; font-size: 13px;">
+                                <strong>💡 What happened:</strong><br>
+                                • System analyzed voice issues<br>
+                                • Applied ${data.fixes_applied ? data.fixes_applied.length : 0} known solutions from fix history<br>
+                                • Re-ran diagnostic to verify results
+                            </div>
+                        </div>
+                    `;
+                    
+                    showAlert(reportHtml, data.verification && data.verification.critical_issues && data.verification.critical_issues.length === 0 ? 'success' : 'info');
+                } else {
+                    showAlert(`❌ Auto-fix failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Auto-fix failed: ' + e.message, 'error');
+            }
+        }
+
+        async function viewServerLogs() {
+            showAlert('📋 Fetching recent logs...', 'info');
+            try {
+                const resp = await fetch('/api/admin/recent-logs');
+                const data = await resp.json();
+                if (data.success) {
+                    const logHtml = `
+                        <div style="background: #000; color: #0f0; padding: 15px; border-radius: 8px; 
+                                    font-family: monospace; font-size: 11px; max-height: 400px; 
+                                    overflow-y: auto; text-align: left; white-space: pre-wrap;">
+${data.logs}
+                        </div>
+                    `;
+                    showAlert(logHtml, 'info');
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Failed to fetch logs: ' + e.message, 'error');
+            }
+        }
+
+        // ========== VONAGE NUMBER MANAGEMENT ==========
+
+        async function syncVonageNumbers() {
+            showAlert('🔄 Syncing numbers from Vonage...', 'info');
+            try {
+                const resp = await fetch('/api/sync-vonage-numbers', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(`✅ ${data.message}`, 'success');
+                    // Auto-refresh after sync
+                    setTimeout(() => loadVonageNumbers(), 1000);
+                } else {
+                    showAlert(`⚠️ Sync failed: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Sync error: ' + e.message, 'error');
+            }
+        }
+
+        async function loadVonageNumbers() {
+            const container = document.getElementById('numbersContainer');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.6;"><div style="font-size: 32px; margin-bottom: 10px;">⏳</div><div>Loading numbers...</div></div>';
+
+            try {
+                const resp = await fetch('/api/owned-numbers');
+                const data = await resp.json();
+                
+                if (!data.success) {
+                    container.innerHTML = `<div style="text-align: center; padding: 40px; color: #e74c3c;"><div style="font-size: 32px; margin-bottom: 10px;">❌</div><div>${data.error}</div></div>`;
+                    return;
+                }
+
+                const numbers = data.numbers || [];
+                
+                if (numbers.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px; opacity: 0.6;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
+                            <div>No Vonage numbers found.</div>
+                            <div style="margin-top: 10px; font-size: 13px;">Purchase numbers from your Vonage dashboard.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Count available vs assigned
+                const availableCount = numbers.filter(n => n.available).length;
+                const assignedCount = numbers.length - availableCount;
+
+                let html = `
+                    <div style="background: linear-gradient(135deg, #2c3e50, #34495e); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">📊 Number Overview</div>
+                        <div style="display: flex; justify-content: center; gap: 30px; font-size: 14px;">
+                            <div><strong>Total:</strong> ${numbers.length}</div>
+                            <div style="color: #27ae60;"><strong>Available:</strong> ${availableCount}</div>
+                            <div style="color: #e67e22;"><strong>Assigned:</strong> ${assignedCount}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Display each number
+                numbers.forEach(number => {
+                    const isAvailable = number.available;
+                    const borderColor = isAvailable ? '#27ae60' : '#e67e22';
+                    const statusBg = isAvailable ? '#27ae60' : '#e67e22';
+                    const statusText = isAvailable ? '✅ AVAILABLE' : `👤 ${number.assigned_to || 'Unavailable'}`;
+
+                    html += `
+                        <div style="background: linear-gradient(135deg, #2c3e50, #34495e); 
+                                    padding: 20px; border-radius: 8px; margin-bottom: 15px;
+                                    border-left: 4px solid ${borderColor};">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
+                                        📞 ${number.number}
+                                    </div>
+                                    <div style="font-size: 13px; opacity: 0.7;">
+                                        ${number.country || 'Unknown'} • ${number.type || 'Unknown Type'}
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <div style="background: ${statusBg}; color: white; padding: 8px 15px; 
+                                                border-radius: 20px; font-size: 13px; font-weight: bold;">
+                                        ${statusText}
+                                    </div>
+                                    ${generateNumberActionButton(number)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div style="text-align: center; padding: 40px; color: #e74c3c;"><div style="font-size: 32px; margin-bottom: 10px;">❌</div><div>Error: ${e.message}</div></div>`;
+            }
+        }
+
+        function generateNumberActionButton(number) {
+            if (number.available) {
+                // Available number - option to make unavailable
+                return `
+                    <button onclick="toggleNumberAvailability('${number.number}', false)" 
+                            style="background: linear-gradient(135deg, #e74c3c, #c0392b); 
+                                   color: white; border: none; padding: 8px 15px; 
+                                   border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">
+                        🔒 Make Unavailable
+                    </button>
+                `;
+            } else if (number.assigned_to && number.user_id) {
+                // Assigned to a user - option to deassign
+                return `
+                    <button onclick="deassignNumber('${number.number}', ${number.user_id})" 
+                            style="background: linear-gradient(135deg, #e67e22, #d35400); 
+                                   color: white; border: none; padding: 8px 15px; 
+                                   border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">
+                        ❌ Deassign
+                    </button>
+                `;
+            } else {
+                // Manually made unavailable - option to make available
+                return `
+                    <button onclick="toggleNumberAvailability('${number.number}', true)" 
+                            style="background: linear-gradient(135deg, #27ae60, #229954); 
+                                   color: white; border: none; padding: 8px 15px; 
+                                   border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">
+                        🔓 Make Available
+                    </button>
+                `;
+            }
+        }
+
+        async function toggleNumberAvailability(phoneNumber, makeAvailable) {
+            const action = makeAvailable ? 'available' : 'unavailable';
+            if (!confirm(`Make ${phoneNumber} ${action}?`)) return;
+
+            showAlert(`🔄 Updating ${phoneNumber}...`, 'info');
+            
+            try {
+                const resp = await fetch('/api/toggle-number-availability', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        phone_number: phoneNumber,
+                        available: makeAvailable
+                    })
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(`✅ ${phoneNumber} is now ${action}`, 'success');
+                    loadVonageNumbers(); // Refresh list
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Update failed: ' + e.message, 'error');
+            }
+        }
+
+        async function deassignNumber(phoneNumber, userId) {
+            if (!confirm(`Deassign ${phoneNumber} from this user? The number will become available for reassignment.`)) return;
+
+            showAlert(`🔄 Deassigning ${phoneNumber}...`, 'info');
+            
+            try {
+                const resp = await fetch('/api/deassign-number', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        phone_number: phoneNumber,
+                        user_id: userId
+                    })
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(`✅ ${phoneNumber} has been deassigned`, 'success');
+                    loadVonageNumbers(); // Refresh list
+                } else {
+                    showAlert(`⚠️ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Deassign failed: ' + e.message, 'error');
+            }
+        }
 
         // Update logout to stop health monitoring
         const originalLogout = logout;
@@ -1172,6 +2549,278 @@
             stopHealthMonitoring();
             originalLogout();
         };
+
+        // Global Instructions Modal Functions
+        function openInstructionsModal() {
+            document.getElementById('instructionsModal').classList.add('show');
+        }
+
+        function closeInstructionsModal(event) {
+            if (event && event.target.classList.contains('instructions-modal-content')) {
+                return; // Don't close if clicking inside modal
+            }
+            document.getElementById('instructionsModal').classList.remove('show');
+        }
+
+        // Make Streaming Status Box Draggable
+        function makeStreamingStatusDraggable() {
+            const box = document.getElementById('streamingStatus');
+            if (!box) {
+                console.log('Streaming status box not found');
+                return;
+            }
+
+            let isDragging = false;
+            let currentX = 0;
+            let currentY = 0;
+            let initialX = 0;
+            let initialY = 0;
+
+            function dragStart(e) {
+                // Get the current transform values
+                const style = window.getComputedStyle(box);
+                const matrix = new DOMMatrixReadOnly(style.transform);
+                currentX = matrix.m41;
+                currentY = matrix.m42;
+
+                initialX = e.clientX - currentX;
+                initialY = e.clientY - currentY;
+                isDragging = true;
+
+                box.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+
+            function drag(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                    box.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                }
+            }
+
+            function dragEnd(e) {
+                isDragging = false;
+                box.style.cursor = 'move';
+            }
+
+            // Remove old listeners if any
+            box.removeEventListener('mousedown', dragStart);
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', dragEnd);
+
+            // Add new listeners
+            box.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+
+            console.log('Streaming status box is now draggable');
+        }
+
+        // Don't initialize on timeout, let updateStreamingStatus do it
+        // setTimeout(makeStreamingStatusDraggable, 1000);
+
+        // ========== CONSOLE DIAGNOSTICS ==========
+        
+        // Store console logs
+        let consoleLogs = [];
+        let consoleErrors = [];
+
+        // Override console methods to capture logs
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const originalConsoleInfo = console.info;
+
+        console.log = function(...args) {
+            captureLog('log', args);
+            originalConsoleLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            captureLog('error', args);
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            captureLog('warn', args);
+            originalConsoleWarn.apply(console, args);
+        };
+
+        console.info = function(...args) {
+            captureLog('info', args);
+            originalConsoleInfo.apply(console, args);
+        };
+
+        // Capture window errors
+        window.addEventListener('error', (event) => {
+            captureLog('error', [`${event.message} at ${event.filename}:${event.lineno}:${event.colno}`]);
+        });
+
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            captureLog('error', [`Unhandled Promise Rejection: ${event.reason}`]);
+        });
+
+        function captureLog(type, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg);
+                    } catch (e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+
+            const logEntry = {
+                type,
+                timestamp,
+                message
+            };
+
+            consoleLogs.push(logEntry);
+            if (type === 'error') {
+                consoleErrors.push(logEntry);
+            }
+
+            // Keep only last 100 logs
+            if (consoleLogs.length > 100) {
+                consoleLogs.shift();
+            }
+
+            // Update diagnostics modal if open
+            updateDiagnosticsDisplay();
+        }
+
+        function openDiagnostics() {
+            document.getElementById('diagnosticsModal').classList.add('show');
+            updateDiagnosticsDisplay();
+        }
+
+        function closeDiagnosticsModal(event) {
+            if (event && event.target.classList.contains('diagnostics-modal-content')) {
+                return;
+            }
+            document.getElementById('diagnosticsModal').classList.remove('show');
+            // Hide analysis when closing
+            document.getElementById('errorAnalysis').classList.remove('show');
+        }
+
+        function updateDiagnosticsDisplay() {
+            const logsContainer = document.getElementById('consoleLogs');
+            const logCount = document.getElementById('logCount');
+            const errorCount = document.getElementById('errorCount');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+
+            if (!logsContainer) return;
+
+            logCount.textContent = consoleLogs.length;
+            errorCount.textContent = consoleErrors.length;
+
+            // Enable/disable analyze button
+            analyzeBtn.disabled = consoleErrors.length === 0;
+
+            if (consoleLogs.length === 0) {
+                logsContainer.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">No logs captured yet...</div>';
+                return;
+            }
+
+            // Display last 50 logs (most recent first)
+            const recentLogs = consoleLogs.slice(-50).reverse();
+            logsContainer.innerHTML = recentLogs.map(log => `
+                <div class="console-log-entry ${log.type}">
+                    <span class="console-log-timestamp">[${log.timestamp}]</span>
+                    <span>[${log.type.toUpperCase()}]</span>
+                    ${log.message}
+                </div>
+            `).join('');
+        }
+
+        function clearConsoleLogs() {
+            if (!confirm('Clear all console logs?')) return;
+            consoleLogs = [];
+            consoleErrors = [];
+            document.getElementById('errorAnalysis').classList.remove('show');
+            updateDiagnosticsDisplay();
+            showAlert('Console logs cleared', 'success');
+        }
+
+        async function analyzeErrors() {
+            if (consoleErrors.length === 0) {
+                showAlert('No errors to analyze', 'error');
+                return;
+            }
+
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const errorAnalysis = document.getElementById('errorAnalysis');
+            const analysisContent = document.getElementById('analysisContent');
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '⏳ Analyzing...';
+            errorAnalysis.classList.add('show');
+            analysisContent.textContent = 'Analyzing errors with DeepSeek AI...';
+
+            try {
+                // Prepare error summary
+                const errorSummary = consoleErrors.map(err => 
+                    `[${err.timestamp}] ${err.message}`
+                ).join('\n\n');
+
+                const response = await fetch('/api/analyze-errors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        errors: errorSummary,
+                        context: {
+                            page: 'Super Admin Dashboard',
+                            timestamp: new Date().toISOString(),
+                            errorCount: consoleErrors.length
+                        }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    analysisContent.textContent = data.analysis;
+                    showAlert('✅ Error analysis complete!', 'success');
+                } else {
+                    analysisContent.textContent = `Analysis failed: ${data.error}`;
+                    showAlert('❌ Analysis failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error analyzing:', error);
+                analysisContent.textContent = `Failed to analyze errors: ${error.message}`;
+                showAlert('❌ Analysis request failed', 'error');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🤖 Analyze Errors';
+            }
+        }
+
+        function copyAnalysisToClipboard() {
+            const analysisContent = document.getElementById('analysisContent').textContent;
+            
+            navigator.clipboard.writeText(analysisContent).then(() => {
+                showAlert('✅ Analysis copied to clipboard!', 'success');
+            }).catch(err => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = analysisContent;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showAlert('✅ Analysis copied to clipboard!', 'success');
+            });
+        }
+
+        // Log page load
+        console.log('Super Admin Dashboard loaded successfully');
     </script>
 </body>
 </html>

@@ -1440,13 +1440,24 @@ class CallSession:
         self._vonage_audio_mode_logged: bool = False
 
     async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
-        if not self.vonage_ws or not self.is_active or not pcm_bytes:
+        if not self.vonage_ws:
+            logger.warning(f"[{self.call_uuid}] ⚠️ Cannot send audio: vonage_ws is None")
+            return
+        if not self.is_active:
+            logger.warning(f"[{self.call_uuid}] ⚠️ Cannot send audio: is_active is False")
+            return
+        if not pcm_bytes:
+            logger.warning(f"[{self.call_uuid}] ⚠️ Cannot send audio: pcm_bytes is empty")
             return
 
+        logger.info(f"[{self.call_uuid}] 🔊 Sending {len(pcm_bytes)} bytes to Vonage (ws={bool(self.vonage_ws)}, active={self.is_active})")
+        
         if getattr(self, "_vonage_audio_mode", "bytes") == "json":
             await self.vonage_ws.send_text(json.dumps({"audio": base64.b64encode(pcm_bytes).decode()}))
+            logger.info(f"[{self.call_uuid}] ✅ Sent as JSON")
         else:
             await self.vonage_ws.send_bytes(pcm_bytes)
+            logger.info(f"[{self.call_uuid}] ✅ Sent as binary")
 
     def _barge_in_stop_speechmatics(self) -> None:
         """Immediately stop any Speechmatics output and drop queued sentences."""
@@ -6467,22 +6478,55 @@ async def answer_call(request: Request):
     result = cursor.fetchone()
     
     if not result:
-        # No user assigned to this number - reject the call
-        conn.close()
-        logger.warning(f"⚠️ Call rejected - No user assigned to phone number {called}")
-        return JSONResponse([
-            {
-                "action": "talk",
-                "text": "We're sorry, but this phone number is not currently assigned. Please contact support."
-            },
-            {
-                "action": "hangup"
-            }
-        ])
-    
-    assigned_user_id = result[0]
-    minutes_remaining = result[1]
-    user_name = result[2]
+        # No user assigned - auto-create a new account for this number
+        logger.warning(f"⚠️ Phone number {called} not assigned - creating auto-account")
+        
+        # Create new user with phone number as name
+        phone_display = called.lstrip('+') if called.startswith('+') else called
+        user_name = f"Auto_{phone_display[-10:]}"  # Last 10 digits
+        
+        try:
+            cursor.execute('''
+                INSERT INTO users (name, created_at, last_login, status, call_mode)
+                VALUES (?, datetime('now'), datetime('now'), 'active', 'realtime')
+            ''', (user_name,))
+            assigned_user_id = cursor.lastrowid
+            
+            # Create account settings with default values and assign this phone number
+            cursor.execute('''
+                INSERT INTO account_settings (
+                    user_id, minutes_remaining, total_minutes_purchased, 
+                    phone_number, voice, voice_provider, speechmatics_voice_id,
+                    agent_name, agent_personality, agent_instructions,
+                    response_latency, call_mode, calendar_booking_enabled, tasks_enabled
+                )
+                VALUES (?, 60, 60, ?, 'shimmer', 'speechmatics', 'sarah',
+                    'Sarah', 'Friendly and professional. Keep responses brief and conversational.',
+                    'Answer questions about the business. Take messages if needed.',
+                    500, 'realtime', 1, 1)
+            ''', (assigned_user_id, called_digits))
+            
+            conn.commit()
+            minutes_remaining = 60
+            
+            logger.info(f"✅ Auto-created account '{user_name}' (ID: {assigned_user_id}) for number {called}")
+            
+        except Exception as e:
+            conn.close()
+            logger.error(f"❌ Failed to auto-create account for {called}: {e}")
+            return JSONResponse([
+                {
+                    "action": "talk",
+                    "text": "We're sorry, there was an error setting up this phone number. Please try again later."
+                },
+                {
+                    "action": "hangup"
+                }
+            ])
+    else:
+        assigned_user_id = result[0]
+        minutes_remaining = result[1]
+        user_name = result[2]
     
     if minutes_remaining <= 0:
         # User exists but no minutes
@@ -6592,8 +6636,7 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
             logger.info(f"[{call_uuid}] ⭐ GREETING CONFIG: strict_greeting = '{strict_greeting}'")
             if strict_greeting.strip():
                 greet_instructions = (
-                    "Say the following greeting EXACTLY as written, word-for-word with no additions or changes: "
-                    f"{strict_greeting.strip()}"
+                    f"You must respond with ONLY these exact words, nothing more, nothing less: '{strict_greeting.strip()}'"
                 )
                 logger.info(f"[{call_uuid}] ⭐ Using STRICT greeting: {strict_greeting}")
             else:
@@ -6601,6 +6644,17 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
                 logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting")
             # Use the session's configured modalities for the greeting
             greeting_modalities = getattr(session, 'modalities', ["text", "audio"])
+            await session.openai_ws.send(json.dumps({
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{
+                        "type": "input_text",
+                        "text": "Please greet the caller now."
+                    }]
+                }
+            }))
             await session.openai_ws.send(json.dumps({
                 "type": "response.create",
                 "response": {
