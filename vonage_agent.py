@@ -1579,7 +1579,7 @@ class CallSession:
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": msg}]
+                    "content": [{"type": "text", "text": msg}]
                 }
             }))
         except Exception as e:
@@ -1746,11 +1746,9 @@ Provide your analysis."""
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
+                    "content": [{"type": "text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
                 }
             }))
-            
-            await self.openai_ws.send(json.dumps({"type": "response.create"}))
             
             # Wait a moment for the message to be sent
             await asyncio.sleep(3)
@@ -1773,6 +1771,7 @@ Provide your analysis."""
                 # Import here to handle missing dependency gracefully
                 from websockets import connect
                 import inspect
+                import time
                 
                 url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17"
                 api_key = CONFIG['OPENAI_API_KEY']
@@ -1792,7 +1791,10 @@ Provide your analysis."""
                 else:
                     connect_kwargs["extra_headers"] = headers
 
+                ws_connect_start = time.time()
                 self.openai_ws = await asyncio.wait_for(connect(url, **connect_kwargs), timeout=10.0)
+                ws_connect_duration = time.time() - ws_connect_start
+                logger.info(f"[{self.call_uuid}] ⏱️ OpenAI WebSocket connection took {ws_connect_duration:.3f}s")
                 
                 # Configure the session with current instructions
                 # Build comprehensive instructions from all config fields
@@ -1801,12 +1803,15 @@ Provide your analysis."""
                 instructions_parts = [f"You are {agent_name}, a phone assistant."]
                 
                 # Add global instructions first (applies to all accounts)
+                db_query_start = time.time()
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute('SELECT global_instructions FROM global_settings WHERE id = 1')
                     result = cursor.fetchone()
                     conn.close()
+                    db_query_duration = time.time() - db_query_start
+                    logger.info(f"[{self.call_uuid}] ⏱️ Global instructions DB query took {db_query_duration:.3f}s")
                     if result and result[0]:
                         instructions_parts.append(f"\n🌐 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):\n{result[0]}")
                         logger.info(f"[{self.call_uuid}] Applied global instructions")
@@ -2029,7 +2034,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "user",
-                                "content": [{"type": "input_text", "text": global_context}]
+                                "content": [{"type": "text", "text": global_context}]
                             }
                         }))
                         
@@ -2038,7 +2043,7 @@ You MUST follow these instructions in ALL calls."""
                             "item": {
                                 "type": "message",
                                 "role": "assistant",
-                                "content": [{"type": "input_text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
+                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
                             }
                         }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
@@ -2058,7 +2063,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "user",
-                            "content": [{"type": "input_text", "text": business_context}]
+                            "content": [{"type": "text", "text": business_context}]
                         }
                     }))
                     
@@ -2067,7 +2072,7 @@ You must use ONLY this information when answering questions about services, area
                         "item": {
                             "type": "message",
                             "role": "assistant",
-                            "content": [{"type": "input_text", "text": "Understood. I will refer to this business information for all responses."}]
+                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
@@ -6619,8 +6624,10 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
     ---------------------------------------------
     Vonage streams caller audio here, and we stream responses back.
     """
+    import time
+    ws_start = time.time()
     await websocket.accept()
-    logger.info(f"[{call_uuid}] 🔌 WebSocket connected")
+    logger.info(f"[{call_uuid}] 🔌 WebSocket connected at {ws_start}")
     
     session = sessions.get_session(call_uuid)
     if not session:
@@ -6632,7 +6639,11 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
 
     # Ensure OpenAI is connected BEFORE we start consuming caller audio.
     if not session.openai_ws:
+        openai_connect_start = time.time()
+        logger.info(f"[{call_uuid}] ⏱️ Starting OpenAI connection at {openai_connect_start - ws_start:.3f}s after WS connect")
         connected = await session.connect_to_openai()
+        openai_connect_duration = time.time() - openai_connect_start
+        logger.info(f"[{call_uuid}] ⏱️ OpenAI connection took {openai_connect_duration:.3f}s")
         if not connected:
             logger.error(f"[{call_uuid}] ❌ Failed to connect to OpenAI after websocket connect")
             await websocket.close()
