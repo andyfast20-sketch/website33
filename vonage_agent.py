@@ -897,50 +897,52 @@ async def extract_tasks_from_call(call_uuid: str, transcript: str, user_id: int,
             messages=[
                 {
                     "role": "system", 
-                    "content": """You are a task extraction assistant analyzing phone conversations. Your job is to identify ANY action items, follow-ups, or things that need to be done later.
+                    "content": """You are a task extraction assistant for business phone calls. Extract tasks ONLY when ALL these conditions are met:
 
-Extract tasks from the BUSINESS OWNER'S perspective (the person receiving calls). This includes:
+1. The caller REQUESTS something (wants the business owner to do something)
+2. Contact information is provided (name + phone number OR name + relationship like "mother/father/boss")
 
-1. CALLBACK REQUESTS:
-   - "Call me back tomorrow"
-   - "Can you give me a ring later?"
+CRITICAL RULES:
 
-2. INFORMATION TO PROVIDE:
-   - "Let me know how many people are coming"
-   - "Get back to me about whether you can meet up"
-   - "Tell me if you're available"
-   - "Confirm if this works for you"
+✅ ADD TO TASK LIST:
+- Caller requests callback AND provides phone number: "John called, wants you to call back on 01613359935"
+- Caller requests callback with relationship (implies known contact): "Mary called, wants you to call her back, it's your mother"
+- Caller wants info/quote AND left contact details: "Barry wants a quote, call him on 07123456789"
+- Caller asks for something AND provides full name+number: "Sarah Smith needs the brochure, call 01234567890"
 
-3. FOLLOW-UP ACTIONS:
-   - "Send me the details"
-   - "Email the invoice"
-   - "Text me the address"
+❌ DO NOT ADD TO TASK LIST:
+- No contact info provided: "John called, wants you to call back" (no number given)
+- Caller will call back themselves: "John called but said he would call back later"
+- Just hung up: "A caller phoned and just hung up"
+- No action requested: "Barry called enquiring about services but didn't leave contact info"
+- Informational only: "Someone called asking about opening hours"
+- Wrong number/spam: "Someone called asking for Dave, wrong number"
 
-4. THINGS TO ARRANGE/COORDINATE:
-   - "Set up a meeting"
-   - "Book an appointment"
-   - "Arrange a time to meet"
+EXAMPLES:
 
-5. PROMISES MADE:
-   - "I'll check on that"
-   - "I'll look into it"
-   - "I'll find out"
+Input: "John called he wants you to call back"
+Output: [] (no phone number or relationship provided)
 
-6. REMINDERS:
-   - Any commitments made during the call
-   - Things promised to the caller
+Input: "John called and he wants you to call him back on 01613359935"
+Output: ["Call John back on 01613359935"]
 
-Reword each task as a clear action item from the business owner's perspective. 
-For example:
-- Caller: "Can we meet up for a drink?" → Task: "Get back to [caller name] about meeting up for drinks"
-- Caller: "Let me know how many are coming" → Task: "Confirm attendance numbers with [caller name]"
-- Caller: "Will you be available on Friday?" → Task: "Respond to [caller name] about Friday availability"
+Input: "John called but he said he would call back later"
+Output: [] (caller will call back, no action needed)
 
-Return ONLY a JSON array of task descriptions. Each task should be actionable and specific.
-If no tasks are found, return an empty array: []
+Input: "A caller phoned and just hung up"
+Output: [] (no request, no info)
 
-Example output:
-["Get back to John about meeting for drinks", "Confirm party attendance numbers", "Send contract details to Sarah by email"]"""
+Input: "Barry called enquiring about the services you offer but did not leave any contact info"
+Output: [] (no contact details)
+
+Input: "Mary called and asked if you can call her back, it's his mother"
+Output: ["Call Mary back (mother)"]
+
+Input: "Sarah wants a quote for cleaning, call her on 07123456789"
+Output: ["Call Sarah on 07123456789 about cleaning quote"]
+
+Return ONLY a JSON array of task descriptions. Each task must include contact info.
+If no valid tasks are found, return an empty array: []"""
                 },
                 {"role": "user", "content": f"Extract tasks from this conversation:\n\n{transcript}"}
             ],
@@ -1917,40 +1919,39 @@ Provide your analysis."""
                     modalities = ["text"]  # Text only - external TTS will handle audio
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
                     
-                    # Cartesia and Speechmatics get ULTRA-aggressive settings for instant response
+                    # Balanced threshold - filters casual sounds but captures intentional yes/no answers
                     if voice_provider == 'cartesia':
-                        silence_ms = 150  # HYPER fast - detect end of speech immediately
-                        padding_ms = 80   # Ultra minimal padding - instant response
-                        threshold = 0.5
+                        silence_ms = 500  # Slightly longer to avoid reacting to casual "yeah"
+                        padding_ms = 80
+                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
                     elif voice_provider == 'speechmatics':
-                        # Less trigger-happy to avoid talking over callers / reacting to small noises.
-                        silence_ms = 800
+                        silence_ms = 700  # Longer silence helps filter casual acknowledgments
                         padding_ms = 250
-                        threshold = 0.65
+                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
                     else:
-                        silence_ms = max(response_latency, 450)  # Standard for others
+                        silence_ms = 600  # Standard
                         padding_ms = 300
-                        threshold = 0.5
+                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
 
                     turn_detection_config = {
                         "type": "server_vad",
-                        "threshold": threshold,
+                        "threshold": threshold,  # Balanced to filter "yeah" but catch "yes"
                         "prefix_padding_ms": padding_ms,
-                        "silence_duration_ms": silence_ms,
+                        "silence_duration_ms": silence_ms,  # Slightly longer helps ignore brief sounds
                         "create_response": True
                     }
-                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} VAD: threshold={threshold}, silence={silence_ms}ms, padding={padding_ms}ms")
+                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} VAD: threshold={threshold} (balanced), silence={silence_ms}ms, padding={padding_ms}ms")
                 else:
                     modalities = ["text", "audio"]  # OpenAI handles both text and audio
-                    # For OpenAI voice: need lower threshold for better conversational flow
+                    # Balanced threshold and silence - filters casual sounds but catches yes/no answers
                     turn_detection_config = {
                         "type": "server_vad",
-                        "threshold": 0.5,  # Lower threshold for more responsive conversation
-                        "prefix_padding_ms": 200,  # Less padding for faster response
-                        "silence_duration_ms": response_latency,  # Use configured latency
+                        "threshold": 0.75,  # Balanced - ignores casual "yeah" but catches "yes/no"
+                        "prefix_padding_ms": 300,
+                        "silence_duration_ms": 700,  # Longer silence helps filter casual acknowledgments
                         "create_response": True
                     }
-                    logger.info(f"[{self.call_uuid}] OpenAI voice VAD: threshold=0.5, silence={response_latency}ms")
+                    logger.info(f"[{self.call_uuid}] OpenAI voice VAD: threshold=0.75 (balanced), silence=700ms")
                 
                 # Store modalities for greeting to use
                 self.modalities = modalities
@@ -2037,15 +2038,6 @@ You MUST follow these instructions in ALL calls."""
                                 "content": [{"type": "text", "text": global_context}]
                             }
                         }))
-                        
-                        await self.openai_ws.send(json.dumps({
-                            "type": "conversation.item.create",
-                            "item": {
-                                "type": "message",
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
-                            }
-                        }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
                 except Exception as e:
                     logger.warning(f"[{self.call_uuid}] Could not load global instructions: {e}")
@@ -2064,15 +2056,6 @@ You must use ONLY this information when answering questions about services, area
                             "type": "message",
                             "role": "user",
                             "content": [{"type": "text", "text": business_context}]
-                        }
-                    }))
-                    
-                    await self.openai_ws.send(json.dumps({
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "message",
-                            "role": "assistant",
-                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")

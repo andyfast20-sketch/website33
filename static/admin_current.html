@@ -721,6 +721,7 @@
             <button class="sidebar-nav-btn" onclick="openTasksModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
                 <span style="font-size: 20px;">✅</span>
                 <span>Tasks</span>
+                <span id="incompleteTaskCount" style="margin-left: auto; background: rgba(102,126,234,0.3); color: rgba(255,255,255,0.9); padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; display: none;"></span>
             </button>
             <button class="sidebar-nav-btn" onclick="openCalendarModal()" style="width: 100%; background: none; border: none; padding: 14px 25px; color: rgba(255,255,255,0.6); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; transition: all 0.2s; border-left: 3px solid transparent;">
                 <span style="font-size: 20px;">📅</span>
@@ -1289,6 +1290,7 @@
             loadCredits();
             loadConfig(); // Load config to populate phone number and other settings
             loadBundles(); // Load bundle settings
+            loadTaskCount(); // Load task count badge
             
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
@@ -4369,12 +4371,18 @@
                     document.getElementById('tasksEmptyState').style.display = 'none';
                     document.getElementById('tasksList').style.display = 'flex';
                     renderTasks(data.tasks);
+                    
+                    // Update incomplete task count badge
+                    const incompleteCount = data.tasks.filter(task => task.completed !== 1).length;
+                    updateIncompleteTaskCount(incompleteCount);
                 } else {
                     document.getElementById('tasksEmptyState').style.display = 'block';
                     document.getElementById('tasksList').style.display = 'none';
+                    updateIncompleteTaskCount(0);
                 }
             } catch (error) {
                 console.error('Failed to load tasks:', error);
+                updateIncompleteTaskCount(0);
             }
         }
 
@@ -4425,6 +4433,46 @@
             }).join('');
         }
 
+        function updateIncompleteTaskCount(count) {
+            const badge = document.getElementById('incompleteTaskCount');
+            console.log('Updating task count badge:', count, 'Badge element:', badge);
+            if (!badge) {
+                console.error('Task count badge element not found!');
+                return;
+            }
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'block';
+                console.log('Badge should now be visible with count:', count);
+            } else {
+                badge.style.display = 'none';
+                console.log('Badge hidden (no incomplete tasks)');
+            }
+        }
+
+        async function loadTaskCount() {
+            console.log('Loading task count...');
+            try {
+                const response = await fetch('/api/tasks', {
+                    headers: getAuthHeaders()
+                });
+                const data = await response.json();
+                console.log('Task data received:', data);
+                
+                if (data.tasks && data.tasks.length > 0) {
+                    const incompleteCount = data.tasks.filter(task => task.completed !== 1).length;
+                    console.log('Total tasks:', data.tasks.length, 'Incomplete:', incompleteCount);
+                    updateIncompleteTaskCount(incompleteCount);
+                } else {
+                    console.log('No tasks found');
+                    updateIncompleteTaskCount(0);
+                }
+            } catch (error) {
+                console.error('Failed to load task count:', error);
+                updateIncompleteTaskCount(0);
+            }
+        }
+
         function showAddTaskForm() {
             document.getElementById('addTaskForm').style.display = 'block';
             document.getElementById('newTaskDescription').focus();
@@ -4456,6 +4504,7 @@
                 if (response.ok) {
                     hideAddTaskForm();
                     loadTasks();
+                    loadTaskCount(); // Update badge count
                 } else {
                     alert('Failed to add task');
                 }
@@ -4475,6 +4524,7 @@
 
                 if (response.ok) {
                     loadTasks();
+                    loadTaskCount(); // Update badge count
                 } else {
                     alert('Failed to update task');
                 }
@@ -4497,6 +4547,7 @@
 
                 if (response.ok) {
                     loadTasks();
+                    loadTaskCount(); // Update badge count
                 } else {
                     alert('Failed to delete task');
                 }
