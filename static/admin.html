@@ -141,6 +141,99 @@
             color: rgba(255, 255, 255, 0.7);
         }
 
+        /* Welcome Modal */
+        .welcome-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .welcome-modal {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+            border: 2px solid rgba(102, 126, 234, 0.4);
+            border-radius: 24px;
+            padding: 45px;
+            max-width: 550px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .welcome-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .welcome-title {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.75);
+            margin-bottom: 35px;
+            line-height: 1.5;
+        }
+
+        .progress-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .progress-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            height: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .progress-message {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 10px;
+            min-height: 20px;
+        }
+
         .tabs-container {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 20px;
@@ -699,6 +792,16 @@
                     <div style="font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 500;">AI Voice Assistant</div>
                 </div>
             </div>
+            
+            <!-- Transfer Number Input -->
+            <div style="margin-top: 15px;">
+                <label style="display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px;">📲 Transfer Number</label>
+                <div style="position: relative;">
+                    <input type="tel" id="headerTransferNumber" placeholder="07123456789" style="width: 100%; padding: 10px 35px 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; color: white; font-size: 14px; font-weight: 500; outline: none; transition: all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(102, 126, 234, 0.6)'" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(102, 126, 234, 0.3)'" onchange="saveHeaderTransferNumber()">
+                    <button onclick="saveHeaderTransferNumber()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: rgba(102, 126, 234, 0.2); border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;" onmouseover="this.style.background='rgba(102, 126, 234, 0.4)'" onmouseout="this.style.background='rgba(102, 126, 234, 0.2)'">💾</button>
+                </div>
+                <div id="transferNumberStatus" style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px; display: none;"></div>
+            </div>
         </div>
 
         <!-- Navigation -->
@@ -908,10 +1011,10 @@
                         <div class="form-group">
                             <label for="voiceProvider">Voice Provider</label>
                             <select id="voiceProvider" onchange="switchVoiceProvider()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
-                                <option value="openai">OpenAI (6 voices, fastest)</option>
-                                <option value="speechmatics">Speechmatics (Real-time streaming)</option>
+                                <option value="speechmatics">Speechmatics (Sarah)</option>
                             </select>
-                            <div class="example-box" style="margin-top: 10px;">
+                            <!-- Voice provider descriptions hidden as requested -->
+                            <div class="example-box" style="margin-top: 10px; display: none;">
                                 <strong>🎭 Voice Providers:</strong><br>
                                 <strong>OpenAI:</strong> 6 high-quality voices, fastest response<br>
                                 <strong>Speechmatics:</strong> Real-time streaming with natural UK voices
@@ -1017,20 +1120,45 @@
                             </div>
                         </div>
 
-                        <!-- Speechmatics Voice Selection -->
+                        <!-- Voice Selection -->
                         <div id="speechmaticsVoiceSection" style="display: none;">
                             <div class="form-group">
-                                <label for="speechmaticsVoice">Speechmatics Voice</label>
+                                <label for="speechmaticsVoice">Agent Voice</label>
                                 <select id="speechmaticsVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
                                     <option value="sarah">Sarah (UK Female - Natural & Clear)</option>
-                                    <option value="will">Will (UK Male - Professional)</option>
+                                    <option value="will" style="display: none;">Will (UK Male - Professional)</option>
                                 </select>
                                 <button onclick="testSpeechmaticsVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
                                     🔊 Test Voice
                                 </button>
-                                <div class="example-box">
+                                <div class="example-box" style="display: none;">
                                     <strong>Real-Time Streaming:</strong> Speechmatics provides natural UK voices with real-time streaming capabilities for low latency conversations.
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>👋 Opening Greeting</h3>
+                        <div class="form-group">
+                            <label for="callGreeting">Opening Greeting (Strict)</label>
+                            <input type="text" id="callGreeting" placeholder="e.g., Hello, thanks for calling Beryl's Cars, how can I help you?">
+                            <div class="example-box">
+                                <strong>Tip:</strong> If set, the AI will say this line exactly first when the call connects.
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Offer Transfer When Caller Is (Up to 5)</label>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <input type="text" id="transferPerson1" placeholder="Caller 1 (e.g., Doctors)">
+                                <input type="text" id="transferPerson2" placeholder="Caller 2">
+                                <input type="text" id="transferPerson3" placeholder="Caller 3">
+                                <input type="text" id="transferPerson4" placeholder="Caller 4">
+                                <input type="text" id="transferPerson5" placeholder="Caller 5" style="grid-column: 1 / -1;">
+                            </div>
+                            <div class="example-box">
+                                <strong>How it works:</strong> If the caller says they are one of these (e.g. "This is Doctors"), the AI will offer to transfer them using your <strong>Transfer Number</strong>.
                             </div>
                         </div>
                     </div>
@@ -1042,6 +1170,22 @@
                             <textarea id="businessInfo" rows="5" placeholder="Describe your business, services, pricing, hours, etc..."></textarea>
                             <div class="example-box">
                                 <strong>Example:</strong> "Garden Pros - Professional gardening services. Lawn mowing £20/hour, hedge trimming £30/hour, full garden maintenance £50/visit. Open Mon-Sat 8am-6pm. Service area: Manchester."
+                            </div>
+                            
+                            <!-- AI Website Analyzer -->
+                            <div style="margin-top: 20px; padding: 18px; background: linear-gradient(135deg, rgba(16,163,127,0.08) 0%, rgba(14,140,111,0.12) 100%); border: 2px solid rgba(16,163,127,0.3); border-radius: 12px;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                    <span style="font-size: 20px;">🤖</span>
+                                    <span style="font-weight: 700; color: white; font-size: 15px;">AI Website Analyzer</span>
+                                </div>
+                                <div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 15px;">Enter your website URL and let AI extract business information automatically</div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <input type="url" id="websiteUrl" placeholder="https://yourwebsite.com" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                                    <button type="button" onclick="analyzeWebsite()" id="analyzeBtn" style="padding: 12px 24px; background: linear-gradient(135deg, #10a37f 0%, #0e8c6f 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; transition: all 0.3s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(16,163,127,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                                        🔍 Analyze
+                                    </button>
+                                </div>
+                                <div id="analyzeStatus" style="margin-top: 12px; padding: 10px; border-radius: 6px; display: none; font-size: 13px;"></div>
                             </div>
                         </div>
                     </div>
@@ -1068,18 +1212,8 @@
                         </div>
                     </div>
 
-                    <div class="form-section">
-                        <h3>👋 Opening Greeting</h3>
-                        <div class="form-group">
-                            <label for="callGreeting">Opening Greeting (Strict)</label>
-                            <input type="text" id="callGreeting" placeholder="e.g., Hello, thanks for calling Beryl's Cars, how can I help you?">
-                            <div class="example-box">
-                                <strong>Tip:</strong> If set, the AI will say this line exactly first when the call connects.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
+                    <!-- Calendar & Appointments section hidden - users can enable via bundles -->
+                    <div class="form-section" style="display: none;">
                         <h3>📅 Calendar & Appointments</h3>
                         <div class="form-group">
                             <label style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
@@ -1317,6 +1451,9 @@
                 return; // Will redirect to signin
             }
             
+            // Check if first-time user and show welcome modal
+            await checkFirstLogin();
+            
             // Load dashboard as default view
             loadDashboard();
             loadTodayStats();
@@ -1328,6 +1465,55 @@
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
         });
+
+        async function checkFirstLogin() {
+            try {
+                const response = await fetch('/api/config', { headers: getAuthHeaders() });
+                const config = await response.json();
+                
+                // Show welcome modal if first login OR if no phone number assigned yet
+                if (!config.FIRST_LOGIN_COMPLETED || !config.PHONE_NUMBER || config.PHONE_NUMBER === '') {
+                    showWelcomeModal();
+                }
+            } catch (error) {
+                console.error('Failed to check first login:', error);
+            }
+        }
+
+        async function showWelcomeModal() {
+            const overlay = document.getElementById('welcomeOverlay');
+            const progressBar = document.getElementById('welcomeProgressBar');
+            const progressMessage = document.getElementById('welcomeProgressMessage');
+            
+            if (!overlay) return;
+            overlay.style.display = 'flex';
+            
+            // Simulate number provisioning progress
+            const stages = [
+                { percent: 15, message: 'Connecting to telephony network...', delay: 500 },
+                { percent: 40, message: 'Searching available numbers...', delay: 800 },
+                { percent: 70, message: 'Provisioning your number...', delay: 1000 },
+                { percent: 90, message: 'Configuring AI agent...', delay: 700 },
+                { percent: 100, message: 'Complete! Setting up your dashboard...', delay: 500 }
+            ];
+            
+            for (const stage of stages) {
+                await new Promise(resolve => setTimeout(resolve, stage.delay));
+                progressBar.style.width = stage.percent + '%';
+                progressMessage.textContent = stage.message;
+            }
+            
+            // Mark first login as complete
+            await fetch('/api/complete-first-login', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            
+            // Hide modal after completion
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 1200);
+        }
 
         function switchMainTab(tabName) {
             console.log('Switching to tab:', tabName);
@@ -1876,6 +2062,88 @@
             }
         }
 
+        // Analyze website and extract business information
+        async function analyzeWebsite() {
+            const urlInput = document.getElementById('websiteUrl');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const statusDiv = document.getElementById('analyzeStatus');
+            const businessInfoTextarea = document.getElementById('businessInfo');
+            
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = 'rgba(255,100,100,0.2)';
+                statusDiv.style.border = '1px solid rgba(255,100,100,0.4)';
+                statusDiv.style.color = '#ff6b6b';
+                statusDiv.innerHTML = '⚠️ Please enter a valid URL';
+                return;
+            }
+            
+            // Validate URL format
+            try {
+                new URL(url);
+            } catch (e) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = 'rgba(255,100,100,0.2)';
+                statusDiv.style.border = '1px solid rgba(255,100,100,0.4)';
+                statusDiv.style.color = '#ff6b6b';
+                statusDiv.innerHTML = '⚠️ Invalid URL format. Please include https:// or http://';
+                return;
+            }
+            
+            // Show loading state
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '⏳ Analyzing...';
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = 'rgba(100,150,255,0.2)';
+            statusDiv.style.border = '1px solid rgba(100,150,255,0.4)';
+            statusDiv.style.color = '#6496ff';
+            statusDiv.innerHTML = '🤖 AI is analyzing the website...';
+            
+            try {
+                const response = await fetch('/api/admin/analyze-website', {
+                    method: 'POST',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to analyze website');
+                }
+                
+                const data = await response.json();
+                
+                // Populate business information
+                businessInfoTextarea.value = data.business_info;
+                
+                // Show success
+                statusDiv.style.background = 'rgba(100,255,100,0.2)';
+                statusDiv.style.border = '1px solid rgba(100,255,100,0.4)';
+                statusDiv.style.color = '#64ff64';
+                statusDiv.innerHTML = '✅ Business information extracted successfully!';
+                
+                // Hide status after 3 seconds
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Website analysis error:', error);
+                statusDiv.style.background = 'rgba(255,100,100,0.2)';
+                statusDiv.style.border = '1px solid rgba(255,100,100,0.4)';
+                statusDiv.style.color = '#ff6b6b';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '🔍 Analyze';
+            }
+        }
+
         async function loadConfig() {
             try {
                 const response = await fetch('/api/config', {
@@ -1925,6 +2193,16 @@
 
                 const callGreetingEl = document.getElementById('callGreeting');
                 if (callGreetingEl) callGreetingEl.value = config.CALL_GREETING || '';
+
+                // Transfer-by-name people list (up to 5)
+                const people = Array.isArray(config.TRANSFER_PEOPLE) ? config.TRANSFER_PEOPLE : [];
+                for (let i = 1; i <= 5; i++) {
+                    const el = document.getElementById('transferPerson' + i);
+                    if (el) el.value = (people[i - 1] || '');
+                }
+                
+                const headerTransferNumberEl = document.getElementById('headerTransferNumber');
+                if (headerTransferNumberEl) headerTransferNumberEl.value = config.TRANSFER_NUMBER || '';
                 
                 // Load calendar booking setting
                 const calendarBookingEl = document.getElementById('calendarBookingEnabled');
@@ -2209,21 +2487,27 @@
             let taskCharge = 0;
             let voiceCharge = 0;
             let salesCharge = 0;
+            let transferCharge = 0;
             
             if (call.description && call.description.includes(' + ')) {
                 const parts = call.description.split(' + ');
+                console.log('Description parts:', parts);
                 parts.forEach(part => {
-                    const match = part.match(/([\d.]+) credits for (bookings|tasks|advanced voice|sales detection)/);
+                    const match = part.match(/([\d.]+) credits for (bookings|tasks|advanced voice|sales detection|transfer)/);
                     if (match) {
                         const amount = parseFloat(match[1]);
                         const type = match[2];
+                        console.log('Matched:', type, '=', amount);
                         if (type === 'bookings') bookingCharge = amount;
                         else if (type === 'tasks') taskCharge = amount;
                         else if (type === 'advanced voice') voiceCharge = amount;
                         else if (type === 'sales detection') salesCharge = amount;
+                        else if (type === 'transfer') transferCharge = amount;
                     }
                 });
             }
+            
+            console.log('Transfer charge extracted:', transferCharge);
             
             // Build charges table
             let chargesHTML = '';
@@ -2298,6 +2582,19 @@
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-powered sales call screening</div>
                         </td>
                         <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #e74c3c; text-align: right;">${salesCharge.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            // Transfer Charge (if applicable)
+            if (transferCharge > 0) {
+                chargesHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 10px 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                            <div style="font-weight: 600;">📞 Call Transfer</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">5 base + 3 credits/min transfer time</div>
+                        </td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${transferCharge.toFixed(2)}</td>
                     </tr>
                 `;
             }
@@ -2802,7 +3099,7 @@
 
         // Switch voice provider sections
         async function switchVoiceProvider() {
-            const provider = document.getElementById('voiceProvider').value;
+            const provider = document.getElementById('voiceProvider').value || 'speechmatics';
             
             // Hide all sections first
             document.getElementById('openaiVoiceSection').style.display = 'none';
@@ -3350,6 +3647,13 @@
             const agentPersonality = document.getElementById('agentPersonality')?.value || '';
             const agentInstructions = document.getElementById('agentInstructions')?.value || '';
             const callGreeting = document.getElementById('callGreeting')?.value || '';
+
+            const transferPeople = [];
+            for (let i = 1; i <= 5; i++) {
+                const v = document.getElementById('transferPerson' + i)?.value || '';
+                const trimmed = v.trim();
+                if (trimmed) transferPeople.push(trimmed);
+            }
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
@@ -3403,7 +3707,8 @@
                         BUSINESS_INFO: businessInfo,
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
-                        CALL_GREETING: callGreeting
+                        CALL_GREETING: callGreeting,
+                        TRANSFER_PEOPLE: transferPeople
                     })
                 });
                 
@@ -3441,6 +3746,47 @@
             setTimeout(() => {
                 messageDiv.style.display = 'none';
             }, 5000);
+        }
+
+        // Save transfer number from header input
+        async function saveHeaderTransferNumber() {
+            const transferNumber = document.getElementById('headerTransferNumber')?.value || '';
+            const statusEl = document.getElementById('transferNumberStatus');
+            
+            try {
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'rgba(255,255,255,0.6)';
+                statusEl.textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        TRANSFER_NUMBER: transferNumber
+                    })
+                });
+                
+                if (response.ok) {
+                    statusEl.style.color = '#2ecc71';
+                    statusEl.textContent = '✅ Saved!';
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 2000);
+                } else {
+                    statusEl.style.color = '#e74c3c';
+                    statusEl.textContent = '❌ Failed to save';
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Error saving transfer number:', error);
+                statusEl.style.color = '#e74c3c';
+                statusEl.textContent = '❌ Error: ' + error.message;
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
         }
 
         // Load credits remaining
@@ -3695,6 +4041,70 @@
         // CALENDAR FUNCTIONS
         // ============================================================================
 
+        // ============================================================================
+        // CALENDAR VIEW MANAGEMENT
+        // ============================================================================
+
+        let currentCalendarView = 'day'; // 'day', 'week', or 'month'
+        let currentDayOffset = 0;
+
+        function switchView(view) {
+            currentCalendarView = view;
+            
+            // Update button styles
+            const dayBtn = document.getElementById('viewDayBtn');
+            const weekBtn = document.getElementById('viewWeekBtn');
+            const monthBtn = document.getElementById('viewMonthBtn');
+            
+            [dayBtn, weekBtn, monthBtn].forEach(btn => {
+                btn.style.background = 'transparent';
+                btn.style.color = 'rgba(255,255,255,0.6)';
+            });
+            
+            if (view === 'day') {
+                dayBtn.style.background = 'rgba(102,126,234,0.4)';
+                dayBtn.style.color = 'white';
+                document.getElementById('navPrevText').textContent = 'Previous';
+                document.getElementById('navNextText').textContent = 'Next';
+            } else if (view === 'week') {
+                weekBtn.style.background = 'rgba(102,126,234,0.4)';
+                weekBtn.style.color = 'white';
+                document.getElementById('navPrevText').textContent = 'Previous';
+                document.getElementById('navNextText').textContent = 'Next';
+            } else {
+                monthBtn.style.background = 'rgba(102,126,234,0.4)';
+                monthBtn.style.color = 'white';
+                document.getElementById('navPrevText').textContent = 'Previous';
+                document.getElementById('navNextText').textContent = 'Next';
+            }
+            
+            loadCalendar();
+        }
+
+        function navigatePrevious() {
+            if (currentCalendarView === 'day') {
+                currentDayOffset--;
+            } else if (currentCalendarView === 'week') {
+                currentWeekOffset--;
+            } else {
+                // Month view - go back one month
+                currentWeekOffset -= 4;
+            }
+            loadCalendar();
+        }
+
+        function navigateNext() {
+            if (currentCalendarView === 'day') {
+                currentDayOffset++;
+            } else if (currentCalendarView === 'week') {
+                currentWeekOffset++;
+            } else {
+                // Month view - go forward one month
+                currentWeekOffset += 4;
+            }
+            loadCalendar();
+        }
+
         function previousWeek() {
             currentWeekOffset--;
             loadCalendar();
@@ -3707,6 +4117,7 @@
 
         function goToToday() {
             currentWeekOffset = 0;
+            currentDayOffset = 0;
             loadCalendar();
         }
 
@@ -4006,138 +4417,216 @@
                 });
                 const data = await response.json();
                 const appointments = data.appointments || [];
-
-                // If we have a target appointment, calculate the week offset to show it
-                if (targetAppointmentId !== null) {
-                    console.log('Looking for appointment ID:', targetAppointmentId);
-                    const targetApt = appointments.find(apt => apt.id === targetAppointmentId);
-                    if (targetApt) {
-                        console.log('Found target appointment:', targetApt);
-                        const aptDate = new Date(targetApt.date + 'T00:00:00');
-                        const now = new Date();
-                        const currentDay = now.getDay();
-                        const currentWeekStart = new Date(now);
-                        currentWeekStart.setDate(now.getDate() - currentDay);
-                        currentWeekStart.setHours(0, 0, 0, 0);
-                        
-                        const aptDay = aptDate.getDay();
-                        const aptWeekStart = new Date(aptDate);
-                        aptWeekStart.setDate(aptDate.getDate() - aptDay);
-                        aptWeekStart.setHours(0, 0, 0, 0);
-                        
-                        const daysDiff = Math.floor((aptWeekStart - currentWeekStart) / (1000 * 60 * 60 * 24));
-                        currentWeekOffset = Math.floor(daysDiff / 7);
-                        console.log('Week offset calculated:', currentWeekOffset);
-                    } else {
-                        console.log('Target appointment not found in list');
-                    }
-                }
-
-                // Get current week based on offset
                 const now = new Date();
-                const currentDay = now.getDay(); // 0 = Sunday
-                const weekStart = new Date(now);
-                weekStart.setDate(now.getDate() - currentDay + (currentWeekOffset * 7)); // Start on Sunday + offset
 
-                // Get month/year for display
-                const weekMiddle = new Date(weekStart);
-                weekMiddle.setDate(weekStart.getDate() + 3); // Wednesday of the week
-                const monthYear = weekMiddle.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                
-                // Update month display
-                document.getElementById('currentMonthDisplay').textContent = monthYear;
-
-                // Build week view with time slots
-                let calendarHTML = '<div style="display: flex; flex-direction: column;">';
-                
-                // Header with dates
-                calendarHTML += '<div style="display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 1px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;">';
-                calendarHTML += '<div style="background: rgba(102,126,234,0.3); padding: 15px; text-align: center; font-weight: 700; border-right: 1px solid rgba(255,255,255,0.1);"></div>';
-                
-                const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-                for (let i = 0; i < 7; i++) {
-                    const date = new Date(weekStart);
-                    date.setDate(weekStart.getDate() + i);
-                    const dateStr = date.toISOString().split('T')[0];
-                    const isToday = dateStr === now.toISOString().split('T')[0];
-                    
-                    calendarHTML += `<div style="background: ${isToday ? 'rgba(102,126,234,0.5)' : 'rgba(102,126,234,0.3)'}; padding: 15px; text-align: center; border-right: 1px solid rgba(255,255,255,0.1);">`;
-                    calendarHTML += `<div style="font-weight: 700; font-size: 12px; color: ${isToday ? '#fff' : 'rgba(255,255,255,0.7)'};">${dayNames[i]}</div>`;
-                    calendarHTML += `<div style="font-size: 24px; font-weight: 800; margin-top: 5px;">${date.getDate()}</div>`;
-                    calendarHTML += `</div>`;
+                // Render based on current view
+                if (currentCalendarView === 'day') {
+                    renderDayView(appointments, now);
+                } else if (currentCalendarView === 'week') {
+                    renderWeekView(appointments, now);
+                } else {
+                    renderMonthView(appointments, now);
                 }
-                calendarHTML += '</div>';
 
-                // Time slots (8 AM to 6 PM)
-                calendarHTML += '<div style="display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 1px; margin-top: 1px; background: rgba(255,255,255,0.05);">';
-                
-                for (let hour = 8; hour <= 18; hour++) {
-                    const timeStr = `${String(hour).padStart(2, '0')}:00`;
-                    
-                    // Time label
-                    calendarHTML += `<div style="background: rgba(0,0,0,0.3); padding: 20px 10px; text-align: right; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);">${timeStr}</div>`;
-                    
-                    // Day cells
-                    for (let i = 0; i < 7; i++) {
-                        const date = new Date(weekStart);
-                        date.setDate(weekStart.getDate() + i);
-                        const dateStr = date.toISOString().split('T')[0];
-                        
-                        // Find appointments for this time slot
-                        const slotAppointments = appointments.filter(apt => {
-                            if (apt.date !== dateStr) return false;
-                            const aptHour = parseInt(apt.time.split(':')[0]);
-                            return aptHour === hour;
-                        });
-                        
-                        const isToday = dateStr === now.toISOString().split('T')[0];
-                        
-                        calendarHTML += `<div onclick="showTimeSlot('${dateStr}', '${timeStr}')" style="background: ${isToday ? 'rgba(102,126,234,0.1)' : 'rgba(0,0,0,0.2)'}; padding: 10px 8px; min-height: 60px; cursor: pointer; transition: all 0.3s; border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.1); position: relative;" onmouseover="this.style.background='rgba(102,126,234,0.2)'" onmouseout="this.style.background='${isToday ? 'rgba(102,126,234,0.1)' : 'rgba(0,0,0,0.2)'}'">`;
-                        
-                        slotAppointments.forEach(apt => {
-                            const emoji = apt.status === 'busy' ? '🚫' : apt.status === 'completed' ? '✅' : '📅';
-                            const bgColor = apt.status === 'busy' ? 'rgba(255,100,100,0.4)' : apt.created_by === 'ai_agent' ? 'rgba(100,200,255,0.4)' : 'rgba(102,126,234,0.6)';
-                            const isTarget = targetAppointmentId !== null && apt.id === targetAppointmentId;
-                            
-                            if (isTarget) {
-                                console.log('Applying yellow flicker to appointment:', apt.id);
-                            }
-                            
-                            calendarHTML += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" class="${isTarget ? 'flicker-target' : ''}" style="background: ${bgColor}; padding: 6px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 11px; font-weight: 600; border-left: 3px solid rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s; ${isTarget ? 'animation: yellowFlicker 2s ease-in-out 3 !important;' : ''}" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
-                            calendarHTML += `<div style="display: flex; align-items: center; gap: 4px;">`;
-                            calendarHTML += `<span>${emoji}</span>`;
-                            calendarHTML += `<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${apt.time} ${apt.title || 'Appointment'}</span>`;
-                            calendarHTML += `</div>`;
-                            if (apt.customer_name) {
-                                calendarHTML += `<div style="font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 2px;">👤 ${apt.customer_name}</div>`;
-                            }
-                            calendarHTML += `</div>`;
-                        });
-                        
-                        calendarHTML += '</div>';
-                    }
-                }
-                
-                calendarHTML += '</div></div>';
-                document.getElementById('calendarGrid').innerHTML = calendarHTML;
-                
-                // Scroll to the target appointment if it exists
+                // Scroll to target appointment if exists
                 if (targetAppointmentId !== null) {
                     setTimeout(() => {
                         const targetElement = document.querySelector('.flicker-target');
                         if (targetElement) {
-                            console.log('Scrolling to target appointment');
                             targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                     }, 100);
+                    targetAppointmentId = null;
                 }
-                
-                // Clear target appointment after first render
-                targetAppointmentId = null;
             } catch (error) {
                 console.error('Failed to load calendar:', error);
                 document.getElementById('calendarGrid').innerHTML = '<div style="padding: 40px; text-align: center; color: rgba(255,255,255,0.5);">Error loading calendar</div>';
             }
+        }
+
+        function renderDayView(appointments, now) {
+            const currentDate = new Date(now);
+            currentDate.setDate(now.getDate() + currentDayOffset);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            
+            const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
+            const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            
+            document.getElementById('currentMonthDisplay').textContent = `${dayName}, ${monthYear}`;
+
+            const dayAppointments = appointments.filter(apt => apt.date === dateStr);
+            const isToday = dateStr === now.toISOString().split('T')[0];
+
+            let html = '<div style="display: grid; grid-template-columns: 60px 1fr; gap: 1px; background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden;">';
+
+            // Time slots (6 AM to 10 PM for day view)
+            for (let hour = 6; hour <= 22; hour++) {
+                const timeStr = `${String(hour).padStart(2, '0')}:00`;
+                const slotAppointments = dayAppointments.filter(apt => {
+                    const aptHour = parseInt(apt.time.split(':')[0]);
+                    return aptHour === hour;
+                });
+
+                // Time label
+                html += `<div style="background: rgba(0,0,0,0.4); padding: 12px 8px; text-align: right; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(255,255,255,0.05);">${timeStr}</div>`;
+                
+                // Content cell
+                html += `<div onclick="showTimeSlot('${dateStr}', '${timeStr}')" style="background: ${isToday ? 'rgba(102,126,234,0.08)' : 'rgba(0,0,0,0.2)'}; padding: 12px; min-height: 50px; cursor: pointer; transition: all 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(102,126,234,0.15)'" onmouseout="this.style.background='${isToday ? 'rgba(102,126,234,0.08)' : 'rgba(0,0,0,0.2)'}'">`;
+                
+                slotAppointments.forEach(apt => {
+                    const emoji = apt.status === 'busy' ? '🚫' : apt.status === 'completed' ? '✅' : '📅';
+                    const bgColor = apt.status === 'busy' ? 'rgba(255,100,100,0.5)' : apt.created_by === 'ai_agent' ? 'rgba(100,200,255,0.5)' : 'rgba(102,126,234,0.7)';
+                    const isTarget = targetAppointmentId !== null && apt.id === targetAppointmentId;
+                    
+                    html += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" class="${isTarget ? 'flicker-target' : ''}" style="background: ${bgColor}; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; font-weight: 600; border-left: 4px solid rgba(255,255,255,0.6); cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.2)'">`;
+                    html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">`;
+                    html += `<span style="font-size: 16px;">${emoji}</span>`;
+                    html += `<span style="font-weight: 700;">${apt.time} ${apt.title || 'Appointment'}</span>`;
+                    html += `</div>`;
+                    if (apt.customer_name) {
+                        html += `<div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-left: 24px;">👤 ${apt.customer_name}</div>`;
+                    }
+                    if (apt.description) {
+                        html += `<div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-left: 24px; margin-top: 4px;">${apt.description}</div>`;
+                    }
+                    html += `</div>`;
+                });
+                
+                html += '</div>';
+            }
+
+            html += '</div>';
+            document.getElementById('calendarGrid').innerHTML = html;
+        }
+
+        function renderWeekView(appointments, now) {
+            const currentDay = now.getDay();
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - currentDay + (currentWeekOffset * 7));
+
+            const weekMiddle = new Date(weekStart);
+            weekMiddle.setDate(weekStart.getDate() + 3);
+            const monthYear = weekMiddle.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            document.getElementById('currentMonthDisplay').textContent = monthYear;
+
+            const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            let html = '<div style="display: flex; flex-direction: column;">';
+            
+            // Compact header
+            html += '<div style="display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 1px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 2px;">';
+            html += '<div style="background: rgba(102,126,234,0.25); padding: 10px; text-align: center; font-weight: 700;"></div>';
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(weekStart);
+                date.setDate(weekStart.getDate() + i);
+                const dateStr = date.toISOString().split('T')[0];
+                const isToday = dateStr === now.toISOString().split('T')[0];
+                
+                html += `<div style="background: ${isToday ? 'linear-gradient(135deg, rgba(102,126,234,0.5), rgba(118,75,162,0.5))' : 'rgba(102,126,234,0.25)'}; padding: 10px; text-align: center;">`;
+                html += `<div style="font-weight: 800; font-size: 10px; color: ${isToday ? '#fff' : 'rgba(255,255,255,0.6)'};">${dayNames[i]}</div>`;
+                html += `<div style="font-size: 20px; font-weight: 900; margin-top: 2px;">${date.getDate()}</div>`;
+                html += `</div>`;
+            }
+            html += '</div>';
+
+            // Compact time slots (8 AM to 6 PM)
+            html += '<div style="display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 1px; background: rgba(255,255,255,0.03);">';
+            
+            for (let hour = 8; hour <= 18; hour++) {
+                const timeStr = `${String(hour).padStart(2, '0')}:00`;
+                
+                html += `<div style="background: rgba(0,0,0,0.3); padding: 12px 6px; text-align: right; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(255,255,255,0.05);">${timeStr}</div>`;
+                
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(weekStart);
+                    date.setDate(weekStart.getDate() + i);
+                    const dateStr = date.toISOString().split('T')[0];
+                    
+                    const slotAppointments = appointments.filter(apt => {
+                        if (apt.date !== dateStr) return false;
+                        const aptHour = parseInt(apt.time.split(':')[0]);
+                        return aptHour === hour;
+                    });
+                    
+                    const isToday = dateStr === now.toISOString().split('T')[0];
+                    
+                    html += `<div onclick="showTimeSlot('${dateStr}', '${timeStr}')" style="background: ${isToday ? 'rgba(102,126,234,0.08)' : 'rgba(0,0,0,0.2)'}; padding: 6px 4px; min-height: 45px; cursor: pointer; transition: all 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(102,126,234,0.15)'" onmouseout="this.style.background='${isToday ? 'rgba(102,126,234,0.08)' : 'rgba(0,0,0,0.2)'}'">`;
+                    
+                    slotAppointments.forEach(apt => {
+                        const emoji = apt.status === 'busy' ? '🚫' : apt.status === 'completed' ? '✅' : '📅';
+                        const bgColor = apt.status === 'busy' ? 'rgba(255,100,100,0.5)' : apt.created_by === 'ai_agent' ? 'rgba(100,200,255,0.5)' : 'rgba(102,126,234,0.7)';
+                        const isTarget = targetAppointmentId !== null && apt.id === targetAppointmentId;
+                        
+                        html += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" class="${isTarget ? 'flicker-target' : ''}" style="background: ${bgColor}; padding: 4px 6px; border-radius: 6px; margin-bottom: 3px; font-size: 10px; font-weight: 600; border-left: 3px solid rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">`;
+                        html += `<div style="display: flex; align-items: center; gap: 3px;">`;
+                        html += `<span style="font-size: 11px;">${emoji}</span>`;
+                        html += `<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px;">${apt.time.slice(0,5)} ${apt.title || 'Appt'}</span>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                    });
+                    
+                    html += '</div>';
+                }
+            }
+            
+            html += '</div></div>';
+            document.getElementById('calendarGrid').innerHTML = html;
+        }
+
+        function renderMonthView(appointments, now) {
+            const currentDate = new Date(now);
+            currentDate.setDate(1);
+            currentDate.setMonth(now.getMonth() + Math.floor(currentWeekOffset / 4));
+            
+            const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('currentMonthDisplay').textContent = monthYear;
+
+            const firstDay = currentDate.getDay();
+            const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; padding: 2px;">';
+            
+            // Day names header
+            const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            dayNames.forEach(day => {
+                html += `<div style="background: rgba(102,126,234,0.25); padding: 12px; text-align: center; font-weight: 800; font-size: 11px; color: rgba(255,255,255,0.7);">${day}</div>`;
+            });
+            
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div style="background: rgba(0,0,0,0.2); padding: 12px; min-height: 90px;"></div>';
+            }
+            
+            // Days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                const dateStr = date.toISOString().split('T')[0];
+                const isToday = dateStr === now.toISOString().split('T')[0];
+                
+                const dayAppointments = appointments.filter(apt => apt.date === dateStr);
+                
+                html += `<div onclick="currentDayOffset = ${Math.floor((date - now) / (1000 * 60 * 60 * 24))}; switchView('day');" style="background: ${isToday ? 'linear-gradient(135deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3))' : 'rgba(0,0,0,0.2)'}; padding: 8px; min-height: 90px; cursor: pointer; transition: all 0.2s; border: ${isToday ? '2px solid rgba(102,126,234,0.6)' : '1px solid rgba(255,255,255,0.05)'}; border-radius: 8px;" onmouseover="this.style.background='rgba(102,126,234,0.2)'" onmouseout="this.style.background='${isToday ? 'linear-gradient(135deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3))' : 'rgba(0,0,0,0.2)'}'">`;
+                html += `<div style="font-weight: 900; font-size: 16px; margin-bottom: 6px; color: ${isToday ? '#fff' : 'rgba(255,255,255,0.8)'};">${day}</div>`;
+                
+                dayAppointments.slice(0, 3).forEach(apt => {
+                    const emoji = apt.status === 'busy' ? '🚫' : apt.status === 'completed' ? '✅' : '📅';
+                    const bgColor = apt.status === 'busy' ? 'rgba(255,100,100,0.6)' : apt.created_by === 'ai_agent' ? 'rgba(100,200,255,0.6)' : 'rgba(102,126,234,0.8)';
+                    
+                    html += `<div onclick="event.stopPropagation(); viewAppointment(${apt.id})" style="background: ${bgColor}; padding: 4px 6px; border-radius: 5px; margin-bottom: 3px; font-size: 9px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">`;
+                    html += `${emoji} ${apt.time.slice(0,5)} ${apt.title || 'Appt'}`;
+                    html += `</div>`;
+                });
+                
+                if (dayAppointments.length > 3) {
+                    html += `<div style="font-size: 9px; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 3px;">+${dayAppointments.length - 3} more</div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            document.getElementById('calendarGrid').innerHTML = html;
         }
 
         function showTimeSlot(date, time) {
@@ -4589,8 +5078,8 @@
                         </div>
                     </div>
 
-                    <!-- Advanced Voice Bundle -->
-                    <div style="background: linear-gradient(135deg, rgba(108,92,231,0.08) 0%, rgba(155,81,224,0.12) 100%); border: 2px solid rgba(108,92,231,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(108,92,231,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(108,92,231,0.25)'" onmouseout="this.style.borderColor='rgba(108,92,231,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                    <!-- Advanced Voice Bundle - Hidden as requested -->
+                    <div style="display: none; background: linear-gradient(135deg, rgba(108,92,231,0.08) 0%, rgba(155,81,224,0.12) 100%); border: 2px solid rgba(108,92,231,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(108,92,231,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(108,92,231,0.25)'" onmouseout="this.style.borderColor='rgba(108,92,231,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                         <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(108,92,231,0.15) 0%, transparent 70%); pointer-events: none;"></div>
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
                             <div style="flex: 1;">
@@ -4653,24 +5142,35 @@
         <div style="max-width: 95%; margin: 20px auto; padding: 0 20px;">
             <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%); border-radius: 20px; padding: 30px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);">
                 <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                    <div style="display: flex; align-items: center; gap: 20px;">
-                        <h2 style="font-size: 32px; margin: 0;">📅 Weekly Calendar</h2>
-                        <div style="background: rgba(102,126,234,0.3); padding: 10px 20px; border-radius: 10px; font-size: 18px; font-weight: 600; border: 1px solid rgba(102,126,234,0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <h2 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900;">📅 Calendar</h2>
+                        <div style="background: rgba(102,126,234,0.2); padding: 8px 16px; border-radius: 10px; font-size: 16px; font-weight: 700; border: 1px solid rgba(102,126,234,0.4);">
                             <span id="currentMonthDisplay">Loading...</span>
                         </div>
                     </div>
-                    <button onclick="closeCalendarModal()" style="background: rgba(255,100,100,0.3); border: none; color: white; font-size: 28px; cursor: pointer; padding: 10px 20px; border-radius: 10px; transition: all 0.3s;">✕</button>
+                    <button onclick="closeCalendarModal()" style="background: rgba(255,100,100,0.2); border: 2px solid rgba(255,100,100,0.4); color: white; font-size: 24px; cursor: pointer; padding: 8px 18px; border-radius: 10px; transition: all 0.3s; font-weight: 700;" onmouseover="this.style.background='rgba(255,100,100,0.4)'" onmouseout="this.style.background='rgba(255,100,100,0.2)'">✕</button>
                 </div>
 
-                <!-- Navigation & Actions -->
-                <div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; align-items: center;">
-                    <button onclick="previousWeek()" class="btn-secondary" style="padding: 12px 25px; font-size: 15px; display: flex; align-items: center; gap: 8px;">◀ Previous Week</button>
-                    <button onclick="goToToday()" class="btn-secondary" style="padding: 12px 25px; font-size: 15px;">📍 Today</button>
-                    <button onclick="nextWeek()" class="btn-secondary" style="padding: 12px 25px; font-size: 15px; display: flex; align-items: center; gap: 8px;">Next Week ▶</button>
+                <!-- View Switcher & Navigation -->
+                <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+                    <!-- View Mode Selector -->
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; display: flex; gap: 4px; border: 1px solid rgba(255,255,255,0.1);">
+                        <button id="viewDayBtn" onclick="switchView('day')" style="background: rgba(102,126,234,0.3); border: none; color: white; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.3s;">📅 Day</button>
+                        <button id="viewWeekBtn" onclick="switchView('week')" style="background: transparent; border: none; color: rgba(255,255,255,0.6); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.3s;">📆 Week</button>
+                        <button id="viewMonthBtn" onclick="switchView('month')" style="background: transparent; border: none; color: rgba(255,255,255,0.6); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.3s;">🗓️ Month</button>
+                    </div>
+                    
+                    <!-- Navigation -->
+                    <button onclick="navigatePrevious()" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; display: flex; align-items: center; gap: 6px; font-weight: 600;">◀ <span id="navPrevText">Previous</span></button>
+                    <button onclick="goToToday()" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">📍 Today</button>
+                    <button onclick="navigateNext()" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; display: flex; align-items: center; gap: 6px; font-weight: 600;"><span id="navNextText">Next</span> ▶</button>
+                    
                     <div style="flex: 1;"></div>
-                    <button class="btn-primary" onclick="showNewAppointmentForm()" style="padding: 12px 25px; font-size: 15px;">➕ New Appointment</button>
-                    <button class="btn-secondary" onclick="markDateBusy()" style="padding: 12px 25px; font-size: 15px;">🚫 Mark Busy</button>
+                    
+                    <!-- Actions -->
+                    <button class="btn-primary" onclick="showNewAppointmentForm()" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">➕ New</button>
+                    <button class="btn-secondary" onclick="markDateBusy()" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">🚫 Busy</button>
                 </div>
 
                 <!-- New Appointment Form -->
@@ -4716,6 +5216,24 @@
                 <div style="background: rgba(0,0,0,0.3); padding: 30px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
                     <div id="calendarGrid"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Welcome Modal (First Login) -->
+    <div id="welcomeOverlay" class="welcome-overlay" style="display: none;">
+        <div class="welcome-modal">
+            <div class="welcome-icon">👋</div>
+            <h1 class="welcome-title">Welcome to Your New Account!</h1>
+            <p class="welcome-subtitle">
+                We're setting up your AI phone agent. You'll forward your calls to this number so your AI can answer.
+            </p>
+            <div class="progress-container">
+                <div class="progress-label">🔍 Searching for your new number...</div>
+                <div class="progress-bar-bg">
+                    <div id="welcomeProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <div id="welcomeProgressMessage" class="progress-message">Initializing...</div>
             </div>
         </div>
     </div>

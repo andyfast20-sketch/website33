@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin - System Dashboard</title>
+    <title>Super Admin - System Dashboard v2.1</title>
     <style>
         * {
             margin: 0;
@@ -460,10 +460,28 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🛡️ Super Admin Dashboard</h1>
+            <h1>🛡️ Super Admin Dashboard <small style="font-size: 12px; opacity: 0.7;">v2.0 - Updated 21 Dec 13:25</small></h1>
             <div class="header-actions">
+                <button class="btn btn-danger" onclick="showFlaggedAccountsModal()" style="background: #e74c3c; margin-right: 10px;">🚨 Flagged Accounts</button>
                 <button class="btn btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
                 <button class="btn btn-primary" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- CONTENT MODERATION ALERT BANNER -->
+        <div onclick="showFlaggedAccountsModal()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(231,76,60,0.4); border: 2px solid rgba(255,255,255,0.3);">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="font-size: 48px;">🚨</div>
+                    <div>
+                        <h2 style="color: white; margin: 0; font-size: 24px;">Content Moderation Alerts</h2>
+                        <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0; font-size: 14px;">Click here to view flagged & suspended accounts</p>
+                    </div>
+                </div>
+                <div style="background: rgba(255,255,255,0.2); padding: 15px 30px; border-radius: 8px; text-align: center;">
+                    <div id="flaggedAccountsBadge" style="font-size: 32px; color: white; font-weight: bold;">...</div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 12px; margin-top: 5px;">Flagged</div>
+                </div>
             </div>
         </div>
 
@@ -520,13 +538,59 @@
                 </div>
             </div>
 
+            <!-- Flagged/Suspended Accounts -->
+            <div class="panel" style="border: 2px solid rgba(231,76,60,0.5);">
+                <h2 style="color: #e74c3c;">🚨 Content Moderation Alerts</h2>
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">
+                    Accounts flagged by AI content moderation for policy violations. Violations include illegal activities, sexual content, terrorism, or scams.
+                </p>
+                <div style="overflow-x: auto;">
+                    <table class="accounts-table">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Status</th>
+                                <th>Flags</th>
+                                <th>Last Violation</th>
+                                <th>Details</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flaggedAccountsTableBody">
+                            <tr>
+                                <td colspan="6" class="loading">Loading flagged accounts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- API Keys Configuration -->
             <div class="panel">
                 <h2>🔑 API Keys Configuration</h2>
                 <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">
-                    Configure global API keys for OpenAI and Speechmatics that will be used across all accounts.
+                    Configure global API keys for third-party services. These keys will be used across all accounts.
                 </p>
-                
+
+                <!-- Vonage API Keys -->
+                <div style="margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                    <h4 style="margin-bottom: 10px;">Vonage API</h4>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="password" id="vonageApiKey" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;" placeholder="Vonage API Key">
+                        <input type="password" id="vonageApiSecret" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;" placeholder="Vonage API Secret">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <input type="password" id="vonageApplicationId" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;" placeholder="Vonage Application ID">
+                    </div>
+                    <textarea id="vonagePrivateKey" rows="5" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; font-family: inherit; resize: vertical;" placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"></textarea>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+                        <button class="btn btn-primary" onclick="saveVonageKeys()">💾 Save Vonage Keys</button>
+                        <button class="btn btn-secondary" onclick="loadVonageKeys()">🔄 Reload</button>
+                        <button class="btn btn-secondary" onclick="togglePasswordVisibility('vonageApiKey', 'vonageApiSecret', 'vonageApplicationId', 'vonagePrivateKey')">👁️ Show</button>
+                        <span id="vonageKeysStatus" style="color: rgba(255,255,255,0.6); font-size: 14px;"></span>
+                    </div>
+                </div>
+
                 <!-- OpenAI API Key -->
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-weight: 600;">OpenAI API Key</label>
@@ -758,6 +822,18 @@
         </div>
     </div>
 
+    <!-- Flagged Accounts Modal -->
+    <div id="flaggedAccountsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; overflow-y: auto;">
+        <div style="max-width: 1200px; margin: 50px auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 30px; position: relative;">
+            <button onclick="closeFlaggedAccountsModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">&times;</button>
+            <h2 style="color: #fff; margin-bottom: 10px; font-size: 28px;">🚨 Content Moderation Alerts</h2>
+            <p style="color: rgba(255,255,255,0.8); margin-bottom: 30px;">Accounts flagged by AI content moderation for policy violations.</p>
+            <div id="flaggedAccountsModalContent" style="background: rgba(255,255,255,0.95); border-radius: 8px; padding: 20px; max-height: 600px; overflow-y: auto;">
+                <div style="text-align: center; padding: 40px; color: #666;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allAccounts = [];
         let currentAccountId = null;
@@ -765,24 +841,30 @@
         // Load dashboard on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadDashboard();
+            loadFlaggedAccountsBadge(); // Load flagged count
             loadApiKeys(); // Load API keys
+            loadVonageKeys(); // Load vonage keys
             loadGlobalInstructions(); // Load global instructions
             loadFillerWords(); // Load filler words
             setInterval(refreshDashboard, 30000); // Auto-refresh every 30 seconds
         });
 
         async function loadDashboard() {
+            console.log('📊 Loading dashboard...', new Date());
             await Promise.all([
                 loadStats(),
                 loadAccounts(),
-                loadActivity()
+                loadActivity(),
+                loadFlaggedAccounts()
             ]);
+            console.log('✅ Dashboard loaded');
         }
 
         async function refreshDashboard() {
             showMessage('Refreshing dashboard...', 'info');
             await loadDashboard();
             await loadGlobalInstructions();
+            await loadFlaggedAccounts();
             showMessage('Dashboard updated', 'success');
         }
 
@@ -871,6 +953,283 @@
                 account.user_id.toString().includes(search)
             );
             renderAccounts(filtered);
+        }
+
+        // ==================== FLAGGED ACCOUNTS ====================
+        
+        async function loadFlaggedAccountsBadge() {
+            try {
+                const response = await fetch('/api/super-admin/flagged-accounts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const count = data.flagged_accounts.length;
+                    const badge = document.getElementById('flaggedAccountsBadge');
+                    if (badge) {
+                        badge.textContent = count;
+                        badge.style.color = count > 0 ? '#fff' : 'rgba(255,255,255,0.6)';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load flagged accounts badge:', error);
+                const badge = document.getElementById('flaggedAccountsBadge');
+                if (badge) badge.textContent = '0';
+            }
+        }
+        
+        async function showFlaggedAccountsModal() {
+            document.getElementById('flaggedAccountsModal').style.display = 'block';
+            document.getElementById('flaggedAccountsModalContent').innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">Loading...</div>';
+            await loadFlaggedAccountsForModal();
+        }
+
+        function closeFlaggedAccountsModal() {
+            document.getElementById('flaggedAccountsModal').style.display = 'none';
+        }
+
+        async function loadFlaggedAccountsForModal() {
+            try {
+                const response = await fetch('/api/super-admin/flagged-accounts');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error('Failed to load flagged accounts');
+                }
+                
+                renderFlaggedAccountsModal(data.flagged_accounts);
+            } catch (error) {
+                console.error('❌ Failed to load flagged accounts:', error);
+                document.getElementById('flaggedAccountsModalContent').innerHTML = 
+                    '<div style="text-align: center; padding: 40px; color: #e74c3c;">Failed to load flagged accounts: ' + error.message + '</div>';
+            }
+        }
+
+        function renderFlaggedAccountsModal(accounts) {
+            if (accounts.length === 0) {
+                document.getElementById('flaggedAccountsModalContent').innerHTML = 
+                    '<div style="text-align: center; padding: 60px; color: #27ae60; font-size: 18px;">✅ No flagged accounts - all clear!</div>';
+                return;
+            }
+
+            let html = '<table style="width: 100%; border-collapse: collapse; color: #333;">';
+            html += '<thead><tr style="background: #667eea; color: white;">';
+            html += '<th style="padding: 12px; text-align: left;">Account</th>';
+            html += '<th style="padding: 12px; text-align: left;">Status</th>';
+            html += '<th style="padding: 12px; text-align: center;">Flags</th>';
+            html += '<th style="padding: 12px; text-align: left;">Last Violation</th>';
+            html += '<th style="padding: 12px; text-align: left;">Reason</th>';
+            html += '<th style="padding: 12px; text-align: center;">Actions</th>';
+            html += '</tr></thead><tbody>';
+
+            accounts.forEach(account => {
+                const isSuspended = account.is_suspended;
+                const statusBadge = isSuspended 
+                    ? '<span style="background: #e74c3c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">🔒 Suspended</span>'
+                    : '<span style="background: #f39c12; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">⚠️ Flagged</span>';
+                
+                const suspensionCount = account.suspension_count || 0;
+                const countBadge = suspensionCount > 1 
+                    ? `<span style="background: #c0392b; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; margin-left: 5px;">🔄 ${suspensionCount}x</span>`
+                    : '';
+                
+                const suspendedDate = account.suspended_at 
+                    ? new Date(account.suspended_at).toLocaleDateString()
+                    : 'N/A';
+                
+                const reason = account.suspension_reason || 'Unknown';
+                const shortReason = reason.length > 50 ? reason.substring(0, 50) + '...' : reason;
+
+                html += '<tr style="border-bottom: 1px solid #ddd;">';
+                html += `<td style="padding: 12px;"><strong>${account.name}</strong><br><small style="color: #666;">${account.phone_number || 'No phone'}</small></td>`;
+                html += `<td style="padding: 12px;">${statusBadge}${countBadge}</td>`;
+                html += `<td style="padding: 12px; text-align: center; font-size: 20px;">${suspensionCount}</td>`;
+                html += `<td style="padding: 12px;"><small>${suspendedDate}</small></td>`;
+                html += `<td style="padding: 12px;" title="${reason}"><small>${shortReason}</small></td>`;
+                html += '<td style="padding: 12px; text-align: center;">';
+                
+                if (isSuspended) {
+                    html += `<button onclick="unsuspendAccountFromModal(${account.user_id})" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">✓ Unsuspend</button>`;
+                }
+                
+                html += `<button onclick="alert('Business Info: ${(account.business_info || 'N/A').replace(/'/g, "\\'").substring(0, 200)}...')" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-left: 5px; font-size: 12px;">👁️ Details</button>`;
+                html += '</td></tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('flaggedAccountsModalContent').innerHTML = html;
+        }
+
+        async function unsuspendAccountFromModal(userId) {
+            if (!confirm('Are you sure you want to unsuspend this account?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/super-admin/unsuspend-account', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Account unsuspended successfully', 'success');
+                    await loadFlaggedAccountsForModal();
+                    await loadAccounts();
+                } else {
+                    throw new Error(data.error || 'Failed to unsuspend account');
+                }
+            } catch (error) {
+                console.error('Failed to unsuspend account:', error);
+                alert('Failed to unsuspend account: ' + error.message);
+            }
+        }
+        
+        async function loadFlaggedAccounts() {
+            console.log('🔍 loadFlaggedAccounts() called');
+            try {
+                console.log('Fetching flagged accounts...');
+                const response = await fetch('/api/super-admin/flagged-accounts');
+                console.log('Response received:', response.status);
+                const data = await response.json();
+                console.log('Flagged accounts data:', data);
+                
+                if (!data.success) {
+                    throw new Error('Failed to load flagged accounts');
+                }
+                
+                renderFlaggedAccounts(data.flagged_accounts);
+            } catch (error) {
+                console.error('❌ Failed to load flagged accounts:', error);
+                document.getElementById('flaggedAccountsTableBody').innerHTML = 
+                    '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6;">Failed to load flagged accounts</td></tr>';
+            }
+        }
+        
+        function renderFlaggedAccounts(accounts) {
+            console.log('🎨 renderFlaggedAccounts() called with:', accounts);
+            const tbody = document.getElementById('flaggedAccountsTableBody');
+            console.log('Table body element:', tbody);
+            
+            if (accounts.length === 0) {
+                console.log('✅ No flagged accounts');
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6; color: #64ff64;">✅ No flagged accounts - all clear!</td></tr>';
+                return;
+            }
+            
+            console.log(`Rendering ${accounts.length} flagged accounts`);
+            
+            tbody.innerHTML = accounts.map(account => {
+                const isSuspended = account.is_suspended;
+                const statusBadge = isSuspended 
+                    ? '<span class="badge badge-danger">🔒 Suspended</span>'
+                    : '<span class="badge badge-warning">⚠️ Flagged</span>';
+                
+                const suspensionCount = account.suspension_count || 0;
+                const suspensionBadge = suspensionCount > 1 
+                    ? `<span class="badge badge-danger" style="margin-left: 5px;">🔄 ${suspensionCount}x</span>`
+                    : '';
+                
+                const detailsPreview = account.flag_details 
+                    ? account.flag_details.substring(0, 60) + (account.flag_details.length > 60 ? '...' : '')
+                    : account.suspension_reason || 'No details';
+                
+                return `
+                    <tr onclick="showFlaggedAccountDetails(${account.user_id})" style="cursor: pointer; background: ${isSuspended ? 'rgba(231,76,60,0.1)' : 'rgba(255,193,7,0.1)'};">
+                        <td>
+                            <div style="font-weight: 600;">${account.name}</div>
+                            <small style="opacity: 0.7;">ID: ${account.user_id} • ${account.phone_number || 'No phone'}</small>
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <span class="badge badge-warning">${suspensionCount} total</span>
+                            ${suspensionBadge}
+                        </td>
+                        <td>${account.suspended_at ? formatDate(account.suspended_at) : 'N/A'}</td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${detailsPreview}
+                        </td>
+                        <td>
+                            ${isSuspended 
+                                ? `<button class="tool-action" style="background: #10a37f;" onclick="event.stopPropagation(); unsuspendAccount(${account.user_id})">✅ Unsuspend</button>`
+                                : `<button class="tool-action" onclick="event.stopPropagation(); showFlaggedAccountDetails(${account.user_id})">View</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        async function unsuspendAccount(userId) {
+            if (!confirm('Are you sure you want to unsuspend this account? They will be able to use the service again, but will remain under stricter monitoring.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/super-admin/unsuspend-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to unsuspend account');
+                }
+                
+                alert('✅ Account unsuspended successfully. User is now under stricter monitoring.');
+                loadFlaggedAccounts();
+                loadAccounts();
+            } catch (error) {
+                console.error('Failed to unsuspend account:', error);
+                alert('❌ Failed to unsuspend account: ' + error.message);
+            }
+        }
+        
+        function showFlaggedAccountDetails(userId) {
+            fetch(`/api/super-admin/flagged-accounts`)
+                .then(res => res.json())
+                .then(data => {
+                    const account = data.flagged_accounts.find(a => a.user_id === userId);
+                    if (!account) return;
+                    
+                    const detailsHTML = `
+                        <h3 style="color: #e74c3c; margin-bottom: 20px;">🚨 Account Flagged: ${account.name}</h3>
+                        <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                            <div style="margin-bottom: 15px;">
+                                <strong>User ID:</strong> ${account.user_id}<br>
+                                <strong>Phone:</strong> ${account.phone_number || 'N/A'}<br>
+                                <strong>Status:</strong> ${account.is_suspended ? '🔒 SUSPENDED' : '⚠️ Flagged'}<br>
+                                <strong>Suspension Count:</strong> ${account.suspension_count || 0} time(s)<br>
+                                <strong>Last Violation:</strong> ${account.suspended_at ? formatDate(account.suspended_at) : 'N/A'}
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong style="color: #e74c3c;">Violation Reason:</strong><br>
+                                <div style="background: rgba(231,76,60,0.2); padding: 10px; border-radius: 5px; margin-top: 5px;">
+                                    ${account.suspension_reason || 'No reason provided'}
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>AI Detection Details:</strong><br>
+                                <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; margin-top: 5px; font-size: 13px;">
+                                    ${account.flag_details || 'No additional details'}
+                                </div>
+                            </div>
+                            <div>
+                                <strong>Business Information Submitted:</strong><br>
+                                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px; margin-top: 5px; font-size: 13px; max-height: 150px; overflow-y: auto;">
+                                    ${account.business_info || 'No business information'}
+                                </div>
+                            </div>
+                        </div>
+                        ${account.is_suspended ? `
+                            <button class="btn btn-primary" onclick="unsuspendAccount(${account.user_id}); closeModal();">✅ Unsuspend Account</button>
+                        ` : ''}
+                        <button class="btn btn-secondary" onclick="closeModal();">Close</button>
+                    `;
+                    
+                    showModal(detailsHTML);
+                });
         }
 
         async function loadActivity() {
@@ -1154,16 +1513,20 @@
         }
 
         // API Keys Management
-        function togglePasswordVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            const button = event.target;
-            if (input.type === 'password') {
-                input.type = 'text';
-                button.textContent = '🙈 Hide';
-            } else {
-                input.type = 'password';
-                button.textContent = '👁️ Show';
-            }
+        function togglePasswordVisibility(...inputIds) {
+            inputIds.forEach(inputId => {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    const button = event.target;
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        button.textContent = '🙈 Hide';
+                    } else {
+                        input.type = 'password';
+                        button.textContent = '👁️ Show';
+                    }
+                }
+            });
         }
 
         async function loadApiKeys() {
@@ -1295,6 +1658,88 @@
                 
             } catch (error) {
                 console.error('Failed to save API keys:', error);
+                statusEl.textContent = '❌ Failed';
+                showMessage('❌ ' + error.message, 'error');
+            }
+        }
+
+        async function loadVonageKeys() {
+            try {
+                const statusEl = document.getElementById('vonageKeysStatus');
+                statusEl.textContent = 'Loading...';
+                
+                const response = await fetch('/api/super-admin/vonage-keys');
+                const data = await response.json();
+
+                const apiKeyInput = document.getElementById('vonageApiKey');
+                const apiSecretInput = document.getElementById('vonageApiSecret');
+                const appIdInput = document.getElementById('vonageApplicationId');
+                const privateKeyInput = document.getElementById('vonagePrivateKey');
+
+                if (data.success) {
+                    apiKeyInput.placeholder = data.api_key_configured ? `Configured (${data.api_key_preview})` : 'API Key not set';
+                    apiSecretInput.placeholder = data.api_secret_configured ? 'Configured (••••••••)' : 'API Secret not set';
+                    appIdInput.placeholder = data.application_id_configured ? 'Configured' : 'Application ID not set';
+                    privateKeyInput.placeholder = data.private_key_configured ? 'Private key is configured' : '-----BEGIN PRIVATE KEY...';
+                    apiKeyInput.value = '';
+                    apiSecretInput.value = '';
+                    appIdInput.value = '';
+                    privateKeyInput.value = '';
+                } else {
+                    apiKeyInput.placeholder = 'Error loading';
+                    apiSecretInput.placeholder = 'Error loading';
+                    appIdInput.placeholder = 'Error loading';
+                    privateKeyInput.placeholder = 'Error loading';
+                }
+                
+                statusEl.textContent = '✅ Loaded';
+                setTimeout(() => statusEl.textContent = '', 2000);
+            } catch (error) {
+                console.error('Failed to load Vonage keys:', error);
+                document.getElementById('vonageKeysStatus').textContent = '❌ Failed to load';
+            }
+        }
+
+        async function saveVonageKeys() {
+            const apiKey = document.getElementById('vonageApiKey').value.trim();
+            const apiSecret = document.getElementById('vonageApiSecret').value.trim();
+            const appId = document.getElementById('vonageApplicationId').value.trim();
+            const privateKey = document.getElementById('vonagePrivateKey').value.trim();
+            const statusEl = document.getElementById('vonageKeysStatus');
+            
+            if (!apiKey && !apiSecret && !privateKey && !appId) {
+                showMessage('⚠️ Please enter at least one Vonage key field to update', 'warning');
+                return;
+            }
+            
+            if (!confirm('Save these Vonage keys for the entire system?')) {
+                return;
+            }
+
+            try {
+                statusEl.textContent = 'Saving...';
+                const payload = { updated_by: 'admin' };
+                if (apiKey) payload.api_key = apiKey;
+                if (apiSecret) payload.api_secret = apiSecret;
+                if (appId) payload.application_id = appId;
+                if (privateKey) payload.private_key_pem = privateKey;
+
+                const response = await fetch('/api/super-admin/vonage-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    statusEl.textContent = '✅ Saved successfully';
+                    showMessage('✅ Vonage keys saved successfully', 'success');
+                    await loadVonageKeys(); // Refresh placeholders
+                } else {
+                    throw new Error(data.error || 'Failed to save Vonage keys');
+                }
+            } catch (error) {
+                console.error('Failed to save Vonage keys:', error);
                 statusEl.textContent = '❌ Failed';
                 showMessage('❌ ' + error.message, 'error');
             }

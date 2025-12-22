@@ -19,6 +19,7 @@ import os
 import subprocess
 import secrets
 import hashlib
+import time
 from typing import Dict, Optional, List, Tuple
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -26,6 +27,38 @@ import sqlite3
 import io
 
 import numpy as np
+
+
+def _load_local_dotenv_if_present() -> None:
+    """Best-effort .env loader.
+
+    This repo includes a `.env` file but does not depend on python-dotenv.
+    For local/dev runs on Windows, load key/value pairs into `os.environ`
+    (without overwriting already-defined environment variables).
+    """
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if not os.path.exists(env_path):
+            return
+        with open(env_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if not key:
+                    continue
+                os.environ.setdefault(key, value)
+    except Exception:
+        # Never block startup due to .env parsing issues.
+        return
+
+
+_load_local_dotenv_if_present()
 
 # --- Secret handling (encryption at rest) -----------------------------------
 # We encrypt API keys stored in SQLite (global_settings) using Fernet.
@@ -235,6 +268,8 @@ CONFIG = {
     
     # Vonage (optional - only needed for outbound calls)
     "VONAGE_APPLICATION_ID": os.getenv("VONAGE_APPLICATION_ID", ""),
+    # Backwards-compatible alias used in some parts of the codebase.
+    "VONAGE_APP_ID": os.getenv("VONAGE_APP_ID", "") or os.getenv("VONAGE_APPLICATION_ID", ""),
     "VONAGE_PRIVATE_KEY_PATH": os.getenv("VONAGE_PRIVATE_KEY_PATH", "private.key"),
     "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", ""),
     "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", ""),
@@ -312,6 +347,111 @@ if CONFIG.get("USE_PLAYHT"):
         logger.warning(f"Failed to configure PlayHT: {e}")
 
 # ============================================================================
+# CONTENT MODERATION
+# ============================================================================
+
+async def moderate_business_content(business_info: str, user_id: int, is_repeat_offender: bool = False) -> dict:
+    """
+    Use DeepSeek AI to moderate business information for inappropriate content.
+    Returns: {"approved": bool, "reason": str, "details": str}
+    """
+    try:
+        deepseek_api_key = CONFIG.get('DEEPSEEK_API_KEY', '').strip()
+        
+        if not deepseek_api_key:
+            logger.warning("DeepSeek API key not configured - skipping content moderation")
+            return {"approved": True, "reason": ""}
+        
+        import aiohttp
+        
+        # Stricter prompt for repeat offenders
+        system_prompt = '''You are a content moderation AI. Analyze the business information provided and detect ANY of the following violations:
+
+CRITICAL VIOLATIONS (Instant Flag):
+- Illegal activities (drugs, weapons, fraud, money laundering, hacking, etc.)
+- Sexual content, adult services, escort services, dating services
+- Terrorism, extremism, violence, hate speech
+- Scams, pyramid schemes, multi-level marketing schemes
+- Gambling, casinos, betting services
+- Cryptocurrency schemes, get-rich-quick schemes
+
+MODERATE VIOLATIONS:
+- Misleading claims, false advertising
+- Unlicensed services (medical, legal, financial without proper credentials)
+- Suspicious contact methods (anonymous, untraceable)
+
+Respond ONLY with valid JSON in this exact format:
+{
+    "flagged": true or false,
+    "severity": "critical" or "moderate" or "clean",
+    "category": "illegal" or "sexual" or "terrorism" or "scam" or "misleading" or "clean",
+    "reason": "Brief explanation of violation",
+    "confidence": 0.0 to 1.0
+}'''
+
+        if is_repeat_offender:
+            system_prompt += "\n\nWARNING: This user has been previously suspended. Apply STRICTER standards and flag anything even remotely suspicious with lower confidence threshold (0.5 instead of 0.7)."
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                'https://api.deepseek.com/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {deepseek_api_key}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'deepseek-chat',
+                    'messages': [
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': f'Analyze this business information:\n\n{business_info}'}
+                    ],
+                    'temperature': 0.1,
+                    'max_tokens': 300
+                }
+            ) as response:
+                if response.status != 200:
+                    logger.error(f"DeepSeek moderation API error: {response.status}")
+                    return {"approved": True, "reason": ""}
+                
+                result = await response.json()
+                content = result['choices'][0]['message']['content'].strip()
+                
+                # Parse JSON response
+                import json
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    moderation_data = json.loads(json_match.group())
+                else:
+                    logger.error(f"Could not parse moderation response: {content}")
+                    return {"approved": True, "reason": ""}
+                
+                # Determine if content should be flagged
+                confidence_threshold = 0.5 if is_repeat_offender else 0.7
+                is_flagged = moderation_data.get('flagged', False)
+                confidence = moderation_data.get('confidence', 0)
+                severity = moderation_data.get('severity', 'clean')
+                
+                if is_flagged and confidence >= confidence_threshold:
+                    category = moderation_data.get('category', 'unknown')
+                    reason = moderation_data.get('reason', 'Inappropriate content detected')
+                    
+                    logger.warning(f"🚨 Content FLAGGED for user {user_id}: {category} - {reason} (confidence: {confidence})")
+                    
+                    return {
+                        "approved": False,
+                        "reason": f"Content policy violation: {category}",
+                        "details": f"{reason} (Confidence: {confidence:.0%}, Severity: {severity})"
+                    }
+                
+                logger.info(f"✅ Content approved for user {user_id} (confidence: {confidence})")
+                return {"approved": True, "reason": ""}
+                
+    except Exception as e:
+        logger.error(f"Content moderation error: {e}", exc_info=True)
+        return {"approved": True, "reason": ""}
+
+# ============================================================================
 # DATABASE SETUP
 # ============================================================================
 
@@ -382,6 +522,22 @@ def init_database():
     # Add average_response_time column if doesn't exist
     try:
         cursor.execute('ALTER TABLE calls ADD COLUMN average_response_time REAL')
+    except:
+        pass  # Column already exists
+    
+    # Add transfer tracking columns
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_initiated INTEGER DEFAULT 0')
+    except:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_duration INTEGER DEFAULT 0')
+    except:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_credits_charged REAL DEFAULT 0')
     except:
         pass  # Column already exists
     
@@ -584,6 +740,27 @@ def init_database():
     except:
         pass
     
+    # Add transfer_number column for auto-transfer feature
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN transfer_number TEXT DEFAULT ""')
+    except:
+        pass
+
+    # Add transfer_people column for transfer-by-name offering (up to 5 names stored as JSON)
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN transfer_people TEXT DEFAULT "[]"')
+    except:
+        pass
+    
+    # Add first_login_completed for onboarding flow
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN first_login_completed INTEGER DEFAULT 0')
+        # Mark all existing accounts as completed so they don't see the welcome modal
+        cursor.execute('UPDATE account_settings SET first_login_completed = 1 WHERE first_login_completed IS NULL OR first_login_completed = 0')
+        conn.commit()
+    except:
+        pass
+    
     # Create global_settings table for admin-controlled settings
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS global_settings (
@@ -594,6 +771,8 @@ def init_database():
             deepseek_api_key TEXT DEFAULT NULL,
             vonage_api_key TEXT DEFAULT NULL,
             vonage_api_secret TEXT DEFAULT NULL,
+            vonage_application_id TEXT DEFAULT NULL,
+            vonage_private_key_pem TEXT DEFAULT NULL,
             ai_brain_provider TEXT DEFAULT 'openai',
             filler_words TEXT DEFAULT '',
             last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -618,6 +797,17 @@ def init_database():
     except:
         pass
 
+    # Add Vonage application credentials (for JWT / call control)
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_application_id TEXT DEFAULT NULL')
+    except:
+        pass
+
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_private_key_pem TEXT DEFAULT NULL')
+    except:
+        pass
+
     # Add DeepSeek API key column
     try:
         cursor.execute('ALTER TABLE global_settings ADD COLUMN deepseek_api_key TEXT DEFAULT NULL')
@@ -627,6 +817,50 @@ def init_database():
     # Add AI brain provider selection column
     try:
         cursor.execute('ALTER TABLE global_settings ADD COLUMN ai_brain_provider TEXT DEFAULT "openai"')
+    except:
+        pass
+
+    # Backchannel / turn-taking tuning (global)
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN ignore_backchannels_always INTEGER DEFAULT 1')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN backchannel_max_words INTEGER DEFAULT 3')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN min_user_turn_seconds REAL DEFAULT 0.45')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE global_settings ADD COLUMN barge_in_min_speech_seconds REAL DEFAULT 0.55')
+    except:
+        pass
+    
+    # Add account suspension tracking columns
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN is_suspended INTEGER DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspension_reason TEXT DEFAULT NULL')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspended_at TEXT DEFAULT NULL')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspension_count INTEGER DEFAULT 0')
+    except:
+        pass
+    
+    try:
+        cursor.execute('ALTER TABLE account_settings ADD COLUMN last_flag_details TEXT DEFAULT NULL')
     except:
         pass
     
@@ -644,17 +878,28 @@ def load_global_api_keys():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, vonage_api_key, vonage_api_secret, ai_brain_provider FROM global_settings WHERE id = 1')
+        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
 
         if result:
-            speechmatics_key_raw, openai_key_raw, deepseek_key_raw, vonage_key_raw, vonage_secret_raw, brain_provider = result
+            (
+                speechmatics_key_raw,
+                openai_key_raw,
+                deepseek_key_raw,
+                vonage_key_raw,
+                vonage_secret_raw,
+                vonage_app_id_raw,
+                vonage_private_key_pem_raw,
+                brain_provider,
+            ) = result
 
             speechmatics_key = _decrypt_secret(speechmatics_key_raw)
             openai_key = _decrypt_secret(openai_key_raw)
             deepseek_key = _decrypt_secret(deepseek_key_raw)
             vonage_key = _decrypt_secret(vonage_key_raw)
             vonage_secret = _decrypt_secret(vonage_secret_raw)
+            vonage_app_id = _decrypt_secret(vonage_app_id_raw)
+            vonage_private_key_pem = _decrypt_secret(vonage_private_key_pem_raw)
 
             # Opportunistic migration: if DB contains plaintext keys and we have
             # an encryption backend, replace them with encrypted values.
@@ -669,6 +914,10 @@ def load_global_api_keys():
                 updates["vonage_api_key"] = _encrypt_secret(str(vonage_key_raw))
             if vonage_secret_raw and not str(vonage_secret_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
                 updates["vonage_api_secret"] = _encrypt_secret(str(vonage_secret_raw))
+            if vonage_app_id_raw and not str(vonage_app_id_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["vonage_application_id"] = _encrypt_secret(str(vonage_app_id_raw))
+            if vonage_private_key_pem_raw and not str(vonage_private_key_pem_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["vonage_private_key_pem"] = _encrypt_secret(str(vonage_private_key_pem_raw))
 
             if updates:
                 set_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
@@ -697,6 +946,15 @@ def load_global_api_keys():
             if vonage_secret:
                 CONFIG["VONAGE_API_SECRET"] = vonage_secret
                 logger.info("✅ Loaded Vonage API secret from database")
+
+            if vonage_app_id:
+                CONFIG["VONAGE_APPLICATION_ID"] = vonage_app_id
+                CONFIG["VONAGE_APP_ID"] = vonage_app_id
+                logger.info("✅ Loaded Vonage Application ID from database")
+
+            if vonage_private_key_pem:
+                CONFIG["VONAGE_PRIVATE_KEY_PEM"] = vonage_private_key_pem
+                logger.info("✅ Loaded Vonage private key (PEM) from database")
 
             if brain_provider:
                 CONFIG["AI_BRAIN_PROVIDER"] = brain_provider
@@ -833,6 +1091,57 @@ def _save_global_filler_meta(filler_dir: str, filler_num: int, meta: Dict) -> No
 # Load API keys from database on startup
 load_global_api_keys()
 
+
+def load_backchannel_settings() -> None:
+    """Load turn-taking/backchannel tuning from global_settings into CONFIG."""
+    defaults = {
+        "IGNORE_BACKCHANNELS_ALWAYS": True,
+        "BACKCHANNEL_MAX_WORDS": 3,
+        "MIN_USER_TURN_SECONDS": 0.45,
+        "BARGE_IN_MIN_SPEECH_SECONDS": 0.55,
+    }
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT ignore_backchannels_always, backchannel_max_words, min_user_turn_seconds, barge_in_min_speech_seconds '
+            'FROM global_settings WHERE id = 1'
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            for k, v in defaults.items():
+                CONFIG[k] = v
+            return
+
+        ignore_always_raw, max_words_raw, min_turn_raw, barge_in_raw = row
+        CONFIG["IGNORE_BACKCHANNELS_ALWAYS"] = bool(ignore_always_raw) if ignore_always_raw is not None else defaults["IGNORE_BACKCHANNELS_ALWAYS"]
+
+        try:
+            CONFIG["BACKCHANNEL_MAX_WORDS"] = int(max_words_raw) if max_words_raw is not None else defaults["BACKCHANNEL_MAX_WORDS"]
+        except Exception:
+            CONFIG["BACKCHANNEL_MAX_WORDS"] = defaults["BACKCHANNEL_MAX_WORDS"]
+
+        try:
+            CONFIG["MIN_USER_TURN_SECONDS"] = float(min_turn_raw) if min_turn_raw is not None else defaults["MIN_USER_TURN_SECONDS"]
+        except Exception:
+            CONFIG["MIN_USER_TURN_SECONDS"] = defaults["MIN_USER_TURN_SECONDS"]
+
+        try:
+            CONFIG["BARGE_IN_MIN_SPEECH_SECONDS"] = float(barge_in_raw) if barge_in_raw is not None else defaults["BARGE_IN_MIN_SPEECH_SECONDS"]
+        except Exception:
+            CONFIG["BARGE_IN_MIN_SPEECH_SECONDS"] = defaults["BARGE_IN_MIN_SPEECH_SECONDS"]
+
+    except Exception as e:
+        logger.warning(f"Failed to load backchannel settings: {e}")
+        for k, v in defaults.items():
+            CONFIG[k] = v
+
+
+# Load backchannel settings from database on startup
+load_backchannel_settings()
+
 # ============================================================================
 # AUTHENTICATION HELPER
 # ============================================================================
@@ -840,7 +1149,7 @@ load_global_api_keys()
 async def get_current_user(authorization: Optional[str] = Header(None)) -> Optional[int]:
     """
     Validates session token and returns user_id.
-    Returns None if invalid or expired.
+    Returns None if invalid, expired, or suspended.
     """
     if not authorization or not authorization.startswith('Bearer '):
         return None
@@ -851,8 +1160,9 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT s.user_id, s.expires_at 
+        SELECT s.user_id, s.expires_at, COALESCE(a.is_suspended, 0) as is_suspended
         FROM sessions s
+        LEFT JOIN account_settings a ON s.user_id = a.user_id
         WHERE s.session_token = ?
     ''', (session_token,))
     
@@ -862,7 +1172,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
     if not result:
         return None
     
-    user_id, expires_at = result
+    user_id, expires_at, is_suspended = result
+    
+    # Check if account is suspended
+    if is_suspended:
+        logger.warning(f"Blocked login attempt for suspended user {user_id}")
+        return None
     
     # Check if session is expired
     if datetime.fromisoformat(expires_at) < datetime.now():
@@ -897,52 +1212,50 @@ async def extract_tasks_from_call(call_uuid: str, transcript: str, user_id: int,
             messages=[
                 {
                     "role": "system", 
-                    "content": """You are a task extraction assistant for business phone calls. Extract tasks ONLY when ALL these conditions are met:
+                    "content": """You are a task extraction assistant analyzing phone conversations. Your job is to identify ANY action items, follow-ups, or things that need to be done later.
 
-1. The caller REQUESTS something (wants the business owner to do something)
-2. Contact information is provided (name + phone number OR name + relationship like "mother/father/boss")
+Extract tasks from the BUSINESS OWNER'S perspective (the person receiving calls). This includes:
 
-CRITICAL RULES:
+1. CALLBACK REQUESTS:
+   - "Call me back tomorrow"
+   - "Can you give me a ring later?"
 
-✅ ADD TO TASK LIST:
-- Caller requests callback AND provides phone number: "John called, wants you to call back on 01613359935"
-- Caller requests callback with relationship (implies known contact): "Mary called, wants you to call her back, it's your mother"
-- Caller wants info/quote AND left contact details: "Barry wants a quote, call him on 07123456789"
-- Caller asks for something AND provides full name+number: "Sarah Smith needs the brochure, call 01234567890"
+2. INFORMATION TO PROVIDE:
+   - "Let me know how many people are coming"
+   - "Get back to me about whether you can meet up"
+   - "Tell me if you're available"
+   - "Confirm if this works for you"
 
-❌ DO NOT ADD TO TASK LIST:
-- No contact info provided: "John called, wants you to call back" (no number given)
-- Caller will call back themselves: "John called but said he would call back later"
-- Just hung up: "A caller phoned and just hung up"
-- No action requested: "Barry called enquiring about services but didn't leave contact info"
-- Informational only: "Someone called asking about opening hours"
-- Wrong number/spam: "Someone called asking for Dave, wrong number"
+3. FOLLOW-UP ACTIONS:
+   - "Send me the details"
+   - "Email the invoice"
+   - "Text me the address"
 
-EXAMPLES:
+4. THINGS TO ARRANGE/COORDINATE:
+   - "Set up a meeting"
+   - "Book an appointment"
+   - "Arrange a time to meet"
 
-Input: "John called he wants you to call back"
-Output: [] (no phone number or relationship provided)
+5. PROMISES MADE:
+   - "I'll check on that"
+   - "I'll look into it"
+   - "I'll find out"
 
-Input: "John called and he wants you to call him back on 01613359935"
-Output: ["Call John back on 01613359935"]
+6. REMINDERS:
+   - Any commitments made during the call
+   - Things promised to the caller
 
-Input: "John called but he said he would call back later"
-Output: [] (caller will call back, no action needed)
+Reword each task as a clear action item from the business owner's perspective. 
+For example:
+- Caller: "Can we meet up for a drink?" → Task: "Get back to [caller name] about meeting up for drinks"
+- Caller: "Let me know how many are coming" → Task: "Confirm attendance numbers with [caller name]"
+- Caller: "Will you be available on Friday?" → Task: "Respond to [caller name] about Friday availability"
 
-Input: "A caller phoned and just hung up"
-Output: [] (no request, no info)
+Return ONLY a JSON array of task descriptions. Each task should be actionable and specific.
+If no tasks are found, return an empty array: []
 
-Input: "Barry called enquiring about the services you offer but did not leave any contact info"
-Output: [] (no contact details)
-
-Input: "Mary called and asked if you can call her back, it's his mother"
-Output: ["Call Mary back (mother)"]
-
-Input: "Sarah wants a quote for cleaning, call her on 07123456789"
-Output: ["Call Sarah on 07123456789 about cleaning quote"]
-
-Return ONLY a JSON array of task descriptions. Each task must include contact info.
-If no valid tasks are found, return an empty array: []"""
+Example output:
+["Get back to John about meeting for drinks", "Confirm party attendance numbers", "Send contract details to Sarah by email"]"""
                 },
                 {"role": "user", "content": f"Extract tasks from this conversation:\n\n{transcript}"}
             ],
@@ -1081,14 +1394,14 @@ class MinutesTracker:
         
         # Get call details and bundle charges
         cursor.execute('''
-            SELECT duration, booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged
+            SELECT duration, booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged, transfer_credits_charged
             FROM calls 
             WHERE call_uuid = ?
         ''', (call_uuid,))
         call_data = cursor.fetchone()
         
         if call_data:
-            duration, booking_charged, task_charged, voice_charged, sales_charged = call_data
+            duration, booking_charged, task_charged, voice_charged, sales_charged, transfer_charged = call_data
             
             # Calculate total credits
             total_credits = credits_per_call  # Connection fee
@@ -1109,6 +1422,9 @@ class MinutesTracker:
             if sales_charged:
                 total_credits += sales_charged
             
+            if transfer_charged:
+                total_credits += transfer_charged
+            
             # Deduct from user's balance
             cursor.execute('''
                 UPDATE account_settings 
@@ -1118,7 +1434,7 @@ class MinutesTracker:
             ''', (total_credits, datetime.now().isoformat(), user_id))
             
             conn.commit()
-            logger.info(f"[{call_uuid}] Deducted {total_credits:.2f} credits from user {user_id} (connection: {credits_per_call}, duration: {minutes * credits_per_minute:.2f}, bookings: {booking_charged or 0}, tasks: {task_charged or 0}, voice: {voice_charged or 0}, sales: {sales_charged or 0})")
+            logger.info(f"[{call_uuid}] Deducted {total_credits:.2f} credits from user {user_id} (connection: {credits_per_call}, duration: {minutes * credits_per_minute:.2f}, bookings: {booking_charged or 0}, tasks: {task_charged or 0}, voice: {voice_charged or 0}, sales: {sales_charged or 0}, transfer: {transfer_charged or 0})")
         
         conn.close()
 
@@ -1394,11 +1710,27 @@ class CallSession:
         self._last_speech_time = None  # Track last time caller spoke
         self._timeout_task = None  # Task for timeout checking
         self._agent_speaking = False  # Track if agent is currently speaking
+
+        # Barge-in control: avoid stopping agent speech for tiny backchannel utterances
+        self._caller_speaking: bool = False
+        self._pending_barge_in_task: Optional[asyncio.Task] = None
+        self._pending_barge_in_started_at: Optional[float] = None
+        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55))
+
+        # Turn gating: avoid treating tiny utterances (e.g., "ok") as full turns.
+        self._last_speech_started_at: Optional[float] = None
+        self._last_speech_duration_seconds: float = 0.0
+        self._min_user_turn_seconds: float = float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45))
         
         # Response time tracking
         self._speech_stopped_time = None  # Timestamp when user stops speaking (initialized to None)
         self._response_times = []  # List of response latencies in milliseconds
         self.user_id = None  # Will be set from caller lookup
+        
+        # Credit monitoring
+        self._credit_monitor_task = None  # Task for monitoring credits
+        self._last_credit_check = time.time()
+        self._credit_check_interval = 10  # Check credits every 10 seconds
         
         # ElevenLabs streaming optimization
         self._elevenlabs_text_buffer = ""  # Buffer for accumulating text
@@ -1412,6 +1744,10 @@ class CallSession:
         self.sales_confidence = None  # Store confidence percentage for display
         self.sales_reasoning = None  # Store reasoning for display
         self.sales_ended_call = False  # Track if we ended the call due to sales detection
+        
+        # Transfer handling
+        self._is_transferring = False  # Flag to indicate call is being transferred
+        self._transfer_person_name = "them"  # Store person name for failed transfer handling
 
         # Filler injection (post-utterance)
         self._filler_played_for_turn = False
@@ -1440,6 +1776,107 @@ class CallSession:
         # If we detect JSON base64 audio inbound, we mirror it outbound.
         self._vonage_audio_mode: str = "bytes"  # "bytes" | "json"
         self._vonage_audio_mode_logged: bool = False
+
+    @staticmethod
+    def _normalize_backchannel_text(text: str) -> str:
+        if not text:
+            return ""
+        t = text.strip().lower()
+        # Keep only letters/digits/spaces/apostrophes/hyphens; treat punctuation as separators.
+        cleaned = []
+        for ch in t:
+            if ch.isalnum() or ch in [" ", "'", "-"]:
+                cleaned.append(ch)
+            else:
+                cleaned.append(" ")
+        t = "".join(cleaned)
+        # Normalize whitespace
+        t = " ".join(t.split())
+        return t
+
+    @classmethod
+    def _is_backchannel_utterance(cls, transcript: str) -> bool:
+        """Return True for short acknowledgements that should not interrupt the agent."""
+        t = cls._normalize_backchannel_text(transcript)
+        if not t:
+            return True
+
+        # Word-count guard: only treat very short utterances as backchannel.
+        words = t.split()
+        max_words = CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)
+        try:
+            max_words = int(max_words)
+        except Exception:
+            max_words = 3
+        if len(words) > max_words:
+            return False
+
+        # Common UK/US backchannels and acknowledgements.
+        backchannels = {
+            "ok",
+            "okay",
+            "k",
+            "right",
+            "yeah",
+            "yep",
+            "yup",
+            "mm",
+            "mhm",
+            "uh huh",
+            "uh-huh",
+            "mm hmm",
+            "alright",
+            "all right",
+            "sure",
+            "cool",
+            "got it",
+            "i see",
+            "thanks",
+            "thank you",
+        }
+
+        if t in backchannels:
+            return True
+
+        # Also treat repeated monosyllables like "ok ok" / "yeah yeah" as backchannel.
+        if len(words) == 2 and words[0] == words[1] and words[0] in {"ok", "okay", "yeah", "yep", "yup", "right"}:
+            return True
+
+        return False
+
+    async def _maybe_barge_in_after_delay(self) -> None:
+        """Only cancel agent output if caller speech persists long enough to be a real interruption."""
+        try:
+            delay = CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds)
+            try:
+                delay = float(delay)
+            except Exception:
+                delay = self._barge_in_min_speech_seconds
+            await asyncio.sleep(delay)
+            if not self.is_active or not self.openai_ws:
+                return
+            if not self._caller_speaking:
+                return
+            if not self._agent_speaking:
+                return
+
+            voice_provider = getattr(self, 'voice_provider', 'openai')
+            logger.info(f"[{self.call_uuid}] Caller interrupted (sustained) - canceling response")
+
+            # Stop any external TTS output (Speechmatics) only for real interruptions.
+            if voice_provider == 'speechmatics':
+                self._barge_in_stop_speechmatics()
+
+            try:
+                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception as e:
+                logger.warning(f"[{self.call_uuid}] Failed to cancel OpenAI response: {e}")
+            self._agent_speaking = False
+            self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.0
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Barge-in delay task error: {e}")
 
     async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
         if not self.vonage_ws:
@@ -1534,7 +1971,8 @@ class CallSession:
                     if not chunk:
                         break
                     await self._send_vonage_audio_bytes(chunk)
-                    # No sleep - stream continuously for best quality
+                    # Pace to real-time so Vonage reliably plays audio.
+                    await asyncio.sleep(len(chunk) / (2 * VONAGE_SAMPLE_RATE))
 
             return True
         except Exception as e:
@@ -1737,6 +2175,328 @@ Provide your analysis."""
         
         return False
     
+    async def _execute_auto_transfer(self, transfer_number: str, detected_sentence: str):
+        """Execute automatic transfer with fixed message - bypasses AI function calling"""
+        try:
+            logger.info(f"[{self.call_uuid}] 🎯 =================================")
+            logger.info(f"[{self.call_uuid}] 🎯 AUTO-TRANSFER EXECUTION STARTING")
+            logger.info(f"[{self.call_uuid}] 🎯 Original transfer number: {transfer_number}")
+            logger.info(f"[{self.call_uuid}] 🎯 Detected sentence: {detected_sentence}")
+            logger.info(f"[{self.call_uuid}] 🎯 =================================")
+            
+            # Check if user has sufficient credits before initiating transfer
+            if self.user_id:
+                import sqlite3
+                conn = sqlite3.connect('call_logs.db')
+                cursor = conn.cursor()
+                cursor.execute('SELECT minutes_remaining FROM account_settings WHERE user_id = ?', (self.user_id,))
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    credits_remaining = result[0]
+                    if credits_remaining <= 0:
+                        logger.warning(f"[{self.call_uuid}] 🚫 TRANSFER BLOCKED - Insufficient credits (balance: {credits_remaining})")
+                        
+                        # Inform caller about insufficient credits
+                        try:
+                            if self.openai_ws:
+                                await self.openai_ws.send(json.dumps({
+                                    "type": "conversation.item.create",
+                                    "item": {
+                                        "type": "message",
+                                        "role": "user",
+                                        "content": [{
+                                            "type": "input_text",
+                                            "text": "[SYSTEM: Cannot transfer call - account has insufficient credits. Politely apologize and inform the caller that they need to add more credits to their account to use the transfer feature.]"}]}}))
+                                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                        except Exception as e:
+                            logger.error(f"[{self.call_uuid}] Error sending insufficient credits message: {e}")
+                        
+                        return  # Cancel transfer
+                    
+                    elif credits_remaining < 5:
+                        logger.warning(f"[{self.call_uuid}] ⚠️ LOW CREDITS for transfer (balance: {credits_remaining})")
+            
+            # Extract person name from the detected sentence (e.g., "Andy")
+            import re
+            person_name = "them"  # Default fallback
+            
+            # Try to extract name after common patterns
+            name_patterns = [
+                r"transfer.*?to\s+(\w+)",
+                r"put you through to\s+(\w+)",
+                r"connect you.*?to\s+(\w+)",
+                r"pass you to\s+(\w+)"
+            ]
+            
+            for pattern in name_patterns:
+                match = re.search(pattern, detected_sentence.lower())
+                if match:
+                    person_name = match.group(1).capitalize()
+                    break
+            
+            # Normalize phone number for Vonage (E.164 format)
+            # If it starts with '0', replace with '44' (assuming UK for now as per context)
+            original_number = transfer_number
+            if transfer_number.startswith('0'):
+                transfer_number = '44' + transfer_number[1:]
+                logger.info(f"[{self.call_uuid}] 📞 Normalized UK number: {original_number} → {transfer_number}")
+            
+            # Generate fixed transfer message
+            transfer_message = f"OK, I'll try and transfer you to {person_name}. Please hold a moment."
+            logger.info(f"[{self.call_uuid}] 🔊 Playing transfer message: {transfer_message}")
+            
+            # Store person name for potential failed transfer handling
+            self._transfer_person_name = person_name
+            
+            # Mark that we're transferring to prevent session cleanup
+            self._is_transferring = True
+            logger.info(f"[{self.call_uuid}] 🔄 Marked session as transferring")
+            
+            # Play fixed message using Speechmatics TTS
+            try:
+                speechmatics_api_key = CONFIG.get('SPEECHMATICS_API_KEY', '')
+                if not speechmatics_api_key:
+                    logger.error(f"[{self.call_uuid}] No Speechmatics API key available for transfer message")
+                else:
+                    import aiohttp
+                    speechmatics_url = "https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000"
+                    headers = {"Authorization": f"Bearer {speechmatics_api_key}"}
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(speechmatics_url, headers=headers, json={"text": transfer_message}) as resp:
+                            if resp.status == 200:
+                                audio_data = await resp.read()
+                                logger.info(f"[{self.call_uuid}] 📻 Received {len(audio_data)} bytes of transfer message audio")
+                                
+                                # Send audio in chunks
+                                chunk_size = 6400  # 200ms chunks
+                                for i in range(0, len(audio_data), chunk_size):
+                                    chunk = audio_data[i:i + chunk_size]
+                                    if self.vonage_ws and self.is_active:
+                                        await self._send_vonage_audio_bytes(chunk)
+                                
+                                logger.info(f"[{self.call_uuid}] ✅ Transfer message played successfully")
+                                
+                                # Wait for message to play completely
+                                await asyncio.sleep(2)
+                            else:
+                                logger.error(f"[{self.call_uuid}] Speechmatics TTS failed with status {resp.status}")
+            except Exception as tts_error:
+                logger.error(f"[{self.call_uuid}] TTS error during transfer: {tts_error}", exc_info=True)
+            
+            # Execute Vonage transfer API call
+            logger.info(f"[{self.call_uuid}] 📞 Executing Vonage transfer to {transfer_number}")
+            
+            # Import required libraries
+            import aiohttp
+            
+            # Generate JWT for Vonage API authentication
+            jwt_token = self._generate_vonage_jwt()
+            if not jwt_token:
+                logger.error(f"[{self.call_uuid}] Cannot execute transfer - failed to generate JWT")
+                return
+            
+            import urllib.parse
+
+            # Vonage call control uses PUT /v1/calls/{uuid} with {"action":"transfer", ...}
+            # (There is no /transfer sub-resource.)
+            transfer_url = f"https://api.nexmo.com/v1/calls/{self.call_uuid}"
+
+            # Vonage expects destination NCCO to be provided by URL.
+            # We serve it from this same app to ensure consistent formatting.
+            # Include 'from' parameter as shown in Vonage transfer documentation
+            # Use the inbound Vonage number (self.called) as the caller ID
+            # Also include uuid for transfer event tracking
+            transfer_params = {"to": transfer_number, "uuid": self.call_uuid}
+            if self.called:
+                transfer_params["from"] = self.called
+            
+            transfer_ncco_url = (
+                f"{CONFIG['PUBLIC_URL']}/webhooks/transfer-ncco?"
+                + urllib.parse.urlencode(transfer_params)
+            )
+
+            transfer_data = {
+                "action": "transfer",
+                "destination": {
+                    "type": "ncco",
+                    "url": [transfer_ncco_url],
+                },
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {jwt_token}",
+                "Content-Type": "application/json"
+            }
+            
+            logger.info(f"[{self.call_uuid}] 📡 Transfer request URL: {transfer_url}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.put(transfer_url, json=transfer_data, headers=headers) as resp:
+                    if resp.status in (200, 204):
+                        logger.info(f"[{self.call_uuid}] ✅ Transfer initiated - keeping session alive for potential reconnect")
+                        # DO NOT close the session - keep it alive so the call can reconnect via websocket if transfer fails
+                        # The transfer NCCO has fallback actions that will reconnect to this websocket
+                    else:
+                        error_text = await resp.text()
+                        logger.error(f"[{self.call_uuid}] Transfer failed with status {resp.status}: {error_text}")
+                        if resp.status == 401:
+                            logger.error(f"[{self.call_uuid}] ⚠️ Authentication failed. Check if private.key exists and is valid.")
+        
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Auto-transfer error: {e}", exc_info=True)
+    
+    def _generate_vonage_jwt(self):
+        """Generate Vonage JWT for API authentication"""
+        try:
+            import jwt
+            import time
+            import uuid as uuid_lib
+
+            # Vonage Voice API transfer requires an *application* JWT signed
+            # with the Vonage application's private key (RS256), not API key/secret.
+            application_id = (CONFIG.get("VONAGE_APPLICATION_ID") or "").strip()
+            private_key_pem = (CONFIG.get("VONAGE_PRIVATE_KEY_PEM") or "").strip()
+            private_key_path = (CONFIG.get("VONAGE_PRIVATE_KEY_PATH") or "private.key").strip()
+
+            if not application_id:
+                logger.error(f"[{self.call_uuid}] Cannot generate JWT - missing VONAGE_APPLICATION_ID")
+                return None
+
+            if not private_key_pem:
+                # Fall back to file-based key.
+                if not os.path.isabs(private_key_path):
+                    private_key_path = os.path.join(os.path.dirname(__file__), private_key_path)
+
+                if not os.path.exists(private_key_path):
+                    logger.error(
+                        f"[{self.call_uuid}] Cannot generate JWT - private key not configured (no PEM in Super Admin) and file not found at: {private_key_path}"
+                    )
+                    return None
+
+                try:
+                    with open(private_key_path, "r", encoding="utf-8") as f:
+                        private_key_pem = f.read().strip()
+                except Exception as read_err:
+                    logger.error(
+                        f"[{self.call_uuid}] Cannot generate JWT - failed to read private key file: {read_err}",
+                        exc_info=True,
+                    )
+                    return None
+
+            now = int(time.time())
+            payload = {
+                "application_id": application_id,
+                "iat": now,
+                "exp": now + 3600,  # 1 hour expiry
+                "jti": str(uuid_lib.uuid4()),
+            }
+
+            # DEBUG: Log JWT details
+            logger.info(f"[{self.call_uuid}] 🔐 JWT Payload: {payload}")
+            logger.info(f"[{self.call_uuid}] 🔐 Application ID: {application_id}")
+            logger.info(f"[{self.call_uuid}] 🔐 Private Key Length: {len(private_key_pem)} chars")
+            logger.info(f"[{self.call_uuid}] 🔐 Private Key starts with: {private_key_pem[:50]}")
+            
+            try:
+                token = jwt.encode(payload, private_key_pem, algorithm="RS256")
+                if isinstance(token, bytes):
+                    token = token.decode('utf-8')
+                
+                # Decode to verify
+                decoded = jwt.decode(token, options={"verify_signature": False})
+                logger.info(f"[{self.call_uuid}] ✅ Generated Vonage JWT token")
+                logger.info(f"[{self.call_uuid}] 🔐 Decoded JWT: {decoded}")
+                logger.info(f"[{self.call_uuid}] 🔐 JWT Token (first 100 chars): {token[:100]}")
+                return token
+            except Exception as jwt_err:
+                logger.error(f"[{self.call_uuid}] ❌ JWT encode error: {jwt_err}", exc_info=True)
+                return None
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Failed to generate JWT: {e}", exc_info=True)
+            return None
+    
+    async def _handle_failed_transfer(self, reason_text: str, person_name: str):
+        """
+        Handle a failed transfer by informing the caller via AI.
+        Injects a conversation item so AI knows transfer failed and can respond appropriately.
+        """
+        logger.info(f"[{self.call_uuid}] 🔄 Handling failed transfer: {person_name} {reason_text}")
+        
+        try:
+            # First, play a fixed message using Speechmatics TTS
+            failed_message = "I'm really sorry but it appears the person you're trying to connect to is not answering."
+            logger.info(f"[{self.call_uuid}] 🔊 Playing failed transfer message: {failed_message}")
+            
+            try:
+                speechmatics_api_key = CONFIG.get('SPEECHMATICS_API_KEY', '')
+                if speechmatics_api_key:
+                    import aiohttp
+                    speechmatics_url = "https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000"
+                    headers = {"Authorization": f"Bearer {speechmatics_api_key}"}
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(speechmatics_url, headers=headers, json={"text": failed_message}) as resp:
+                            if resp.status == 200:
+                                audio_data = await resp.read()
+                                logger.info(f"[{self.call_uuid}] 📻 Received {len(audio_data)} bytes of failed transfer audio")
+                                
+                                # Send audio in chunks to Vonage
+                                chunk_size = 6400  # 200ms chunks
+                                for i in range(0, len(audio_data), chunk_size):
+                                    chunk = audio_data[i:i + chunk_size]
+                                    if self.vonage_ws and self.is_active:
+                                        await self._send_vonage_audio_bytes(chunk)
+                                
+                                logger.info(f"[{self.call_uuid}] ✅ Failed transfer message played successfully")
+                                
+                                # Wait for message to finish playing
+                                await asyncio.sleep(2)
+                            else:
+                                logger.error(f"[{self.call_uuid}] Speechmatics TTS failed with status {resp.status}")
+                else:
+                    logger.warning(f"[{self.call_uuid}] No Speechmatics API key - skipping audio message")
+            except Exception as tts_error:
+                logger.error(f"[{self.call_uuid}] TTS error during failed transfer: {tts_error}", exc_info=True)
+            
+            # Now check if OpenAI WebSocket is still connected and inject message
+            if not self.openai_ws or self.openai_ws.closed:
+                logger.warning(f"[{self.call_uuid}] ⚠️ OpenAI WebSocket closed, cannot continue conversation")
+                return
+            
+            # Inject a system message telling AI to continue the conversation
+            system_message = "The caller just heard that the person they wanted to reach is not answering. Continue the conversation naturally and offer to help them or arrange a callback."
+            
+            logger.info(f"[{self.call_uuid}] 💬 Injecting system message: {system_message}")
+            
+            # Inject the message into OpenAI conversation
+            await self.openai_ws.send(json.dumps({
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": system_message
+                        }
+                    ]
+                }
+            }))
+            
+            # Trigger a response from the AI
+            await self.openai_ws.send(json.dumps({
+                "type": "response.create"
+            }))
+            
+            logger.info(f"[{self.call_uuid}] ✅ Failed transfer context injected, AI will respond")
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] ❌ Error handling failed transfer: {e}", exc_info=True)
+    
     async def politely_end_call(self):
         """Politely end the call after detecting a sales pitch"""
         goodbye_message = "I appreciate you reaching out, but we're not interested in any sales calls at the moment. Thank you for your time, and have a great day. Goodbye!"
@@ -1910,48 +2670,60 @@ Provide your analysis."""
                     logger.info(f"[{self.call_uuid}] ⚖️ BALANCED MODE: silence={response_latency}ms, prefix=300ms, tokens=300, temp=0.8")
                 
                 # Get voice provider to determine if we need OpenAI audio
-                # NOTE: Some legacy DB values (e.g. 'speechmatics') are not supported for live TTS.
                 voice_provider = getattr(self, 'voice_provider', 'openai')
-                
-                # Configure modalities based on voice provider
-                # If using Cartesia, ElevenLabs, Google, PlayHT, or Speechmatics, we only need text from OpenAI (no audio)
-                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht', 'speechmatics']:
-                    modalities = ["text"]  # Text only - external TTS will handle audio
-                    logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
-                    
-                    # Balanced threshold - filters casual sounds but captures intentional yes/no answers
-                    if voice_provider == 'cartesia':
-                        silence_ms = 500  # Slightly longer to avoid reacting to casual "yeah"
-                        padding_ms = 80
-                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
-                    elif voice_provider == 'speechmatics':
-                        silence_ms = 700  # Longer silence helps filter casual acknowledgments
-                        padding_ms = 250
-                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
-                    else:
-                        silence_ms = 600  # Standard
-                        padding_ms = 300
-                        threshold = 0.75  # Balanced - ignores casual sounds, catches yes/no
 
-                    turn_detection_config = {
-                        "type": "server_vad",
-                        "threshold": threshold,  # Balanced to filter "yeah" but catch "yes"
-                        "prefix_padding_ms": padding_ms,
-                        "silence_duration_ms": silence_ms,  # Slightly longer helps ignore brief sounds
-                        "create_response": True
-                    }
-                    logger.info(f"[{self.call_uuid}] {voice_provider.upper()} VAD: threshold={threshold} (balanced), silence={silence_ms}ms, padding={padding_ms}ms")
+                # If Speechmatics is selected but not configured, fall back to OpenAI audio.
+                if voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
+                    logger.warning(
+                        f"[{self.call_uuid}] Speechmatics selected but SPEECHMATICS_API_KEY missing; falling back to OpenAI audio"
+                    )
+                    voice_provider = 'openai'
+                    try:
+                        self.voice_provider = 'openai'
+                    except Exception:
+                        pass
+
+                # Configure modalities based on voice provider
+                # - For external TTS providers, we typically only need text.
+                # - For Speechmatics, we also request OpenAI audio as a reliability fallback.
+                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht']:
+                    modalities = ["text"]
+                    logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
+                elif voice_provider == 'speechmatics':
+                    modalities = ["text", "audio"]
+                    logger.info(f"[{self.call_uuid}] Using Speechmatics for TTS - OpenAI audio enabled as fallback")
                 else:
-                    modalities = ["text", "audio"]  # OpenAI handles both text and audio
-                    # Balanced threshold and silence - filters casual sounds but catches yes/no answers
-                    turn_detection_config = {
-                        "type": "server_vad",
-                        "threshold": 0.75,  # Balanced - ignores casual "yeah" but catches "yes/no"
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 700,  # Longer silence helps filter casual acknowledgments
-                        "create_response": True
-                    }
-                    logger.info(f"[{self.call_uuid}] OpenAI voice VAD: threshold=0.75 (balanced), silence=700ms")
+                    modalities = ["text", "audio"]
+                    logger.info(f"[{self.call_uuid}] Using OpenAI for TTS")
+
+                # VAD tuning
+                if voice_provider == 'cartesia':
+                    silence_ms = 150
+                    padding_ms = 80
+                    threshold = 0.5
+                elif voice_provider == 'speechmatics':
+                    # Less trigger-happy to avoid talking over callers / reacting to small noises.
+                    silence_ms = 800
+                    padding_ms = 250
+                    threshold = 0.65
+                elif voice_provider in ['elevenlabs', 'google', 'playht']:
+                    silence_ms = max(response_latency, 450)
+                    padding_ms = 300
+                    threshold = 0.5
+                else:
+                    # OpenAI voice: need lower threshold for better conversational flow
+                    silence_ms = response_latency
+                    padding_ms = 200
+                    threshold = 0.5
+
+                turn_detection_config = {
+                    "type": "server_vad",
+                    "threshold": threshold,
+                    "prefix_padding_ms": padding_ms,
+                    "silence_duration_ms": silence_ms,
+                    "create_response": True
+                }
+                logger.info(f"[{self.call_uuid}] VAD: provider={voice_provider}, threshold={threshold}, silence={silence_ms}ms, padding={padding_ms}ms")
                 
                 # Store modalities for greeting to use
                 self.modalities = modalities
@@ -2038,6 +2810,15 @@ You MUST follow these instructions in ALL calls."""
                                 "content": [{"type": "text", "text": global_context}]
                             }
                         }))
+                        
+                        await self.openai_ws.send(json.dumps({
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "message",
+                                "role": "assistant",
+                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
+                            }
+                        }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
                 except Exception as e:
                     logger.warning(f"[{self.call_uuid}] Could not load global instructions: {e}")
@@ -2056,6 +2837,15 @@ You must use ONLY this information when answering questions about services, area
                             "type": "message",
                             "role": "user",
                             "content": [{"type": "text", "text": business_context}]
+                        }
+                    }))
+                    
+                    await self.openai_ws.send(json.dumps({
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
@@ -2122,10 +2912,14 @@ You must use ONLY this information when answering questions about services, area
                     
                 elif event_type == "input_audio_buffer.speech_started":
                     logger.debug(f"[{self.call_uuid}] Caller speaking...")
+                    self._caller_speaking = True
                     self._last_speech_time = asyncio.get_event_loop().time()
+                    self._last_speech_started_at = asyncio.get_event_loop().time()
 
                     voice_provider = getattr(self, 'voice_provider', 'openai')
-                    if voice_provider == 'speechmatics':
+                    # Only stop Speechmatics output immediately if we're currently injecting filler.
+                    # For agent speech, we delay barge-in to avoid cancelling on tiny acknowledgements.
+                    if voice_provider == 'speechmatics' and self._filler_injecting:
                         self._barge_in_stop_speechmatics()
 
                     # Reset filler-per-turn state
@@ -2135,13 +2929,26 @@ You must use ONLY this information when answering questions about services, area
 
                     # If agent is speaking, cancel current response to allow interruption
                     if self._agent_speaking:
-                        logger.info(f"[{self.call_uuid}] Caller interrupted - canceling response")
-                        await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-                        self._agent_speaking = False
+                        # Delay barge-in slightly: if the caller only says "ok/right/yeah" we keep speaking.
+                        # If they keep talking past the threshold, we cancel in _maybe_barge_in_after_delay().
+                        if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
+                            self._pending_barge_in_started_at = asyncio.get_event_loop().time()
+                            self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
                     logger.debug(f"[{self.call_uuid}] Caller stopped speaking")
+                    self._caller_speaking = False
                     self._last_speech_time = asyncio.get_event_loop().time()
+
+                    # Estimate how long the caller spoke using VAD timing. This lets us ignore tiny
+                    # one-word/backchannel bursts before we even have a transcript.
+                    now_t = asyncio.get_event_loop().time()
+                    if self._last_speech_started_at is not None:
+                        self._last_speech_duration_seconds = max(0.0, now_t - self._last_speech_started_at)
+                    else:
+                        self._last_speech_duration_seconds = 0.0
+                    self._last_speech_started_at = None
+
                     # Mark time when user stops speaking for latency tracking (use time.time() for consistency)
                     import time
                     self._speech_stopped_time = time.time()
@@ -2154,7 +2961,21 @@ You must use ONLY this information when answering questions about services, area
                     # For Speechmatics we must overlap LLM generation with the filler,
                     # otherwise you effectively wait: filler + LLM + Speechmatics.
                     voice_provider = getattr(self, 'voice_provider', 'openai')
-                    if voice_provider == 'speechmatics' and self.openai_ws:
+
+                    min_turn = CONFIG.get("MIN_USER_TURN_SECONDS", self._min_user_turn_seconds)
+                    try:
+                        min_turn = float(min_turn)
+                    except Exception:
+                        min_turn = self._min_user_turn_seconds
+
+                    # IMPORTANT: if the agent is currently speaking, a short backchannel ("ok/yeah") can produce
+                    # speech_stopped events; do not trigger a new response in that case.
+                    if (
+                        voice_provider == 'speechmatics'
+                        and self.openai_ws
+                        and not self._agent_speaking
+                        and self._last_speech_duration_seconds >= min_turn
+                    ):
                         # Start the LLM response immediately (best-effort cancel prior).
                         try:
                             await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
@@ -2165,9 +2986,19 @@ You must use ONLY this information when answering questions about services, area
                             logger.info(f"[{self.call_uuid}] ✅ AI response triggered immediately (overlapping with filler)")
                         except Exception as e:
                             logger.warning(f"[{self.call_uuid}] Failed to create response: {e}")
+                    elif voice_provider == 'speechmatics' and not self._agent_speaking and self._last_speech_duration_seconds < min_turn:
+                        logger.info(
+                            f"[{self.call_uuid}] 💤 Ignoring very short utterance ({self._last_speech_duration_seconds:.2f}s) - no filler/response"
+                        )
 
                     # Play ONE filler after the user stops speaking (Speechmatics only)
-                    if voice_provider == 'speechmatics' and not self._filler_played_for_turn and not self._filler_injecting and not self._agent_speaking:
+                    if (
+                        voice_provider == 'speechmatics'
+                        and not self._filler_played_for_turn
+                        and not self._filler_injecting
+                        and not self._agent_speaking
+                        and self._last_speech_duration_seconds >= min_turn
+                    ):
                         candidate = self._pick_random_global_filler("sarah")
                         if candidate and self.vonage_ws:
                             audio_path, phrase = candidate
@@ -2192,9 +3023,210 @@ You must use ONLY this information when answering questions about services, area
                     
                 elif event_type == "conversation.item.input_audio_transcription.completed":
                     transcript = event.get("transcript", "")
+                    # If the caller is just backchanneling while the agent is talking, ignore it:
+                    # don't stop TTS, and cancel any auto-response triggered by that utterance.
+                    # Also ignore pure backchannels even when the agent is not speaking ("ok", "yeah", etc.)
+                    # to prevent filler/LLM turns from firing on acknowledgements.
+                    ignore_always = bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True))
+                    if self._is_backchannel_utterance(transcript) and (ignore_always or self._agent_speaking or self._caller_speaking):
+                        logger.info(f"[{self.call_uuid}] 💤 Ignoring backchannel: {transcript!r}")
+
+                        # Best-effort: delete the underlying conversation item so it doesn't linger in context
+                        # and get "responded to" later.
+                        item_id = event.get("item_id")
+                        if not item_id:
+                            item = event.get("item") if isinstance(event.get("item"), dict) else None
+                            if item:
+                                item_id = item.get("id")
+                        if item_id and self.openai_ws:
+                            try:
+                                await self.openai_ws.send(json.dumps({
+                                    "type": "conversation.item.delete",
+                                    "item_id": item_id
+                                }))
+                                logger.debug(f"[{self.call_uuid}] 🗑️ Deleted backchannel item: {item_id}")
+                            except Exception:
+                                pass
+
+                        # Best-effort cancel any response OpenAI started for this utterance.
+                        try:
+                            if self.openai_ws:
+                                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                        except Exception:
+                            pass
+                        # Drop any trailing audio/text deltas that might already be in flight.
+                        self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.5
+                        continue
+
                     logger.info(f"[{self.call_uuid}] 📞 Caller: {transcript}")
                     self.transcript_parts.append(f"Caller: {transcript}")
                     self._last_speech_time = asyncio.get_event_loop().time()
+
+                    # ------------------------------------------------------------------
+                    # Transfer-by-name offering (up to 5 configured names)
+                    # If caller asks for a configured person, offer transfer; transfer only on confirmation.
+                    # ------------------------------------------------------------------
+                    transfer_number = getattr(self, 'transfer_number', '')
+                    transfer_people = getattr(self, 'transfer_people', []) or []
+
+                    now_ts = asyncio.get_event_loop().time()
+                    pending_name = getattr(self, '_pending_transfer_person_name', '') or ''
+                    pending_expires = float(getattr(self, '_pending_transfer_expires_at', 0) or 0)
+
+                    # Expire pending confirmation window
+                    if pending_name and pending_expires and now_ts > pending_expires:
+                        self._pending_transfer_person_name = ""
+                        self._pending_transfer_expires_at = 0
+                        pending_name = ""
+
+                    if pending_name and transfer_number:
+                        low = (transcript or "").strip().lower()
+                        yes_markers = [
+                            "yes", "yeah", "yep", "ok", "okay", "sure", "please", "go ahead",
+                            "do it", "transfer", "put me through", "connect me"
+                        ]
+                        no_markers = ["no", "nope", "nah", "no thanks", "not now", "don't", "do not"]
+
+                        if any(m in low for m in yes_markers):
+                            logger.info(f"[{self.call_uuid}] ✅ Transfer confirmed to {pending_name}")
+                            self._pending_transfer_person_name = ""
+                            self._pending_transfer_expires_at = 0
+
+                            # Cancel any active OpenAI response and stop Speechmatics output
+                            try:
+                                if self.openai_ws:
+                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                            except Exception:
+                                pass
+                            self._barge_in_stop_speechmatics()
+                            self._speechmatics_pending_text = ""
+
+                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"transfer to {pending_name}"))
+                            continue
+
+                        if any(m in low for m in no_markers):
+                            logger.info(f"[{self.call_uuid}] 🚫 Transfer declined (asked for {pending_name})")
+                            self._pending_transfer_person_name = ""
+                            self._pending_transfer_expires_at = 0
+                            try:
+                                if self.openai_ws:
+                                    await self.openai_ws.send(json.dumps({
+                                        "type": "conversation.item.create",
+                                        "item": {
+                                            "type": "message",
+                                            "role": "user",
+                                            "content": [{
+                                                "type": "input_text",
+                                                "text": "[SYSTEM: The caller declined a transfer. Acknowledge and continue helping normally.]"
+                                            }]
+                                        }
+                                    }))
+                                    await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                            except Exception:
+                                pass
+                            continue
+
+                    # Detect name request (only if we are not already awaiting confirmation)
+                    if transfer_number and transcript and transfer_people and not pending_name:
+                        low = transcript.lower()
+                        matched_person = None
+
+                        for person in transfer_people[:5]:
+                            p = (person or "").strip()
+                            if not p:
+                                continue
+                            p_low = p.lower()
+                            if " " in p_low:
+                                if p_low in low:
+                                    matched_person = p
+                                    break
+                            else:
+                                try:
+                                    import re
+                                    if re.search(r"\b" + re.escape(p_low) + r"\b", low):
+                                        matched_person = p
+                                        break
+                                except Exception:
+                                    if p_low in low:
+                                        matched_person = p
+                                        break
+
+                        if matched_person:
+                            # Only trigger when the caller is identifying themselves (not when asking for that person)
+                            asked_for_markers = [
+                                "speak to", "talk to", "put me through", "connect me", "connect us", "transfer me to",
+                                "can i speak", "could i speak", "can i talk", "could i talk"
+                            ]
+                            if any(m in low for m in asked_for_markers):
+                                matched_person = None
+
+                        if matched_person:
+                            import re
+                            p_low = matched_person.lower()
+                            identity_patterns = [
+                                rf"\\b(i am|i'm|this is|it'?s|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"\\bcalling from\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"\\bfrom\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"^\\s*(?:the\\s+)?{re.escape(p_low)}\\b"
+                            ]
+                            if any(re.search(pat, low) for pat in identity_patterns):
+                                logger.info(f"[{self.call_uuid}] 📲 Caller identified as '{matched_person}' - offering transfer")
+                                self._pending_transfer_person_name = matched_person
+                                self._pending_transfer_expires_at = now_ts + 30.0
+
+                                # Best-effort cancel any active OpenAI response and force an offer
+                                try:
+                                    if self.openai_ws:
+                                        await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                                except Exception:
+                                    pass
+
+                                try:
+                                    if self.openai_ws:
+                                        await self.openai_ws.send(json.dumps({
+                                            "type": "conversation.item.create",
+                                            "item": {
+                                                "type": "message",
+                                                "role": "user",
+                                                "content": [{
+                                                    "type": "input_text",
+                                                    "text": (
+                                                        f"[SYSTEM: The caller says they are {matched_person}. "
+                                                        f"Offer to transfer them now. Ask a yes/no question. "
+                                                        f"Do not transfer unless they explicitly confirm yes.]"
+                                                    )
+                                                }]
+                                            }
+                                        }))
+                                        await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                except Exception:
+                                    pass
+                                continue
+
+                    # 🔥 AUTO-TRANSFER: Check if caller is requesting a transfer
+                    logger.info(f"[{self.call_uuid}] 🔍 Transfer check: transfer_number='{transfer_number}', transcript='{transcript}'")
+                    
+                    if transfer_number and transcript:
+                        caller_keywords = ["transfer me", "transfer", "speak to someone", "talk to someone", 
+                                          "connect me", "put me through", "real person", "human", "manager"]
+                        if any(keyword in transcript.lower() for keyword in caller_keywords):
+                            logger.info(f"[{self.call_uuid}] 🔥🔥🔥 CALLER REQUESTED TRANSFER: '{transcript}'")
+                            logger.info(f"[{self.call_uuid}] 🔥 USING TRANSFER NUMBER: {transfer_number}")
+                            logger.info(f"[{self.call_uuid}] 🔥 STOPPING OPENAI and executing transfer to {transfer_number}")
+                            
+                            # IMMEDIATELY cancel any active OpenAI response
+                            try:
+                                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                                logger.info(f"[{self.call_uuid}] ✅ Cancelled OpenAI response")
+                            except Exception as e:
+                                logger.warning(f"[{self.call_uuid}] Failed to cancel OpenAI response: {e}")
+                            
+                            # Stop Speechmatics output
+                            self._barge_in_stop_speechmatics()
+                            self._speechmatics_pending_text = ""
+                            
+                            # Execute transfer immediately
+                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"Caller requested: {transcript}"))
 
                     # Check for sales call in background (non-blocking) - don't wait for result
                     if self.sales_detector_enabled:
@@ -2527,7 +3559,7 @@ You must use ONLY this information when answering questions about services, area
                     
                     # Send immediately when buffer reaches minimum - don't wait
                     if len(chunk_buffer) >= min_buffer_size:
-                        await self.vonage_ws.send_bytes(chunk_buffer)
+                        await self._send_vonage_audio_bytes(chunk_buffer)
                         total_bytes += len(chunk_buffer)
                         chunk_count += 1
                         
@@ -2535,14 +3567,18 @@ You must use ONLY this information when answering questions about services, area
                         if first_chunk_time is None:
                             first_chunk_time = (time.time() - start_time) * 1000
                             logger.info(f"[{self.call_uuid}] ⚡ Cartesia 1st chunk: {first_chunk_time:.0f}ms")
-                        
+
+                        # Pace to real-time so Vonage reliably plays audio.
+                        await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
+
                         chunk_buffer = b''
             
             # Send any remaining audio
             if chunk_buffer and self.vonage_ws and self.is_active:
-                await self.vonage_ws.send_bytes(chunk_buffer)
+                await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
+                await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
             
             gen_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ Cartesia: {chunk_count} chunks ({total_bytes}B) in {gen_time:.0f}ms")
@@ -2608,7 +3644,7 @@ You must use ONLY this information when answering questions about services, area
                     
                     # Send when we have enough for smooth playback
                     if len(chunk_buffer) >= min_buffer_size:
-                        await self.vonage_ws.send_bytes(chunk_buffer)
+                        await self._send_vonage_audio_bytes(chunk_buffer)
                         total_bytes += len(chunk_buffer)
                         chunk_count += 1
                         
@@ -2616,14 +3652,18 @@ You must use ONLY this information when answering questions about services, area
                         if first_chunk_time is None:
                             first_chunk_time = (time.time() - start_time) * 1000
                             logger.info(f"[{self.call_uuid}] ⚡ First ElevenLabs chunk in {first_chunk_time:.0f}ms")
-                        
+
+                        # Pace to real-time so Vonage reliably plays audio.
+                        await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
+
                         chunk_buffer = b''
             
             # Send any remaining audio
             if chunk_buffer and self.vonage_ws and self.is_active:
-                await self.vonage_ws.send_bytes(chunk_buffer)
+                await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
+                await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
             
             total_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ ElevenLabs streamed {chunk_count} chunks ({total_bytes} bytes) in {total_time:.0f}ms")
@@ -2709,11 +3749,14 @@ You must use ONLY this information when answering questions about services, area
                         buffered = buffered[chunk_size:]
                         await self._send_vonage_audio_bytes(chunk)
                         chunks_sent += 1
+                        # Pace to real-time so Vonage reliably plays audio.
+                        await asyncio.sleep(len(chunk) / (2 * VONAGE_SAMPLE_RATE))
 
                 # Flush any remainder
                 if buffered and self.is_active and self.vonage_ws and my_generation == self._speechmatics_output_generation:
                     await self._send_vonage_audio_bytes(buffered)
                     chunks_sent += 1
+                    await asyncio.sleep(len(buffered) / (2 * VONAGE_SAMPLE_RATE))
             
             total_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ Speechmatics complete: {total_time:.0f}ms ({chunks_sent} chunks)")
@@ -3171,9 +4214,88 @@ You must use ONLY this information when answering questions about services, area
         """Start background task to listen for OpenAI responses"""
         self._openai_task = asyncio.create_task(self.receive_from_openai())
     
+    def start_credit_monitor(self):
+        """Start background task to monitor credits and disconnect if balance reaches 0"""
+        self._credit_monitor_task = asyncio.create_task(self._monitor_credits())
+    
+    async def _monitor_credits(self):
+        """Monitor account credits and disconnect call if balance <= 0"""
+        try:
+            while self.is_active:
+                await asyncio.sleep(self._credit_check_interval)
+                
+                if not self.user_id:
+                    continue
+                
+                # Check current credit balance
+                import sqlite3
+                conn = sqlite3.connect('call_logs.db')
+                cursor = conn.cursor()
+                cursor.execute('SELECT minutes_remaining FROM account_settings WHERE user_id = ?', (self.user_id,))
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    credits_remaining = result[0]
+                    
+                    if credits_remaining <= 0:
+                        logger.warning(f"[{self.call_uuid}] 🚫 CREDITS DEPLETED (balance: {credits_remaining}) - Disconnecting call for user {self.user_id}")
+                        
+                        # Send farewell message before disconnecting
+                        try:
+                            if self.openai_ws:
+                                await self.openai_ws.send(json.dumps({
+                                    "type": "conversation.item.create",
+                                    "item": {
+                                        "type": "message",
+                                        "role": "user",
+                                        "content": [{
+                                            "type": "input_text",
+                                            "text": "[SYSTEM: Account credits depleted. Politely inform the caller that their account balance has run out and the call must end. Thank them for calling and suggest they contact support to add more credits.]"
+                                        }]
+                                    }
+                                }))
+                                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                
+                                # Wait briefly for the message to be sent
+                                await asyncio.sleep(3)
+                        except Exception as e:
+                            logger.error(f"[{self.call_uuid}] Error sending credit depletion message: {e}")
+                        
+                        # Close the session
+                        await self.close()
+                        
+                        # Close Vonage websocket if it exists
+                        if self.vonage_ws:
+                            try:
+                                await self.vonage_ws.close()
+                            except:
+                                pass
+                        
+                        break
+                    
+                    elif credits_remaining <= 5:
+                        # Warn when credits are low (only once)
+                        if not hasattr(self, '_low_credit_warning_sent'):
+                            self._low_credit_warning_sent = True
+                            logger.warning(f"[{self.call_uuid}] ⚠️ LOW CREDITS WARNING (balance: {credits_remaining}) for user {self.user_id}")
+                
+        except asyncio.CancelledError:
+            logger.info(f"[{self.call_uuid}] Credit monitoring cancelled")
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Error in credit monitoring: {e}", exc_info=True)
+    
     async def close(self):
         """Clean up the session"""
         self.is_active = False
+        
+        # Cancel credit monitoring
+        if self._credit_monitor_task:
+            self._credit_monitor_task.cancel()
+            try:
+                await self._credit_monitor_task
+            except asyncio.CancelledError:
+                pass
         
         # Cancel timeout monitoring
         if self._timeout_task:
@@ -3246,7 +4368,7 @@ class SessionManager:
                     SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
                            calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
                            business_info, agent_personality, agent_instructions, agent_name,
-                           call_greeting
+                           call_greeting, transfer_number, transfer_people
                     FROM account_settings WHERE user_id = ?
                 ''', (user_id,))
                 row = cursor.fetchone()
@@ -3262,6 +4384,20 @@ class SessionManager:
                     session.agent_instructions = row[13] if len(row) > 13 and row[13] else "Answer questions about the business. Take messages if needed."
                     session.agent_name = row[14] if len(row) > 14 and row[14] else CONFIG['AGENT_NAME']
                     session.call_greeting = row[15] if len(row) > 15 and row[15] else ""
+                    session.transfer_number = row[16] if len(row) > 16 and row[16] else ""
+                    if session.transfer_number:
+                        logger.info(f"[{call_uuid}] ⚡ Transfer number configured: {session.transfer_number}")
+
+                    # Transfer-by-name offering list
+                    session.transfer_people = []
+                    try:
+                        import json as _json
+                        raw_people = row[17] if len(row) > 17 and row[17] else "[]"
+                        parsed = _json.loads(raw_people) if isinstance(raw_people, str) else raw_people
+                        if isinstance(parsed, list):
+                            session.transfer_people = [str(p).strip() for p in parsed if str(p).strip()][:5]
+                    except Exception:
+                        session.transfer_people = []
                     logger.info(f"[{call_uuid}] Loaded business config:")
                     logger.info(f"[{call_uuid}]   - Agent Name: {session.agent_name}")
                     logger.info(f"[{call_uuid}]   - Business Info: {session.business_info[:100] if session.business_info else '(empty)'}...")
@@ -3374,9 +4510,11 @@ class SessionManager:
     
     async def close_session(self, call_uuid: str):
         """Close and remove a session"""
-        if call_uuid in self._sessions:
-            await self._sessions[call_uuid].close()
-            del self._sessions[call_uuid]
+        # Multiple end-of-call paths can race (webhook events, transfer, internal close).
+        # Pop first to make this idempotent and avoid KeyError.
+        session = self._sessions.pop(call_uuid, None)
+        if session:
+            await session.close()
     
     async def close_all(self):
         """Close all sessions"""
@@ -3396,6 +4534,32 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Vonage Voice Agent starting...")
     logger.info(f"📞 Answer URL: {CONFIG['PUBLIC_URL']}/webhooks/answer")
     logger.info(f"📋 Event URL: {CONFIG['PUBLIC_URL']}/webhooks/events")
+
+    # If any account has auto-transfer enabled, ensure Vonage app auth is configured.
+    try:
+        application_id = (CONFIG.get("VONAGE_APPLICATION_ID") or "").strip()
+        private_key_path = (CONFIG.get("VONAGE_PRIVATE_KEY_PATH") or "private.key").strip()
+        private_key_pem = (CONFIG.get("VONAGE_PRIVATE_KEY_PEM") or "").strip()
+        if not os.path.isabs(private_key_path):
+            private_key_path = os.path.join(os.path.dirname(__file__), private_key_path)
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM account_settings WHERE transfer_number IS NOT NULL AND TRIM(transfer_number) != ''"
+        )
+        transfer_enabled_count = int(cur.fetchone()[0] or 0)
+        conn.close()
+
+        if transfer_enabled_count > 0:
+            if not application_id:
+                logger.error("⚠️ Auto-transfer is configured, but VONAGE_APPLICATION_ID is missing. Transfers will fail.")
+            if not private_key_pem and not os.path.exists(private_key_path):
+                logger.error(
+                    f"⚠️ Auto-transfer is configured, but Vonage private key is missing (no PEM in Super Admin) and file not found: {private_key_path}. Transfers will fail."
+                )
+    except Exception as e:
+        logger.warning(f"Startup transfer config check failed: {e}")
     yield
     logger.info("Shutting down...")
     await sessions.close_all()
@@ -3499,6 +4663,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
     agent_personality = 'Friendly and professional. Keep responses brief and conversational.'
     agent_instructions = 'Answer questions about the business. Take messages if needed.'
     call_greeting = ''
+    transfer_number = ''
+    transfer_people = []
     calendar_booking_enabled = True
     tasks_enabled = True
     advanced_voice_enabled = False
@@ -3513,7 +4679,7 @@ async def get_config(authorization: Optional[str] = Header(None)):
                        response_latency, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
                        agent_name, business_info, agent_personality, agent_instructions,
                        calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
-                       call_greeting
+                       call_greeting, transfer_number, transfer_people, first_login_completed
                 FROM account_settings WHERE user_id = ?
             ''', (user_id,))
             row = cursor.fetchone()
@@ -3559,6 +4725,21 @@ async def get_config(authorization: Optional[str] = Header(None)):
                     sales_detector_enabled = bool(row[16])
                 if len(row) > 17 and row[17]:
                     call_greeting = row[17]
+                if len(row) > 18 and row[18]:
+                    transfer_number = row[18]
+
+                # transfer_people stored as JSON array string
+                try:
+                    import json as _json
+                    raw_people = row[19] if len(row) > 19 and row[19] else "[]"
+                    parsed = _json.loads(raw_people) if isinstance(raw_people, str) else raw_people
+                    if isinstance(parsed, list):
+                        transfer_people = [str(p).strip() for p in parsed if str(p).strip()]
+                        transfer_people = transfer_people[:5]
+                except Exception:
+                    transfer_people = []
+
+                first_login_completed = bool(row[20]) if len(row) > 20 and row[20] is not None else False
         except Exception as e:
             logger.error(f"Failed to load user config: {e}")
     
@@ -3607,7 +4788,10 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "CALENDAR_BOOKING_CREDITS": calendar_credits,
         "TASK_CREDITS": task_credits,
         "ADVANCED_VOICE_CREDITS": voice_credits,
-        "SALES_DETECTOR_CREDITS": sales_credits
+        "SALES_DETECTOR_CREDITS": sales_credits,
+        "TRANSFER_NUMBER": transfer_number,
+        "TRANSFER_PEOPLE": transfer_people,
+        "FIRST_LOGIN_COMPLETED": first_login_completed
     }
 
 
@@ -3632,6 +4816,40 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             logger.info(f"Agent name updated to {data['AGENT_NAME']} for user {user_id}")
         
         if "BUSINESS_INFO" in data:
+            # CONTENT MODERATION: Check for inappropriate content
+            business_info = data["BUSINESS_INFO"]
+            
+            # Check if account has been previously suspended (stricter checking)
+            cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+            result = cursor.fetchone()
+            previous_suspensions = result[0] if result and result[0] else 0
+            
+            moderation_result = await moderate_business_content(business_info, user_id, previous_suspensions > 0)
+            
+            if not moderation_result["approved"]:
+                # Content flagged - suspend account
+                from datetime import datetime
+                suspension_reason = moderation_result["reason"]
+                flag_details = moderation_result.get("details", "")
+                
+                cursor.execute('''UPDATE account_settings 
+                                 SET is_suspended = 1, 
+                                     suspension_reason = ?, 
+                                     suspended_at = ?, 
+                                     suspension_count = suspension_count + 1,
+                                     last_flag_details = ?
+                                 WHERE user_id = ?''',
+                             (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                conn.commit()
+                conn.close()
+                
+                logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+                
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Account suspended: {suspension_reason}. Please contact support."
+                )
+            
             CONFIG["BUSINESS_INFO"] = data["BUSINESS_INFO"]
             cursor.execute('UPDATE account_settings SET business_info = ? WHERE user_id = ?', 
                          (data["BUSINESS_INFO"], user_id))
@@ -3679,6 +4897,30 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             cursor.execute('UPDATE account_settings SET phone_number = ? WHERE user_id = ?', 
                          (data["PHONE_NUMBER"], user_id))
             logger.info(f"Phone number updated to {data['PHONE_NUMBER']} for user {user_id}")
+        
+        if "TRANSFER_NUMBER" in data:
+            cursor.execute('UPDATE account_settings SET transfer_number = ? WHERE user_id = ?', 
+                         (data["TRANSFER_NUMBER"], user_id))
+            logger.info(f"Transfer number updated to {data['TRANSFER_NUMBER']} for user {user_id}")
+
+        if "TRANSFER_PEOPLE" in data:
+            # Accept list[str] or a single string (comma/newline separated)
+            raw_people = data.get("TRANSFER_PEOPLE")
+            people_list = []
+            if isinstance(raw_people, list):
+                people_list = [str(p).strip() for p in raw_people if str(p).strip()]
+            elif isinstance(raw_people, str):
+                # Split on newlines or commas
+                parts = [p.strip() for p in raw_people.replace('\r', '\n').split('\n')]
+                if len(parts) == 1:
+                    parts = [p.strip() for p in raw_people.split(',')]
+                people_list = [p for p in parts if p]
+            people_list = people_list[:5]
+
+            import json as _json
+            cursor.execute('UPDATE account_settings SET transfer_people = ? WHERE user_id = ?',
+                         (_json.dumps(people_list), user_id))
+            logger.info(f"Transfer people updated for user {user_id}: {people_list}")
         
         if "RESPONSE_LATENCY" in data:
             cursor.execute('UPDATE account_settings SET response_latency = ? WHERE user_id = ?', 
@@ -3931,6 +5173,28 @@ async def status():
             "websocket": f"wss://{CONFIG['PUBLIC_URL'].replace('https://', '')}/socket/{{call_uuid}}"
         }
     }
+
+
+@app.post("/api/complete-first-login")
+async def complete_first_login(authorization: Optional[str] = Header(None)):
+    """Mark user's first login as completed"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE account_settings SET first_login_completed = 1 WHERE user_id = ?',
+            (user_id,)
+        )
+        conn.commit()
+        conn.close()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Failed to complete first login: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 @app.get("/api/calls")
@@ -4335,7 +5599,8 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
         # Get all calls for this user
         cursor.execute('''
             SELECT call_uuid, start_time, duration, caller_number, summary, 
-                   booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged, sales_confidence
+                   booking_credits_charged, task_credits_charged, advanced_voice_credits_charged, sales_detector_credits_charged, sales_confidence,
+                   transfer_initiated, transfer_duration, transfer_credits_charged
             FROM calls 
             WHERE user_id = ?
             ORDER BY start_time DESC
@@ -4345,7 +5610,7 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
         total_credits = 0
         
         for row in cursor.fetchall():
-            call_uuid, start_time, duration, caller_number, summary, booking_charged, task_charged, voice_charged, sales_charged, sales_conf = row
+            call_uuid, start_time, duration, caller_number, summary, booking_charged, task_charged, voice_charged, sales_charged, sales_conf, transfer_initiated, transfer_duration, transfer_charged = row
             
             # Calculate credits for this call
             call_credits = credits_per_call  # Connection charge
@@ -4362,8 +5627,8 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
                 call_credits += voice_charged
             if sales_charged:
                 call_credits += sales_charged
-            if voice_charged:
-                call_credits += voice_charged
+            if transfer_charged:
+                call_credits += transfer_charged
             
             total_credits += call_credits
             
@@ -4377,6 +5642,8 @@ async def get_billing_history(authorization: Optional[str] = Header(None)):
                 breakdown.append(f"{voice_charged} credits for advanced voice")
             if sales_charged:
                 breakdown.append(f"{sales_charged} credits for sales detection")
+            if transfer_charged:
+                breakdown.append(f"{transfer_charged:.2f} credits for transfer")
             
             calls.append({
                 "type": "call",
@@ -5714,20 +6981,29 @@ async def generate_global_speechmatics_fillers(request: Request):
 
 @app.post("/api/super-admin/regenerate-filler/{filler_num}")
 async def regenerate_global_filler(filler_num: int, request: Request):
-    """Regenerate a single global filler with a new random phrase"""
+    """Regenerate a single global filler.
+
+    If request JSON includes a non-empty `text`, generate audio from that text.
+    Otherwise, fall back to a random phrase.
+    """
     try:
         body = await request.json()
         use_ai = body.get('use_ai', True)
         voice_id = body.get('voice_id', 'sarah')
+        custom_text = (body.get('text') or '').strip()
         
         logger.info(f"🔁 Regenerating global filler {filler_num}")
         
-        # Random filler phrases to choose from
-        import random
+        phrase = custom_text
+        if not phrase:
+            # Random filler phrases to choose from
+            import random
+            all_phrases = resolved_filler_phrases(min_count=18)
+            phrase = random.choice(all_phrases)
 
-        all_phrases = resolved_filler_phrases(min_count=18)
-        
-        phrase = random.choice(all_phrases)
+        # Keep filler clips short/snappy
+        if len(phrase) > 220:
+            phrase = phrase[:220]
         
         speechmatics_api_key = CONFIG.get("SPEECHMATICS_API_KEY")
         if not speechmatics_api_key:
@@ -5771,7 +7047,7 @@ async def regenerate_global_filler(filler_num: int, request: Request):
                 "text": phrase,
                 "voice_id": voice_id,
                 "updated_at": datetime.utcnow().isoformat() + "Z",
-                "source": "regenerate",
+                "source": "custom_text" if custom_text else "regenerate",
             },
         )
 
@@ -6196,6 +7472,124 @@ async def get_logs():
     return {"logs": logs}
 
 
+@app.post("/api/admin/analyze-website")
+async def analyze_website(request: Request):
+    """Analyze a website URL and extract business information using DeepSeek AI"""
+    try:
+        data = await request.json()
+        url = data.get('url', '').strip()
+        
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+        
+        logger.info(f"🌐 Analyzing website: {url}")
+        
+        # Fetch website content
+        import aiohttp
+        from bs4 import BeautifulSoup
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as response:
+                    if response.status != 200:
+                        raise HTTPException(status_code=400, detail=f"Failed to fetch website (HTTP {response.status})")
+                    
+                    html_content = await response.text()
+                    
+                    # Parse HTML with BeautifulSoup
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    
+                    # Remove script, style, and other non-content elements
+                    for element in soup(['script', 'style', 'nav', 'footer', 'header', 'aside']):
+                        element.decompose()
+                    
+                    # Extract text content
+                    text_content = soup.get_text(separator=' ', strip=True)
+                    
+                    # Limit content length to avoid token limits
+                    max_chars = 8000
+                    if len(text_content) > max_chars:
+                        text_content = text_content[:max_chars] + "..."
+                    
+        except aiohttp.ClientError as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch website: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error parsing website: {str(e)}")
+        
+        # Use DeepSeek to analyze and extract business information
+        deepseek_api_key = CONFIG.get('DEEPSEEK_API_KEY', '').strip()
+        
+        if not deepseek_api_key:
+            raise HTTPException(status_code=400, detail="DeepSeek API key not configured")
+        
+        logger.info(f"🤖 Using DeepSeek AI to extract business information...")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    'https://api.deepseek.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {deepseek_api_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': 'deepseek-chat',
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': '''You are a business information extraction AI. Extract comprehensive business information from website content and format it in FIRST PERSON (we/our/us) for an AI phone answering agent.
+
+Extract and include ALL relevant details:
+- Full range of products/services offered (be specific and detailed)
+- Pricing information (exact prices, price ranges, packages, discounts)
+- Business hours and availability
+- Service areas, locations, delivery options
+- Contact methods (phone, email, online forms)
+- Unique selling points, specialties, expertise
+- Company background, mission, values if mentioned
+- Customer service policies, guarantees, warranties
+- Any special programs, memberships, or loyalty options
+- Popular items, bestsellers, featured products
+- Technical specifications or product details when available
+
+Write in first person as if YOU are the business. Use "we", "our", "us" - NEVER use "they" or "the company".
+Be comprehensive but organized. Aim for 8-12 detailed sentences covering all aspects.
+Make it conversational and informative so an AI agent can answer customer questions confidently.'''
+                            },
+                            {
+                                'role': 'user',
+                                'content': f'Extract detailed business information from this website content and write it in first person:\n\n{text_content}'
+                            }
+                        ],
+                        'temperature': 0.3,
+                        'max_tokens': 1500
+                    }
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"DeepSeek API error: {error_text}")
+                        raise HTTPException(status_code=500, detail="DeepSeek API request failed")
+                    
+                    result = await response.json()
+                    business_info = result['choices'][0]['message']['content'].strip()
+                    
+                    logger.info(f"✅ Successfully extracted business information ({len(business_info)} chars)")
+                    
+                    return {
+                        'business_info': business_info,
+                        'url': url
+                    }
+                    
+        except aiohttp.ClientError as e:
+            raise HTTPException(status_code=500, detail=f"DeepSeek API error: {str(e)}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Website analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/admin/diagnostics")
 async def run_diagnostics():
     """Run comprehensive system diagnostics and auto-fix issues"""
@@ -6475,7 +7869,7 @@ async def answer_call(request: Request):
         WHERE a.phone_number IN (?, ?, ?, ?)
     ''', tuple(called_candidates[:4]))
     result = cursor.fetchone()
-    
+
     if not result:
         # No user assigned - auto-create a new account for this number
         logger.warning(f"⚠️ Phone number {called} not assigned - creating auto-account")
@@ -6572,6 +7966,101 @@ async def answer_call(request: Request):
     return JSONResponse(ncco)
 
 
+@app.api_route("/webhooks/transfer-ncco", methods=["GET", "POST"])
+async def transfer_ncco(request: Request, to: str = "", from_number: str = Query("", alias="from"), uuid: str = ""):
+    """NCCO used for call transfer/connect.
+
+    Vonage call transfer expects destination to be a URL returning NCCO.
+    Query params:
+    - to: destination number (digits, e.g. 4479...; '+' is tolerated)
+    - from: optional caller ID / originating number
+    - uuid: original call UUID for tracking
+    """
+    to = (to or "").strip().replace("+", "")
+    from_num = (from_number or "").strip().replace("+", "")
+    call_uuid = (uuid or "").strip()
+    logger.info(f"📡 transfer-ncco request ({request.method}) to={to!r} from={from_num!r} uuid={call_uuid!r}")
+    if not to:
+        return JSONResponse({"error": "Missing 'to' query param"}, status_code=400)
+
+    # Build simple connect action
+    connect_action = {
+        "action": "connect",
+        "endpoint": [{"type": "phone", "number": to}]
+    }
+    
+    # Add "from" parameter if provided (required for some Vonage accounts)
+    if from_num:
+        connect_action["from"] = from_num
+    
+    # Add eventUrl to track transfer status and duration for billing
+    if call_uuid:
+        connect_action["eventUrl"] = [f"{CONFIG['PUBLIC_URL']}/webhooks/transfer-event?original_uuid={call_uuid}"]
+    
+    return JSONResponse([connect_action])
+
+
+@app.post("/webhooks/transfer-event")
+async def transfer_event_webhook(request: Request):
+    """
+    Receives status updates about transfer attempts and tracks transfer duration for billing.
+    """
+    try:
+        body = await request.json()
+        original_uuid = request.query_params.get("original_uuid", "")
+        status = body.get("status", "")
+        direction = body.get("direction", "")
+        duration = body.get("duration", "0")
+        
+        logger.info(f"📞 Transfer event: uuid={original_uuid}, status={status}, direction={direction}, duration={duration}")
+        
+        if direction == "outbound" and status == "answered":
+            logger.info(f"✅ Transfer successful for call {original_uuid}")
+            # Mark transfer as initiated
+            conn = sqlite3.connect('call_logs.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE calls 
+                SET transfer_initiated = 1
+                WHERE call_uuid = ?
+            ''', (original_uuid,))
+            conn.commit()
+            conn.close()
+            
+        elif direction == "outbound" and status == "completed":
+            # Transfer call ended - calculate and store transfer credits
+            try:
+                transfer_duration = int(duration) if duration else 0
+                if transfer_duration > 0:
+                    # Calculate transfer credits: 5 base fee + 3 credits per minute
+                    transfer_minutes = transfer_duration / 60
+                    transfer_credits = 5.0 + (transfer_minutes * 3.0)
+                    
+                    conn = sqlite3.connect('call_logs.db')
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        UPDATE calls 
+                        SET transfer_duration = ?,
+                            transfer_credits_charged = ?
+                        WHERE call_uuid = ?
+                    ''', (transfer_duration, transfer_credits, original_uuid))
+                    conn.commit()
+                    conn.close()
+                    
+                    logger.info(f"💳 Transfer billing: {transfer_duration}s = {transfer_minutes:.2f} min × 3 credits/min + 5 base = {transfer_credits:.2f} credits")
+            except Exception as e:
+                logger.error(f"❌ Error calculating transfer credits: {e}")
+                
+        elif direction == "outbound" and status in ["unanswered", "failed", "rejected", "busy", "timeout"]:
+            logger.warning(f"⚠️ Transfer failed for call {original_uuid}: {status}")
+        
+        return JSONResponse({"status": "ok"})
+    
+    except Exception as e:
+        logger.error(f"❌ Error in transfer event webhook: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 @app.api_route("/webhooks/events", methods=["GET", "POST"])
 async def call_events(request: Request):
     """
@@ -6589,8 +8078,16 @@ async def call_events(request: Request):
     
     call_uuid = data.get("uuid", data.get("conversation_uuid", "unknown"))
     status = data.get("status", "unknown")
+    direction = data.get("direction", "unknown")
+    to_uri = data.get("to", "")
     
-    logger.info(f"📋 Event [{call_uuid}]: {status}")
+    # Log rejection details for debugging transfer failures
+    if status == "rejected":
+        reason = data.get("reason", "unknown")
+        to_number = data.get("to", "unknown")
+        logger.error(f"📋 Event [{call_uuid}]: REJECTED - reason={reason}, direction={direction}, to={to_number}, full_data={data}")
+    else:
+        logger.info(f"📋 Event [{call_uuid}]: {status}")
     
     # Clean up when call ends
     if status in ["completed", "failed", "rejected", "timeout", "cancelled", "busy"]:
@@ -6633,6 +8130,7 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
             return
 
         session.start_openai_listener()
+        session.start_credit_monitor()
     
     # Trigger the AI to greet the caller immediately
     try:
@@ -6827,6 +8325,127 @@ async def get_all_accounts():
     except Exception as e:
         logger.error(f"Failed to get accounts: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/flagged-accounts")
+async def get_flagged_accounts():
+    """Get all suspended/flagged user accounts"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT 
+                u.id as user_id,
+                u.name,
+                a.phone_number,
+                a.is_suspended,
+                a.suspension_reason,
+                a.suspended_at,
+                a.suspension_count,
+                a.last_flag_details,
+                a.business_info
+            FROM users u
+            JOIN account_settings a ON u.id = a.user_id
+            WHERE a.is_suspended = 1
+            ORDER BY a.suspended_at DESC
+        ''')
+        
+        flagged_accounts = []
+        for row in cursor.fetchall():
+            flagged_accounts.append({
+                "user_id": row[0],
+                "name": row[1],
+                "phone_number": row[2],
+                "is_suspended": bool(row[3]),
+                "suspension_reason": row[4],
+                "suspended_at": row[5],
+                "suspension_count": row[6],
+                "flag_details": row[7],
+                "business_info": row[8]
+            })
+        
+        conn.close()
+        return {"success": True, "flagged_accounts": flagged_accounts}
+    except Exception as e:
+        logger.error(f"Failed to get flagged accounts: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/account-config/{user_id}")
+async def get_account_config(user_id: int):
+    """Get key configuration fields for an account (used by super-admin moderation details)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            '''
+            SELECT
+                u.id as user_id,
+                u.name,
+                COALESCE(a.phone_number, '') as phone_number,
+                COALESCE(a.business_info, '') as business_info,
+                COALESCE(a.call_greeting, '') as call_greeting
+            FROM users u
+            LEFT JOIN account_settings a ON u.id = a.user_id
+            WHERE u.id = ?
+            ''',
+            (user_id,)
+        )
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return JSONResponse({"error": "Account not found"}, status_code=404)
+
+        return {
+            "success": True,
+            "user_id": row[0],
+            "name": row[1],
+            "config": {
+                "PHONE_NUMBER": row[2],
+                "BUSINESS_INFO": row[3],
+                "CALL_GREETING": row[4],
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to get account config for user {user_id}: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/unsuspend-account")
+async def unsuspend_account(request: Request):
+    """Unsuspend a user account"""
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Unsuspend and clear current suspension details while preserving history count
+        cursor.execute('''UPDATE account_settings 
+                         SET is_suspended = 0,
+                             suspension_reason = NULL,
+                             suspended_at = NULL,
+                             last_flag_details = NULL
+                         WHERE user_id = ?''',
+                     (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Account unsuspended and restored to normal: User {user_id}")
+        
+        return {"success": True, "message": "Account unsuspended successfully"}
+    except Exception as e:
+        logger.error(f"Failed to unsuspend account: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/super-admin/account/{user_id}")
@@ -7263,6 +8882,128 @@ async def update_filler_words(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/backchannel-settings")
+async def get_backchannel_settings():
+    """Get current backchannel/turn-taking tuning settings."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT ignore_backchannels_always, backchannel_max_words, min_user_turn_seconds, barge_in_min_speech_seconds, last_updated, updated_by '
+            'FROM global_settings WHERE id = 1'
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            load_backchannel_settings()
+            return {
+                "success": True,
+                "settings": {
+                    "ignore_backchannels_always": bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True)),
+                    "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)),
+                    "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45)),
+                    "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55)),
+                },
+                "last_updated": None,
+                "updated_by": None,
+            }
+
+        (
+            ignore_backchannels_always,
+            backchannel_max_words,
+            min_user_turn_seconds,
+            barge_in_min_speech_seconds,
+            last_updated,
+            updated_by,
+        ) = row
+
+        return {
+            "success": True,
+            "settings": {
+                "ignore_backchannels_always": bool(ignore_backchannels_always) if ignore_backchannels_always is not None else True,
+                "backchannel_max_words": int(backchannel_max_words) if backchannel_max_words is not None else 3,
+                "min_user_turn_seconds": float(min_user_turn_seconds) if min_user_turn_seconds is not None else 0.45,
+                "barge_in_min_speech_seconds": float(barge_in_min_speech_seconds) if barge_in_min_speech_seconds is not None else 0.55,
+            },
+            "last_updated": last_updated,
+            "updated_by": updated_by,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get backchannel settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/backchannel-settings")
+async def update_backchannel_settings(request: Request):
+    """Update backchannel/turn-taking tuning settings."""
+    try:
+        body = await request.json()
+        updated_by = body.get("updated_by", "admin")
+        settings = body.get("settings") if isinstance(body.get("settings"), dict) else body
+
+        ignore_backchannels_always = 1 if bool(settings.get("ignore_backchannels_always", True)) else 0
+
+        try:
+            backchannel_max_words = int(settings.get("backchannel_max_words", 3))
+        except Exception:
+            backchannel_max_words = 3
+        backchannel_max_words = max(1, min(8, backchannel_max_words))
+
+        try:
+            min_user_turn_seconds = float(settings.get("min_user_turn_seconds", 0.45))
+        except Exception:
+            min_user_turn_seconds = 0.45
+        min_user_turn_seconds = max(0.1, min(2.0, min_user_turn_seconds))
+
+        try:
+            barge_in_min_speech_seconds = float(settings.get("barge_in_min_speech_seconds", 0.55))
+        except Exception:
+            barge_in_min_speech_seconds = 0.55
+        barge_in_min_speech_seconds = max(0.1, min(2.0, barge_in_min_speech_seconds))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET ignore_backchannels_always = ?,
+                backchannel_max_words = ?,
+                min_user_turn_seconds = ?,
+                barge_in_min_speech_seconds = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (
+                ignore_backchannels_always,
+                backchannel_max_words,
+                min_user_turn_seconds,
+                barge_in_min_speech_seconds,
+                updated_by,
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        # Apply immediately without restart
+        load_backchannel_settings()
+
+        return {
+            "success": True,
+            "message": "Backchannel settings updated",
+            "settings": {
+                "ignore_backchannels_always": bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True)),
+                "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)),
+                "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45)),
+                "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55)),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to update backchannel settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/speechmatics-key")
 async def get_speechmatics_key_status():
     """Check if Speechmatics API key is configured and return it"""
@@ -7472,43 +9213,146 @@ async def get_vonage_keys_status():
 
 
 @app.post("/api/super-admin/vonage-keys")
-async def save_vonage_keys(request: Request):
-    """Save Vonage API key and secret globally"""
+async def save_vonage_keys_route(request: Request):
+    """Save Vonage API keys to global_settings (Super Admin)"""
     try:
         body = await request.json()
-        api_key = body.get('api_key', '').strip()
-        api_secret = body.get('api_secret', '').strip()
-        updated_by = body.get('updated_by', 'admin')
-        
-        if not api_key or not api_secret:
-            return JSONResponse({"success": False, "error": "Both API key and secret are required"}, status_code=400)
+        api_key = body.get('api_key')
+        api_secret = body.get('api_secret')
+        app_id = body.get('application_id')
+        private_key = body.get('private_key_pem')
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            UPDATE global_settings 
-            SET vonage_api_key = ?,
-                vonage_api_secret = ?,
-                last_updated = CURRENT_TIMESTAMP,
-                updated_by = ?
-            WHERE id = 1
-        ''', (_encrypt_secret(api_key), _encrypt_secret(api_secret), updated_by))
+        updates = {}
+        if api_key:
+            updates['vonage_api_key'] = _encrypt_secret(api_key)
+        if api_secret:
+            updates['vonage_api_secret'] = _encrypt_secret(api_secret)
+        if app_id:
+            updates['vonage_application_id'] = _encrypt_secret(app_id)
+        if private_key:
+            updates['vonage_private_key_pem'] = _encrypt_secret(private_key)
         
+        if not updates:
+            return JSONResponse({'success': False, 'error': 'No keys provided'}, status_code=400)
+        
+        set_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
+        params = list(updates.values())
+        
+        cursor.execute(f"UPDATE global_settings SET {set_clause} WHERE id = 1", params)
         conn.commit()
         conn.close()
         
-        # Update CONFIG immediately
-        CONFIG["VONAGE_API_KEY"] = api_key
-        CONFIG["VONAGE_API_SECRET"] = api_secret
+        # Reload keys into memory
+        load_global_api_keys()
         
-        logger.info(f"✅ Vonage API keys updated by {updated_by}")
+        logger.info(f"✅ Vonage credentials updated")
+        return JSONResponse({'success': True, 'message': 'Vonage credentials saved successfully'})
+    except Exception as e:
+        logger.error(f"Failed to save Vonage keys: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/vonage-app")
+async def get_vonage_app_status():
+    """Check if Vonage application JWT config is present (application id + private key)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT vonage_application_id, vonage_private_key_pem FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        app_id = _decrypt_secret(result[0] if result else None)
+        private_key_pem = _decrypt_secret(result[1] if result else None)
+
+        configured = bool(app_id and private_key_pem)
         return {
             "success": True,
-            "message": "Vonage API keys saved successfully"
+            "configured": configured,
+            "application_id_preview": (app_id or "")[:8] + ("…" if app_id and len(app_id) > 8 else ""),
+            "has_private_key": bool(private_key_pem),
         }
     except Exception as e:
-        logger.error(f"Failed to save Vonage API keys: {e}")
+        logger.error(f"Failed to get Vonage app status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/vonage-app")
+async def save_vonage_app(request: Request):
+    """Save Vonage application id and private key PEM globally (encrypted)."""
+    try:
+        body = await request.json()
+        application_id = (body.get("application_id") or "").strip()
+        private_key_pem = (body.get("private_key_pem") or "")
+        updated_by = body.get('updated_by', 'admin')
+
+        # Normalize line endings and trim outer whitespace without breaking PEM formatting.
+        private_key_pem = private_key_pem.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+        if not application_id or not private_key_pem:
+            return JSONResponse(
+                {"success": False, "error": "Both application_id and private_key_pem are required"},
+                status_code=400,
+            )
+
+        # Basic sanity: must look like a PEM private key.
+        # Common mistake: pasting the Public Key from Vonage (BEGIN PUBLIC KEY) instead of the downloaded Private Key.
+        upper = private_key_pem.upper()
+        looks_like_pem_block = ("BEGIN" in upper and "END" in upper)
+        is_private_key = ("PRIVATE KEY" in upper and "PUBLIC KEY" not in upper)
+
+        if not private_key_pem:
+            return JSONResponse(
+                {"success": False, "error": "private_key_pem is empty"},
+                status_code=400,
+            )
+
+        if "BEGIN PUBLIC KEY" in upper or "PUBLIC KEY" in upper:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "That looks like a PUBLIC key. Please paste the PRIVATE key PEM (downloaded when you click 'Generate public and private key' in Vonage). It must include the BEGIN/END PRIVATE KEY lines.",
+                },
+                status_code=400,
+            )
+
+        if not (looks_like_pem_block and is_private_key):
+            preview = private_key_pem[:40].replace("\n", " ")
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": f"private_key_pem does not look like a PEM private key. It must include the full block starting with '-----BEGIN PRIVATE KEY-----' (or '-----BEGIN RSA PRIVATE KEY-----') and ending with the matching END line. Preview: {preview!r}",
+                },
+                status_code=400,
+            )
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET vonage_application_id = ?,
+                vonage_private_key_pem = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (_encrypt_secret(application_id), _encrypt_secret(private_key_pem), updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["VONAGE_APPLICATION_ID"] = application_id
+        CONFIG["VONAGE_APP_ID"] = application_id
+        CONFIG["VONAGE_PRIVATE_KEY_PEM"] = private_key_pem
+
+        logger.info(f"✅ Vonage application credentials updated by {updated_by}")
+        return {"success": True, "message": "Vonage application credentials saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to save Vonage application credentials: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
