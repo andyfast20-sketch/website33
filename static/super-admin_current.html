@@ -704,6 +704,23 @@
             </div>
         </div>
 
+        <!-- Content Moderation Alerts (Top Banner) -->
+        <div id="contentModerationBanner" onclick="showFlaggedAccountsModal()" style="background: linear-gradient(135deg, rgba(231, 76, 60, 0.95) 0%, rgba(192, 57, 43, 0.95) 100%); padding: 18px 20px; border-radius: 14px; margin: 0 0 18px 0; cursor: pointer; border: 2px solid rgba(255,255,255,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="font-size: 34px; line-height: 1;">🚨</div>
+                    <div>
+                        <div style="font-size: 18px; font-weight: 800; color: white; letter-spacing: 0.3px;">Content Moderation Alerts</div>
+                        <div style="font-size: 13px; color: rgba(255,255,255,0.9); margin-top: 2px;">Click to view flagged & suspended accounts</div>
+                    </div>
+                </div>
+                <div style="background: rgba(255,255,255,0.18); padding: 10px 16px; border-radius: 12px; text-align: center; min-width: 110px;">
+                    <div id="flaggedAccountsBadge" style="font-size: 24px; font-weight: 900; color: white;">…</div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.85); margin-top: 2px;">Flagged</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Service Health Monitor -->
         <div class="health-monitor">
             <div class="health-monitor-title">
@@ -977,6 +994,12 @@
                     <div class="input-wrapper">
                         <input type="password" id="inputVonageSecret" placeholder="API Secret">
                     </div>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputVonageAppId" placeholder="Application ID">
+                    </div>
+                    <div class="input-wrapper">
+                        <textarea id="inputVonagePrivateKey" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows="4" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 13px; font-family: 'Courier New', monospace; resize: vertical;"></textarea>
+                    </div>
                     <button class="btn-save" onclick="saveAPIKey('vonage')">💾 Save</button>
                 </div>
             </div>
@@ -1038,6 +1061,57 @@
             </div>
         </div>
 
+        <div class="panel">
+            <h2>🎛️ Backchannel / Turn-Taking Tuning</h2>
+            <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
+                Use this to stop the agent treating short acknowledgements like “ok/yeah/right” as full turns.
+                Higher thresholds = harder to trigger filler + AI response.
+            </p>
+
+            <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start;">
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Ignore Backchannels</div>
+                        <label style="display:flex; gap: 10px; align-items:center; font-size: 13px; color: rgba(255,255,255,0.85);">
+                            <input type="checkbox" id="ignoreBackchannelsAlways" style="transform: scale(1.15);">
+                            Ignore “ok/yeah/right/thanks” even when agent is silent
+                        </label>
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">
+                            Recommended ON to prevent “ok” from triggering filler + response.
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Backchannel Max Words</div>
+                        <input id="backchannelMaxWords" type="number" min="1" max="8" step="1" value="3" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">If an utterance has more than this many words, it’s treated as a real request.</div>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Min User Turn (seconds)</div>
+                        <input id="minUserTurnSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.45" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="minUserTurnSecondsLabel">0.45</span>s</div>
+                        <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">Utterances shorter than this won’t trigger filler/AI in Speechmatics mode.</div>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Barge-in Min Speech (seconds)</div>
+                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.55" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.55</span>s</div>
+                        <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">How long caller must talk before we cancel agent speech (interrupt).</div>
+                    </div>
+
+                </div>
+
+                <div style="margin-top: 14px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                    <button class="btn-save" onclick="saveBackchannelSettings()">💾 Save Tuning</button>
+                    <button class="btn-save" onclick="loadBackchannelSettings()" style="background: rgba(255,255,255,0.12);">↻ Reload</button>
+                    <span id="backchannelSettingsStatus" style="font-size: 13px; opacity: 0.85;"></span>
+                </div>
+            </div>
+        </div>
+
         <div class="panel">            <h2>�💬 Filler Words (Sarah Voice)</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">10 audio files using Speechmatics Sarah voice. These will be randomly played during pauses to cover latency.</p>
             
@@ -1050,6 +1124,30 @@
 
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;" id="fillerSlots">
                 <!-- Filler slots will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Flagged Accounts Modal -->
+    <div id="flaggedAccountsModal" style="display:none; position:fixed; inset:0; background: rgba(0,0,0,0.85); z-index: 5000; align-items:center; justify-content:center; padding: 20px;">
+        <div style="background: linear-gradient(135deg, rgba(44, 62, 80, 0.98) 0%, rgba(52, 73, 94, 0.98) 100%); border-radius: 18px; padding: 22px; max-width: 1100px; width: 100%; max-height: 85vh; overflow: hidden; border: 2px solid rgba(231, 76, 60, 0.35); box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative;">
+            <button onclick="closeFlaggedAccountsModal()" style="position:absolute; top: 14px; right: 14px; background: rgba(231, 76, 60, 0.3); border:none; color:white; font-size: 22px; width: 38px; height: 38px; border-radius: 50%; cursor:pointer;">×</button>
+            <div style="font-size: 20px; font-weight: 900; color: white; margin-bottom: 6px;">🚨 Content Moderation Alerts</div>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 14px;">Accounts flagged by AI moderation (illegal, sexual content, terrorism, scams, etc.).</div>
+            <div id="flaggedAccountsModalContent" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 12px; height: calc(85vh - 140px); overflow: auto;">
+                <div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Config Details Modal -->
+    <div id="accountConfigModal" style="display:none; position:fixed; inset:0; background: rgba(0,0,0,0.85); z-index: 5500; align-items:center; justify-content:center; padding: 20px;">
+        <div style="background: linear-gradient(135deg, rgba(44, 62, 80, 0.98) 0%, rgba(52, 73, 94, 0.98) 100%); border-radius: 18px; padding: 22px; max-width: 900px; width: 100%; max-height: 85vh; overflow: hidden; border: 2px solid rgba(52, 152, 219, 0.35); box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative;">
+            <button onclick="closeAccountConfigModal()" style="position:absolute; top: 14px; right: 14px; background: rgba(231, 76, 60, 0.3); border:none; color:white; font-size: 22px; width: 38px; height: 38px; border-radius: 50%; cursor:pointer;">×</button>
+            <div style="font-size: 20px; font-weight: 900; color: white; margin-bottom: 6px;">👁️ Account Configuration</div>
+            <div id="accountConfigModalSubtitle" style="font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 14px;"></div>
+            <div id="accountConfigModalContent" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 12px; height: calc(85vh - 140px); overflow: auto;">
+                <div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading…</div>
             </div>
         </div>
     </div>
@@ -1069,6 +1167,7 @@
             document.getElementById('loginScreen').style.display = 'none'; 
             document.getElementById('mainDashboard').style.display = 'block'; 
             loadAllSettings(); 
+            loadFlaggedAccountsBadge();
             startStreamingStatusPolling(); 
             // Delay health monitoring start by 1 second to ensure server is ready after restart
             setTimeout(() => {
@@ -1076,11 +1175,275 @@
             }, 1000);
         }
         function logout() { stopStreamingStatusPolling(); sessionStorage.removeItem('superAdminAuth'); location.reload(); }
-        async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadAccountsList(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
+        async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadBackchannelSettings(); await loadAccountsList(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
+
+        // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
+        function _setBackchannelStatus(msg, ok=true) {
+            const el = document.getElementById('backchannelSettingsStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.style.color = ok ? 'rgba(120, 255, 160, 0.95)' : 'rgba(255, 140, 140, 0.95)';
+        }
+
+        function _wireBackchannelSliders() {
+            const minSlider = document.getElementById('minUserTurnSeconds');
+            const minLabel = document.getElementById('minUserTurnSecondsLabel');
+            const bargeSlider = document.getElementById('bargeInMinSpeechSeconds');
+            const bargeLabel = document.getElementById('bargeInMinSpeechSecondsLabel');
+            if (minSlider && minLabel) {
+                minLabel.textContent = String(Number(minSlider.value).toFixed(2));
+                minSlider.oninput = () => { minLabel.textContent = String(Number(minSlider.value).toFixed(2)); };
+            }
+            if (bargeSlider && bargeLabel) {
+                bargeLabel.textContent = String(Number(bargeSlider.value).toFixed(2));
+                bargeSlider.oninput = () => { bargeLabel.textContent = String(Number(bargeSlider.value).toFixed(2)); };
+            }
+        }
+
+        async function loadBackchannelSettings() {
+            try {
+                _wireBackchannelSliders();
+                _setBackchannelStatus('Loading…', true);
+                const resp = await fetch('/api/super-admin/backchannel-settings');
+                const data = await resp.json();
+                if (!data || !data.success) throw new Error(data?.error || 'Failed to load');
+                const s = data.settings || {};
+
+                const ignore = document.getElementById('ignoreBackchannelsAlways');
+                const maxWords = document.getElementById('backchannelMaxWords');
+                const minTurn = document.getElementById('minUserTurnSeconds');
+                const bargeIn = document.getElementById('bargeInMinSpeechSeconds');
+
+                if (ignore) ignore.checked = !!s.ignore_backchannels_always;
+                if (maxWords) maxWords.value = String(s.backchannel_max_words ?? 3);
+                if (minTurn) minTurn.value = String(s.min_user_turn_seconds ?? 0.45);
+                if (bargeIn) bargeIn.value = String(s.barge_in_min_speech_seconds ?? 0.55);
+
+                _wireBackchannelSliders();
+                _setBackchannelStatus('Loaded', true);
+            } catch (e) {
+                console.error('Error loading backchannel settings:', e);
+                _setBackchannelStatus('Load failed', false);
+            }
+        }
+
+        async function saveBackchannelSettings() {
+            try {
+                _wireBackchannelSliders();
+                _setBackchannelStatus('Saving…', true);
+
+                const ignore = document.getElementById('ignoreBackchannelsAlways')?.checked ?? true;
+                const maxWordsRaw = document.getElementById('backchannelMaxWords')?.value ?? '3';
+                const minTurnRaw = document.getElementById('minUserTurnSeconds')?.value ?? '0.45';
+                const bargeInRaw = document.getElementById('bargeInMinSpeechSeconds')?.value ?? '0.55';
+
+                const payload = {
+                    updated_by: 'super-admin',
+                    settings: {
+                        ignore_backchannels_always: !!ignore,
+                        backchannel_max_words: Number(maxWordsRaw),
+                        min_user_turn_seconds: Number(minTurnRaw),
+                        barge_in_min_speech_seconds: Number(bargeInRaw),
+                    }
+                };
+
+                console.log('Saving backchannel settings:', payload);
+
+                const resp = await fetch('/api/super-admin/backchannel-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('Response status:', resp.status);
+                const data = await resp.json();
+                console.log('Response data:', data);
+                
+                if (!data || !data.success) throw new Error(data?.error || 'Save failed');
+
+                _setBackchannelStatus('Saved (applies immediately)', true);
+            } catch (e) {
+                console.error('Error saving backchannel settings:', e);
+                _setBackchannelStatus(`Save failed: ${e.message}`, false);
+            }
+        }
+
+        // ==================== CONTENT MODERATION (FLAGGED ACCOUNTS) ====================
+        async function loadFlaggedAccountsBadge() {
+            try {
+                const response = await fetch('/api/super-admin/flagged-accounts');
+                const data = await response.json();
+                if (!data || !data.success) return;
+                const count = Array.isArray(data.flagged_accounts) ? data.flagged_accounts.length : 0;
+                const badge = document.getElementById('flaggedAccountsBadge');
+                if (badge) badge.textContent = String(count);
+            } catch (error) {
+                const badge = document.getElementById('flaggedAccountsBadge');
+                if (badge) badge.textContent = '0';
+                console.error('Failed to load flagged accounts badge:', error);
+            }
+        }
+
+        function showFlaggedAccountsModal() {
+            const modal = document.getElementById('flaggedAccountsModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            const content = document.getElementById('flaggedAccountsModalContent');
+            if (content) content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading…</div>';
+            loadFlaggedAccountsForModal();
+        }
+
+        function closeFlaggedAccountsModal() {
+            const modal = document.getElementById('flaggedAccountsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function loadFlaggedAccountsForModal() {
+            try {
+                const response = await fetch('/api/super-admin/flagged-accounts');
+                const data = await response.json();
+                if (!data || !data.success) throw new Error('Failed to load flagged accounts');
+                renderFlaggedAccountsModal(Array.isArray(data.flagged_accounts) ? data.flagged_accounts : []);
+                loadFlaggedAccountsBadge();
+            } catch (error) {
+                console.error('Failed to load flagged accounts:', error);
+                const content = document.getElementById('flaggedAccountsModalContent');
+                if (content) content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.85); padding: 30px;"><div style="color:#ff6b6b; font-weight: 800;">Failed to load flagged accounts</div><div style="margin-top: 8px; opacity: 0.8;">' + String(error.message || error) + '</div></div>';
+            }
+        }
+
+        function renderFlaggedAccountsModal(accounts) {
+            const content = document.getElementById('flaggedAccountsModalContent');
+            if (!content) return;
+            if (accounts.length === 0) {
+                content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.85); padding: 40px;"><div style="font-size: 18px; font-weight: 900; color: #64ff64;">✅ No flagged accounts</div><div style="margin-top: 6px; opacity: 0.85;">All clear.</div></div>';
+                return;
+            }
+
+            const escapeHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+            const rows = accounts.map((account) => {
+                const userId = account.user_id;
+                const name = escapeHtml(account.name || ('User ' + userId));
+                const phone = escapeHtml(account.phone_number || '');
+                const isSuspended = !!account.is_suspended;
+                const status = isSuspended
+                    ? '<span style="background: rgba(231,76,60,0.25); border: 1px solid rgba(231,76,60,0.55); color: #ffb3b3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">🔒 Suspended</span>'
+                    : '<span style="background: rgba(243,156,18,0.22); border: 1px solid rgba(243,156,18,0.55); color: #ffd7a3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">⚠️ Flagged</span>';
+                const count = Number(account.suspension_count || 0);
+                const reason = escapeHtml(account.suspension_reason || '');
+                const when = escapeHtml(account.suspended_at || '');
+                const details = escapeHtml(account.flag_details || account.last_flag_details || '');
+                const businessInfo = escapeHtml(account.business_info || '');
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.10);">
+                        <td style="padding: 10px 8px;">
+                            <div style="font-weight: 900; color: white;">${name}</div>
+                            <div style="font-size: 12px; color: rgba(255,255,255,0.65);">${phone}</div>
+                        </td>
+                        <td style="padding: 10px 8px;">${status}</td>
+                        <td style="padding: 10px 8px; text-align:center; font-weight: 900; color: white;">${count}</td>
+                        <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.75);">${when || '—'}</td>
+                        <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.85);">${reason || '—'}</td>
+                        <td style="padding: 10px 8px; text-align:right; white-space: nowrap;">
+                            ${isSuspended ? `<button onclick="unsuspendAccountFromModal(${userId})" style="background: rgba(39,174,96,0.25); border: 1px solid rgba(39,174,96,0.6); color: #b7ffcf; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 800;">✓ Unsuspend</button>` : ''}
+                            <button onclick="showAccountConfigModal(${userId})" style="margin-left: 8px; background: rgba(52,152,219,0.22); border: 1px solid rgba(52,152,219,0.55); color: #cde8ff; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 800;">👁 Details</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            content.innerHTML = `
+                <div style="overflow-x:auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.06);">
+                                <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Account</th>
+                                <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Status</th>
+                                <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Flags</th>
+                                <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Last Violation</th>
+                                <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Reason</th>
+                                <th style="text-align:right; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        async function unsuspendAccountFromModal(userId) {
+            if (!confirm('Unsuspend this account?')) return;
+            try {
+                const response = await fetch('/api/super-admin/unsuspend-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                const data = await response.json();
+                if (!data || !data.success) throw new Error(data?.error || data?.detail || 'Failed to unsuspend');
+                if (typeof showAlert === 'function') showAlert('✅ Account unsuspended', 'success');
+                loadFlaggedAccountsForModal();
+                if (typeof loadAccountsList === 'function') loadAccountsList();
+            } catch (error) {
+                console.error('Failed to unsuspend account:', error);
+                if (typeof showAlert === 'function') showAlert('❌ Failed to unsuspend: ' + (error.message || error), 'error');
+            }
+        }
+
+        function closeAccountConfigModal() {
+            const modal = document.getElementById('accountConfigModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function showAccountConfigModal(userId) {
+            const modal = document.getElementById('accountConfigModal');
+            const subtitle = document.getElementById('accountConfigModalSubtitle');
+            const content = document.getElementById('accountConfigModalContent');
+            if (!modal || !subtitle || !content) return;
+
+            modal.style.display = 'flex';
+            subtitle.textContent = 'Loading…';
+            content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading…</div>';
+
+            try {
+                const response = await fetch(`/api/super-admin/account-config/${userId}`);
+                const data = await response.json();
+                if (!data || !data.success) throw new Error(data?.error || 'Failed to load account config');
+
+                const cfg = data.config || {};
+                const escapeHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+
+                subtitle.textContent = `${data.name || 'Account'} (User ID: ${data.user_id})`;
+
+                const phoneNumber = escapeHtml(cfg.PHONE_NUMBER || '');
+                const businessInfo = escapeHtml(cfg.BUSINESS_INFO || '');
+                const callGreeting = escapeHtml(cfg.CALL_GREETING || '');
+
+                const fieldBlock = (label, value, isMultiline) => {
+                    const displayValue = value || '<span style="opacity:0.6;">(empty)</span>';
+                    return `
+                        <div style="margin-bottom: 14px;">
+                            <div style="font-size: 12px; letter-spacing: 0.4px; font-weight: 900; color: rgba(255,255,255,0.85); margin-bottom: 6px;">${label}</div>
+                            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px; color: rgba(255,255,255,0.92); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; white-space: ${isMultiline ? 'pre-wrap' : 'normal'}; word-break: break-word;">${displayValue}</div>
+                        </div>
+                    `;
+                };
+
+                content.innerHTML = `
+                    ${fieldBlock('PHONE NUMBER', phoneNumber, false)}
+                    ${fieldBlock('BUSINESS INFORMATION', businessInfo, true)}
+                    ${fieldBlock('CALL GREETING (Opening Line)', callGreeting, true)}
+                `;
+            } catch (error) {
+                subtitle.textContent = `User ID: ${userId}`;
+                content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.85); padding: 30px;"><div style="color:#ff6b6b; font-weight: 800;">Failed to load account configuration</div><div style="margin-top: 8px; opacity: 0.8;">' + String(error.message || error) + '</div></div>';
+            }
+        }
         async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
         function selectBrain(provider) { document.getElementById('brainOpenAI').classList.remove('selected'); document.getElementById('brainDeepSeek').classList.remove('selected'); if (provider === 'openai') { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; } else { document.getElementById('brainDeepSeek').classList.add('selected'); document.querySelector('input[value="deepseek"]').checked = true; } saveBrainProvider(provider); }
         async function saveBrainProvider(provider) { try { const response = await fetch('/api/super-admin/brain-provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert(data.message, 'success'); else showAlert('Failed to update brain provider', 'error'); } catch (error) { console.error('Error saving brain provider:', error); showAlert('Error saving brain provider', 'error'); } }
-        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); if (!apiKey || !apiSecret) { showAlert('Please enter both Vonage API key and secret', 'error'); return; } body = { api_key: apiKey, api_secret: apiSecret, updated_by: 'super-admin' }; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
+        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); const appId = document.getElementById('inputVonageAppId').value.trim(); const privateKey = document.getElementById('inputVonagePrivateKey').value.trim(); if (!apiKey && !apiSecret && !appId && !privateKey) { showAlert('Please enter at least one Vonage credential', 'error'); return; } body = { updated_by: 'super-admin' }; if (apiKey) body.api_key = apiKey; if (apiSecret) body.api_secret = apiSecret; if (appId) body.application_id = appId; if (privateKey) body.private_key_pem = privateKey; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; document.getElementById('inputVonageAppId').value = ''; document.getElementById('inputVonagePrivateKey').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
         async function loadGlobalInstructions() { 
             try { 
                 const response = await fetch('/api/super-admin/global-instructions'); 
@@ -1269,12 +1632,16 @@
         }
         
         async function saveFillerWords() { try { const fillerWords = document.getElementById('fillerWords').value.trim(); const response = await fetch('/api/super-admin/filler-words', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filler_words: fillerWords, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert('Filler words saved successfully', 'success'); else showAlert('Failed to save filler words', 'error'); } catch (error) { console.error('Error saving filler words:', error); showAlert('Error saving filler words', 'error'); } }
-        async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; card.innerHTML = `
+        async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; const fillerText = (filler?.text || ''); card.innerHTML = `
                     <div class="filler-slot-header">
                         <div class="filler-slot-title">🎙️ Filler ${i}</div>
                         <div class="filler-slot-status ${hasAudio ? 'filled' : 'empty'}">${hasAudio ? '✅ Ready' : '⚪ Empty'}</div>
                     </div>
-                    ${filler?.text ? `<div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-style: italic;">"${filler.text}"</div>` : ''}
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Filler Text</div>
+                        <textarea id="fillerText${i}" placeholder="Type any filler phrase here (e.g., 'Just a second…')" style="width: 100%; min-height: 70px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;">${fillerText}</textarea>
+                        <div style="margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.55);">Tip: leave blank to generate a random filler. Long text will be trimmed.</div>
+                    </div>
                     <div class="filler-slot-controls">
                         <button class="btn-slot play" onclick="playFiller(${i})" ${!hasAudio ? 'disabled' : ''}>▶️ Play</button>
                         <button class="btn-slot regenerate" onclick="regenerateFiller(${i})">🔄 Generate</button>
@@ -1282,7 +1649,7 @@
                     </div>
                 `; container.appendChild(card); } } catch (error) { console.error('Error loading filler slots:', error); showAlert('Error loading filler slots', 'error'); } }
         async function playFiller(slot) { try { const audio = new Audio(`/api/super-admin/get-filler/${slot}?voice_id=sarah&t=${Date.now()}`); audio.play(); } catch (error) { console.error('Error playing filler:', error); showAlert('Error playing audio', 'error'); } }
-        async function regenerateFiller(slot) { try { const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Generating...'; const response = await fetch(`/api/super-admin/regenerate-filler/${slot}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin', use_ai: true }) }); const data = await response.json(); if (data.success) { showAlert(`Filler ${slot} generated successfully`, 'success'); await loadFillerSlots(); } else { showAlert(data.error || 'Failed to generate filler', 'error'); btn.disabled = false; btn.textContent = '🔄 Generate'; } } catch (error) { console.error('Error regenerating filler:', error); showAlert('Error generating filler', 'error'); } }
+        async function regenerateFiller(slot) { try { const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Generating...'; const textEl = document.getElementById(`fillerText${slot}`); const customText = (textEl?.value || '').trim(); const response = await fetch(`/api/super-admin/regenerate-filler/${slot}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin', use_ai: true, text: customText }) }); const data = await response.json(); if (data.success) { showAlert(`Filler ${slot} generated successfully`, 'success'); await loadFillerSlots(); } else { showAlert(data.error || 'Failed to generate filler', 'error'); btn.disabled = false; btn.textContent = '🔄 Generate'; } } catch (error) { console.error('Error regenerating filler:', error); showAlert('Error generating filler', 'error'); } }
         async function deleteFiller(slot) { if (!confirm(`Delete filler ${slot}?`)) return; try { const response = await fetch(`/api/super-admin/delete-filler/${slot}?voice_id=sarah`, { method: 'DELETE' }); const data = await response.json(); if (data.success) { showAlert(`Filler ${slot} deleted`, 'success'); await loadFillerSlots(); } else { showAlert('Failed to delete filler', 'error'); } } catch (error) { console.error('Error deleting filler:', error); showAlert('Error deleting filler', 'error'); } }
         async function generateAllFillers() { if (!confirm('Generate all 10 filler audio files? This will overwrite existing ones.')) return; try { const statusEl = document.getElementById('generateAllStatus'); statusEl.textContent = '⏳ Generating all 10 fillers...'; statusEl.style.color = '#f39c12'; const response = await fetch('/api/super-admin/generate-speechmatics-fillers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) { showAlert('All 10 fillers generated successfully!', 'success'); statusEl.textContent = '✅ Complete!'; statusEl.style.color = '#2ecc71'; await loadFillerSlots(); setTimeout(() => { statusEl.textContent = ''; }, 3000); } else { showAlert(data.error || 'Failed to generate fillers', 'error'); statusEl.textContent = '❌ Failed'; statusEl.style.color = '#e74c3c'; } } catch (error) { console.error('Error generating all fillers:', error); showAlert('Error generating fillers', 'error'); } }
         function showAlert(message, type) { 

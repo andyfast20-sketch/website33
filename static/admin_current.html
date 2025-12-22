@@ -699,6 +699,16 @@
                     <div style="font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 500;">AI Voice Assistant</div>
                 </div>
             </div>
+            
+            <!-- Transfer Number Input -->
+            <div style="margin-top: 15px;">
+                <label style="display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px;">📲 Transfer Number</label>
+                <div style="position: relative;">
+                    <input type="tel" id="headerTransferNumber" placeholder="07123456789" style="width: 100%; padding: 10px 35px 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; color: white; font-size: 14px; font-weight: 500; outline: none; transition: all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(102, 126, 234, 0.6)'" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(102, 126, 234, 0.3)'" onchange="saveHeaderTransferNumber()">
+                    <button onclick="saveHeaderTransferNumber()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: rgba(102, 126, 234, 0.2); border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;" onmouseover="this.style.background='rgba(102, 126, 234, 0.4)'" onmouseout="this.style.background='rgba(102, 126, 234, 0.2)'">💾</button>
+                </div>
+                <div id="transferNumberStatus" style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px; display: none;"></div>
+            </div>
         </div>
 
         <!-- Navigation -->
@@ -1039,6 +1049,17 @@
                             <textarea id="agentInstructions" rows="4" placeholder="Any other specific instructions for handling calls..."></textarea>
                             <div class="example-box">
                                 <strong>Example:</strong> "Take messages if the owner isn't available. Offer to schedule appointments. Always ask for contact details."
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>📲 Auto-Transfer Settings</h3>
+                        <div class="form-group">
+                            <label for="transferNumber">Transfer Destination Number</label>
+                            <input type="tel" id="transferNumber" placeholder="e.g., 07123456789 or +447123456789">
+                            <div class="example-box">
+                                <strong>Info:</strong> When a caller asks to be transferred, the AI will automatically transfer them to this number. Leave blank to disable auto-transfer.
                             </div>
                         </div>
                     </div>
@@ -1885,6 +1906,12 @@
                 
                 const callGreetingEl = document.getElementById('callGreeting');
                 if (callGreetingEl) callGreetingEl.value = config.CALL_GREETING || '';
+                
+                const transferNumberEl = document.getElementById('transferNumber');
+                if (transferNumberEl) transferNumberEl.value = config.TRANSFER_NUMBER || '';
+                
+                const headerTransferNumberEl = document.getElementById('headerTransferNumber');
+                if (headerTransferNumberEl) headerTransferNumberEl.value = config.TRANSFER_NUMBER || '';
                 
                 const businessInfoEl = document.getElementById('businessInfo');
                 if (businessInfoEl) businessInfoEl.value = config.BUSINESS_INFO || '';
@@ -3903,6 +3930,7 @@
             const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
             const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
             const callGreeting = document.getElementById('callGreeting')?.value || '';
+            const transferNumber = document.getElementById('transferNumber')?.value || '';
             const businessInfo = document.getElementById('businessInfo')?.value || '';
             const agentPersonality = document.getElementById('agentPersonality')?.value || '';
             const agentInstructions = document.getElementById('agentInstructions')?.value || '';
@@ -3953,6 +3981,7 @@
                         USE_ELEVENLABS: 0,
                         RESPONSE_LATENCY: responseLatency,
                         CALL_GREETING: callGreeting,
+                        TRANSFER_NUMBER: transferNumber,
                         BUSINESS_INFO: businessInfo,
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
@@ -3994,6 +4023,52 @@
             setTimeout(() => {
                 messageDiv.style.display = 'none';
             }, 5000);
+        }
+
+        // Save transfer number from header input
+        async function saveHeaderTransferNumber() {
+            const transferNumber = document.getElementById('headerTransferNumber')?.value || '';
+            const statusEl = document.getElementById('transferNumberStatus');
+            
+            try {
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'rgba(255,255,255,0.6)';
+                statusEl.textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        TRANSFER_NUMBER: transferNumber
+                    })
+                });
+                
+                if (response.ok) {
+                    statusEl.style.color = '#2ecc71';
+                    statusEl.textContent = '✅ Saved!';
+                    
+                    // Also update the form field if it exists
+                    const formTransferNumberEl = document.getElementById('transferNumber');
+                    if (formTransferNumberEl) formTransferNumberEl.value = transferNumber;
+                    
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 2000);
+                } else {
+                    statusEl.style.color = '#e74c3c';
+                    statusEl.textContent = '❌ Failed to save';
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Error saving transfer number:', error);
+                statusEl.style.color = '#e74c3c';
+                statusEl.textContent = '❌ Error: ' + error.message;
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
         }
 
         // Load credits remaining
