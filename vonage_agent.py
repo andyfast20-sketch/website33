@@ -1971,8 +1971,6 @@ class CallSession:
                     if not chunk:
                         break
                     await self._send_vonage_audio_bytes(chunk)
-                    # Pace to real-time so Vonage reliably plays audio.
-                    await asyncio.sleep(len(chunk) / (2 * VONAGE_SAMPLE_RATE))
 
             return True
         except Exception as e:
@@ -3567,10 +3565,7 @@ You must use ONLY this information when answering questions about services, area
                         if first_chunk_time is None:
                             first_chunk_time = (time.time() - start_time) * 1000
                             logger.info(f"[{self.call_uuid}] ⚡ Cartesia 1st chunk: {first_chunk_time:.0f}ms")
-
-                        # Pace to real-time so Vonage reliably plays audio.
-                        await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
-
+                        
                         chunk_buffer = b''
             
             # Send any remaining audio
@@ -3578,7 +3573,6 @@ You must use ONLY this information when answering questions about services, area
                 await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
-                await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
             
             gen_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ Cartesia: {chunk_count} chunks ({total_bytes}B) in {gen_time:.0f}ms")
@@ -3652,10 +3646,7 @@ You must use ONLY this information when answering questions about services, area
                         if first_chunk_time is None:
                             first_chunk_time = (time.time() - start_time) * 1000
                             logger.info(f"[{self.call_uuid}] ⚡ First ElevenLabs chunk in {first_chunk_time:.0f}ms")
-
-                        # Pace to real-time so Vonage reliably plays audio.
-                        await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
-
+                        
                         chunk_buffer = b''
             
             # Send any remaining audio
@@ -3663,7 +3654,6 @@ You must use ONLY this information when answering questions about services, area
                 await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
-                await asyncio.sleep(len(chunk_buffer) / (2 * VONAGE_SAMPLE_RATE))
             
             total_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ ElevenLabs streamed {chunk_count} chunks ({total_bytes} bytes) in {total_time:.0f}ms")
@@ -3749,14 +3739,11 @@ You must use ONLY this information when answering questions about services, area
                         buffered = buffered[chunk_size:]
                         await self._send_vonage_audio_bytes(chunk)
                         chunks_sent += 1
-                        # Pace to real-time so Vonage reliably plays audio.
-                        await asyncio.sleep(len(chunk) / (2 * VONAGE_SAMPLE_RATE))
 
                 # Flush any remainder
                 if buffered and self.is_active and self.vonage_ws and my_generation == self._speechmatics_output_generation:
                     await self._send_vonage_audio_bytes(buffered)
                     chunks_sent += 1
-                    await asyncio.sleep(len(buffered) / (2 * VONAGE_SAMPLE_RATE))
             
             total_time = (time.time() - start_time) * 1000
             logger.info(f"[{self.call_uuid}] ✅ Speechmatics complete: {total_time:.0f}ms ({chunks_sent} chunks)")
@@ -4636,6 +4623,20 @@ async def super_admin():
 async def super_admin_html():
     """Serve the super admin dashboard"""
     with open("static/super-admin_current.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing_page():
+    """Serve the pricing page"""
+    with open("static/pricing.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/pricing.html", response_class=HTMLResponse)
+async def pricing_page_html():
+    """Serve the pricing page"""
+    with open("static/pricing.html", "r", encoding="utf-8") as f:
         return f.read()
 
 

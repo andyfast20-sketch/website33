@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - VoiceAI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f23;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px 50px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 36px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-home {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-home:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 0 50px;
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .pricing-header h1 {
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .pricing-header p {
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .pricing-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            border-color: #667eea;
+            box-shadow: 0 30px 60px rgba(102, 126, 234, 0.4);
+        }
+
+        .pricing-card.popular {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -15px;
+            right: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .pricing-card h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .pricing-card .price {
+            font-size: 56px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .pricing-card .credits {
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+
+        .features-list {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+
+        .features-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+        }
+
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+
+        .check-icon {
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .buy-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .buy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+        }
+
+        .cost-breakdown {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 60px;
+        }
+
+        .cost-breakdown h2 {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cost-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cost-table thead {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .cost-table th,
+        .cost-table td {
+            padding: 18px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .cost-table th {
+            font-weight: 700;
+            color: #667eea;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        .cost-table td {
+            font-size: 15px;
+        }
+
+        .cost-table tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .highlight {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .note {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .note-title {
+            font-weight: 700;
+            color: #ffc107;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .note p {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+        }
+
+        .examples {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+        }
+
+        .examples h2 {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .example-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .example-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .example-card h3 {
+            font-size: 18px;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .example-card .scenario {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .example-card .cost-detail {
+            background: rgba(102, 126, 234, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .example-card .cost-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .example-card .cost-line:last-child {
+            margin-bottom: 0;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-weight: 700;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <header class="admin-header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">📞</span>
+                <span>VoiceAI</span>
+            </div>
+            <div class="header-actions">
+                <a href="/admin" class="btn btn-home">← Back to Dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="pricing-header">
+            <h1>💎 Pricing & Credits</h1>
+            <p>Simple, transparent pricing. Pay only for what you use with no monthly fees or commitments.</p>
+        </div>
+
+        <div class="pricing-cards">
+            <div class="pricing-card">
+                <h2>Starter</h2>
+                <div class="price">£5</div>
+                <div class="credits">100 Credits</div>
+                <ul class="features-list">
+                    <li><span class="check-icon">✓</span> Perfect for testing</li>
+                    <li><span class="check-icon">✓</span> ~100 minutes of calls</li>
+                    <li><span class="check-icon">✓</span> All features included</li>
+                    <li><span class="check-icon">✓</span> No expiry</li>
+                </ul>
+                <button class="buy-btn" onclick="buyCredits(5, 100)">Get Started</button>
+            </div>
+
+            <div class="pricing-card popular">
+                <div class="popular-badge">Most Popular</div>
+                <h2>Professional</h2>
+                <div class="price">£20</div>
+                <div class="credits">500 Credits</div>
+                <ul class="features-list">
+                    <li><span class="check-icon">✓</span> Best value</li>
+                    <li><span class="check-icon">✓</span> ~500 minutes of calls</li>
+                    <li><span class="check-icon">✓</span> 25% bonus credits</li>
+                    <li><span class="check-icon">✓</span> Priority support</li>
+                </ul>
+                <button class="buy-btn" onclick="buyCredits(20, 500)">Buy Now</button>
+            </div>
+
+            <div class="pricing-card">
+                <h2>Business</h2>
+                <div class="price">£50</div>
+                <div class="credits">1500 Credits</div>
+                <ul class="features-list">
+                    <li><span class="check-icon">✓</span> Maximum savings</li>
+                    <li><span class="check-icon">✓</span> ~1500 minutes of calls</li>
+                    <li><span class="check-icon">✓</span> 50% bonus credits</li>
+                    <li><span class="check-icon">✓</span> Dedicated support</li>
+                </ul>
+                <button class="buy-btn" onclick="buyCredits(50, 1500)">Buy Now</button>
+            </div>
+        </div>
+
+        <div class="cost-breakdown">
+            <h2>📊 Cost Breakdown</h2>
+            <table class="cost-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Cost</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Call Connection</strong></td>
+                        <td><span class="highlight">1.0 credit</span></td>
+                        <td>One-time fee per call when answered</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Call Duration</strong></td>
+                        <td><span class="highlight">1.0 credit/minute</span></td>
+                        <td>Charged per minute of active conversation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Appointment Booking</strong></td>
+                        <td><span class="highlight">5.0 credits</span></td>
+                        <td>When AI successfully books an appointment</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Task Creation</strong></td>
+                        <td><span class="highlight">2.0 credits</span></td>
+                        <td>When AI creates a task or reminder</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Advanced Voice (Optional)</strong></td>
+                        <td><span class="highlight">2.0 credits/minute</span></td>
+                        <td>Premium ElevenLabs voices (if enabled)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Call Transfer</strong></td>
+                        <td><span class="highlight">5.0 + 3.0/min</span></td>
+                        <td>Base fee + per minute of transferred call</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <div class="note-title">💡 Important Notes</div>
+                <p>
+                    <strong>Credits never expire</strong> - Use them at your own pace.<br>
+                    <strong>Pay as you go</strong> - No monthly fees, no contracts.<br>
+                    <strong>Full transparency</strong> - See exact costs in your call logs.<br>
+                    <strong>Unused credits roll over</strong> - Buy more anytime to top up.
+                </p>
+            </div>
+        </div>
+
+        <div class="examples">
+            <h2>📞 Example Call Costs</h2>
+            <div class="example-grid">
+                <div class="example-card">
+                    <h3>Simple Inquiry Call</h3>
+                    <div class="scenario">
+                        Customer calls asking about business hours. AI agent provides information and ends call after 2 minutes.
+                    </div>
+                    <div class="cost-detail">
+                        <div class="cost-line">
+                            <span>Connection Fee:</span>
+                            <span>1.0 credit</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>2 minutes @ 1.0/min:</span>
+                            <span>2.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>Total Cost:</span>
+                            <span>3.0 credits</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example-card">
+                    <h3>Appointment Booking</h3>
+                    <div class="scenario">
+                        Customer calls to book an appointment. AI asks questions, checks availability, and books a slot. Call lasts 4 minutes.
+                    </div>
+                    <div class="cost-detail">
+                        <div class="cost-line">
+                            <span>Connection Fee:</span>
+                            <span>1.0 credit</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>4 minutes @ 1.0/min:</span>
+                            <span>4.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>Appointment Booking:</span>
+                            <span>5.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>Total Cost:</span>
+                            <span>10.0 credits</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example-card">
+                    <h3>Call with Transfer</h3>
+                    <div class="scenario">
+                        Customer asks to speak with manager. AI talks for 2 minutes, then transfers. Transfer call lasts 3 minutes.
+                    </div>
+                    <div class="cost-detail">
+                        <div class="cost-line">
+                            <span>Connection Fee:</span>
+                            <span>1.0 credit</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>2 minutes @ 1.0/min:</span>
+                            <span>2.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>Transfer Base Fee:</span>
+                            <span>5.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>3 minutes @ 3.0/min:</span>
+                            <span>9.0 credits</span>
+                        </div>
+                        <div class="cost-line">
+                            <span>Total Cost:</span>
+                            <span>17.0 credits</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function buyCredits(amount, credits) {
+            alert(`Purchase feature coming soon!\n\nYou selected: £${amount} for ${credits} credits\n\nPlease contact support to add credits to your account.`);
+        }
+    </script>
+</body>
+</html>
