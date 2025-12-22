@@ -36,8 +36,28 @@ a { color: var(--text); text-decoration: none; }
 }
 
 .logo {
-  font-weight: 800;
-  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  color: #0b0e24;
+  background: var(--gradient);
+  box-shadow: 0 12px 25px rgba(93, 229, 207, 0.3);
+}
+
+.logo-text {
+  font-size: 1.05rem;
+  text-transform: uppercase;
 }
 
 .main-nav { display: flex; align-items: center; gap: 1rem; font-size: 0.95rem; }
