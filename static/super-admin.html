@@ -523,6 +523,7 @@
                             <tr>
                                 <th>Account</th>
                                 <th>Credits</th>
+                                <th>Plan</th>
                                 <th>Calls (Today)</th>
                                 <th>Last Active</th>
                                 <th>Status</th>
@@ -531,7 +532,7 @@
                         </thead>
                         <tbody id="accountsTableBody">
                             <tr>
-                                <td colspan="6" class="loading">Loading accounts...</td>
+                                <td colspan="7" class="loading">Loading accounts...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -791,6 +792,10 @@
                         <div class="value" id="modalTotalCredits">-</div>
                     </div>
                     <div class="detail-item">
+                        <label>Plan / Trial</label>
+                        <div class="value" id="modalPlan">-</div>
+                    </div>
+                    <div class="detail-item">
                         <label>Voice Setting</label>
                         <div class="value" id="modalVoice">-</div>
                     </div>
@@ -880,7 +885,7 @@
 
                 document.getElementById('totalAccounts').textContent = stats.total_accounts || 0;
                 document.getElementById('totalCalls').textContent = callStats.total_calls || 0;
-                document.getElementById('totalCredits').textContent = stats.total_minutes_used || 0;
+                document.getElementById('totalCredits').textContent = Math.round(stats.total_minutes_used || 0);
                 document.getElementById('systemHealth').textContent = '100%';
                 document.getElementById('healthStatus').textContent = 'All systems operational';
             } catch (error) {
@@ -891,13 +896,14 @@
         async function loadAccounts() {
             try {
                 const response = await fetch('/api/super-admin/accounts');
-                allAccounts = await response.json();
-                
+                const data = await response.json();
+                // Support both legacy (array) and current ({ success, accounts }) API shapes
+                allAccounts = Array.isArray(data) ? data : (data.accounts || []);
                 renderAccounts(allAccounts);
             } catch (error) {
                 console.error('Failed to load accounts:', error);
                 document.getElementById('accountsTableBody').innerHTML = 
-                    '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6;">Failed to load accounts</td></tr>';
+                    '<tr><td colspan="7" style="text-align: center; padding: 40px; opacity: 0.6;">Failed to load accounts</td></tr>';
             }
         }
 
@@ -905,7 +911,7 @@
             const tbody = document.getElementById('accountsTableBody');
             
             if (accounts.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; opacity: 0.6;">No accounts found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; opacity: 0.6;">No accounts found</td></tr>';
                 return;
             }
 
@@ -922,10 +928,27 @@
                     statusText = '⏸️ Suspended';
                 } else {
                     // Check credits for active accounts
-                    status = account.minutes_remaining > 10 ? 'active' : 
-                            account.minutes_remaining > 0 ? 'warning' : 'inactive';
-                    statusText = account.minutes_remaining > 10 ? 'Active' : 
-                                account.minutes_remaining > 0 ? 'Low Credits' : 'No Credits';
+                    const credits = account.minutes_remaining ?? account.credits ?? 0;
+                    status = credits > 10 ? 'active' : 
+                            credits > 0 ? 'warning' : 'inactive';
+                    statusText = credits > 10 ? 'Active' : 
+                                credits > 0 ? 'Low Credits' : 'No Credits';
+                }
+
+                // Plan / Trial state
+                const planStatus = account.plan_status || 'trial';
+                const trialDays = (account.trial_days_remaining ?? 0);
+                let planBadgeClass = 'badge-warning';
+                let planText = 'Free Trial';
+                if (planStatus === 'upgraded') {
+                    planBadgeClass = 'badge-active';
+                    planText = '✅ Upgraded';
+                } else if (planStatus === 'trial_expired') {
+                    planBadgeClass = 'badge-inactive';
+                    planText = '⛔ Trial Expired';
+                } else {
+                    planBadgeClass = 'badge-warning';
+                    planText = `🎁 Free Trial (${trialDays} day${trialDays === 1 ? '' : 's'})`;
                 }
                 
                 return `
@@ -934,7 +957,8 @@
                             <strong>${account.name}</strong><br>
                             <small style="opacity: 0.7;">ID: ${account.user_id}</small>
                         </td>
-                        <td>${account.minutes_remaining || 0} min</td>
+                        <td>${Math.round(account.minutes_remaining ?? account.credits ?? 0)} min</td>
+                        <td><span class="badge ${planBadgeClass}">${planText}</span></td>
                         <td>${account.calls_today || 0}</td>
                         <td>${account.last_call ? formatDate(account.last_call) : 'Never'}</td>
                         <td><span class="badge badge-${status}">${statusText}</span></td>
@@ -950,7 +974,8 @@
             const search = document.getElementById('searchAccounts').value.toLowerCase();
             const filtered = allAccounts.filter(account => 
                 account.name.toLowerCase().includes(search) ||
-                account.user_id.toString().includes(search)
+                account.user_id.toString().includes(search) ||
+                (account.phone_number || '').toLowerCase().includes(search)
             );
             renderAccounts(filtered);
         }
@@ -1264,8 +1289,25 @@
 
                 document.getElementById('modalUserId').textContent = account.user_id;
                 document.getElementById('modalUserName').textContent = account.name;
-                document.getElementById('modalCredits').textContent = `${account.minutes_remaining || 0} credits`;
-                document.getElementById('modalTotalCredits').textContent = `${account.total_minutes_purchased || 0} credits`;
+                document.getElementById('modalCredits').textContent = `${Math.round(account.minutes_remaining || 0)} credits`;
+                document.getElementById('modalTotalCredits').textContent = `${Math.round(account.total_minutes_purchased || 0)} credits`;
+
+                // Plan / Trial (show days left for trial accounts)
+                const planStatus = account.plan_status || 'trial';
+                const trialDays = Number(account.trial_days_remaining ?? 0);
+                let planText = '🎁 Free Trial';
+                if (planStatus === 'upgraded') {
+                    planText = '✅ Upgraded';
+                } else if (planStatus === 'trial_expired') {
+                    planText = '⛔ Trial Expired';
+                } else if (trialDays === 0) {
+                    planText = '🎁 Free Trial - Last day';
+                } else if (trialDays === 1) {
+                    planText = '🎁 Free Trial - 1 day left';
+                } else {
+                    planText = `🎁 Free Trial - ${trialDays} days left`;
+                }
+                document.getElementById('modalPlan').textContent = planText;
                 document.getElementById('modalVoice').textContent = account.voice || 'shimmer';
                 document.getElementById('modalElevenlabs').textContent = account.use_elevenlabs ? '✅ Enabled' : '❌ Disabled';
 

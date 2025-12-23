@@ -20,6 +20,8 @@ import subprocess
 import secrets
 import hashlib
 import time
+import hmac
+import base64 as _py_base64
 from typing import Dict, Optional, List, Tuple
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -59,6 +61,10 @@ def _load_local_dotenv_if_present() -> None:
 
 
 _load_local_dotenv_if_present()
+
+# Super-admin bootstrap: to allow setting the first super-admin password from the
+# Super Admin page (local-only workflows), require a one-time setup token.
+# Set `SUPER_ADMIN_SETUP_TOKEN` in `.env` before using `/super-admin` the first time.
 
 # --- Secret handling (encryption at rest) -----------------------------------
 # We encrypt API keys stored in SQLite (global_settings) using Fernet.
@@ -223,6 +229,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import openai
 import httpx
+import requests
 from elevenlabs import ElevenLabs, VoiceSettings
 from google.cloud import texttospeech
 from pyht import Client as PlayHTClient
@@ -458,417 +465,30 @@ Respond ONLY with valid JSON in this exact format:
 def get_db_connection():
     """Get a database connection with proper settings for concurrency"""
     conn = sqlite3.connect('call_logs.db', timeout=30, check_same_thread=False)
-    conn.execute('PRAGMA journal_mode=WAL')  # Write-Ahead Logging for better concurrency
-    conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout=30000')
     return conn
 
 def init_database():
-    """Initialize SQLite database for call logs"""
+    """
+    Check for the existence of the database and key tables.
+    If they don't exist, prompt the user to run setup_database.py
+    """
+    if not os.path.exists('call_logs.db'):
+        print("Database not found. Please run 'python setup_database.py' to initialize the database.")
+        exit(1)
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Create users table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            last_login TEXT
-        )
-    ''')
-    
-    # Create sessions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            session_token TEXT UNIQUE NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            expires_at TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            call_uuid TEXT UNIQUE,
-            caller_number TEXT,
-            called_number TEXT,
-            start_time TEXT,
-            end_time TEXT,
-            duration INTEGER,
-            transcript TEXT,
-            summary TEXT,
-            status TEXT DEFAULT 'active',
-            user_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    # Add user_id column if it doesn't exist (for existing databases)
+    # Check for a key table to verify initialization
     try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN user_id INTEGER')
-    except:
-        pass  # Column already exists
-    
-    # Add status column if it doesn't exist (for existing databases)
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN status TEXT DEFAULT "active"')
-    except:
-        pass  # Column already exists
-    
-    # Add average_response_time column if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN average_response_time REAL')
-    except:
-        pass  # Column already exists
-    
-    # Add transfer tracking columns
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_initiated INTEGER DEFAULT 0')
-    except:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_duration INTEGER DEFAULT 0')
-    except:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN transfer_credits_charged REAL DEFAULT 0')
-    except:
-        pass  # Column already exists
-    
-    # Add credits tracking columns
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN booking_credits_charged REAL DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN task_credits_charged REAL DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN advanced_voice_credits_charged REAL DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN sales_detector_credits_charged REAL DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN sales_confidence INTEGER DEFAULT NULL')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN sales_reasoning TEXT DEFAULT NULL')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE calls ADD COLUMN sales_ended_by_detector INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    # Create appointments table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            time TEXT NOT NULL,
-            duration INTEGER DEFAULT 30,
-            title TEXT,
-            description TEXT,
-            customer_name TEXT,
-            customer_phone TEXT,
-            status TEXT DEFAULT 'scheduled',
-            created_by TEXT DEFAULT 'user',
-            call_uuid TEXT,
-            user_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    # Create tasks table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            description TEXT NOT NULL,
-            completed INTEGER DEFAULT 0,
-            source TEXT DEFAULT 'manual',
-            call_uuid TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    # Add user_id to appointments if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE appointments ADD COLUMN user_id INTEGER')
-    except:
-        pass
-    
-    # Create account_settings table for minutes tracking (per user)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS account_settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER UNIQUE NOT NULL,
-            minutes_remaining INTEGER DEFAULT 60,
-            total_minutes_purchased INTEGER DEFAULT 60,
-            voice TEXT DEFAULT 'shimmer',
-            use_elevenlabs INTEGER DEFAULT 0,
-            last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    # Add voice column if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN voice TEXT DEFAULT "shimmer"')
-    except:
-        pass
-    
-    # Add use_elevenlabs column if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN use_elevenlabs INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    # Add elevenlabs_voice_id column if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN elevenlabs_voice_id TEXT DEFAULT "EXAVITQu4vr4xnSDxMaL"')
-    except:
-        pass
-    
-    # Add phone_number column if doesn't exist
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN phone_number TEXT')
-    except:
-        pass
-    
-    # Add response_latency column if doesn't exist (in milliseconds)
-    # AI-optimized default: 300ms balances speed and natural conversation
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN response_latency INTEGER DEFAULT 300')
-    except:
-        pass
-    
-    # Add voice_provider column (openai, elevenlabs, cartesia, google)
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN voice_provider TEXT DEFAULT "openai"')
-    except:
-        pass
-    
-    # Add cartesia_voice_id column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN cartesia_voice_id TEXT DEFAULT "a0e99841-438c-4a64-b679-ae501e7d6091"')
-    except:
-        pass
-    
-    # Add google_voice column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN google_voice TEXT DEFAULT "en-GB-Neural2-A"')
-    except:
-        pass
-    
-    # Add playht_voice_id column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN playht_voice_id TEXT DEFAULT "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json"')
-    except:
-        pass
-    
-    # Add agent_name column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN agent_name TEXT DEFAULT "Judie"')
-    except:
-        pass
-    
-    # Add business_info column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN business_info TEXT DEFAULT ""')
-    except:
-        pass
-    
-    # Add agent_personality column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN agent_personality TEXT DEFAULT "Friendly and professional. Keep responses brief and conversational."')
-    except:
-        pass
-    
-    # Add agent_instructions column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN agent_instructions TEXT DEFAULT "Answer questions about the business. Take messages if needed."')
-    except:
-        pass
-    
-    # Add calendar_booking_enabled column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN calendar_booking_enabled INTEGER DEFAULT 1')
-    except:
-        pass
-    
-    # Add tasks_enabled column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN tasks_enabled INTEGER DEFAULT 1')
-    except:
-        pass
-    
-    # Add advanced_voice_enabled column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN advanced_voice_enabled INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    # Add sales_detector_enabled column
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN sales_detector_enabled INTEGER DEFAULT 0')
-    except:
-        pass
-
-    # Add call_greeting column (strict opening line the agent should say first)
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN call_greeting TEXT DEFAULT ""')
-    except:
-        pass
-    
-    # Add transfer_number column for auto-transfer feature
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN transfer_number TEXT DEFAULT ""')
-    except:
-        pass
-
-    # Add transfer_people column for transfer-by-name offering (up to 5 names stored as JSON)
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN transfer_people TEXT DEFAULT "[]"')
-    except:
-        pass
-    
-    # Add first_login_completed for onboarding flow
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN first_login_completed INTEGER DEFAULT 0')
-        # Mark all existing accounts as completed so they don't see the welcome modal
-        cursor.execute('UPDATE account_settings SET first_login_completed = 1 WHERE first_login_completed IS NULL OR first_login_completed = 0')
-        conn.commit()
-    except:
-        pass
-    
-    # Create global_settings table for admin-controlled settings
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS global_settings (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            global_instructions TEXT DEFAULT '',
-            speechmatics_api_key TEXT DEFAULT NULL,
-            openai_api_key TEXT DEFAULT NULL,
-            deepseek_api_key TEXT DEFAULT NULL,
-            vonage_api_key TEXT DEFAULT NULL,
-            vonage_api_secret TEXT DEFAULT NULL,
-            vonage_application_id TEXT DEFAULT NULL,
-            vonage_private_key_pem TEXT DEFAULT NULL,
-            ai_brain_provider TEXT DEFAULT 'openai',
-            filler_words TEXT DEFAULT '',
-            last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_by TEXT DEFAULT 'admin'
-        )
-    ''')
-
-    # Add filler_words column if global_settings already existed
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN filler_words TEXT DEFAULT ""')
-    except:
-        pass
-
-    # Add Vonage credential columns if global_settings already existed
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_api_key TEXT DEFAULT NULL')
-    except:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_api_secret TEXT DEFAULT NULL')
-    except:
-        pass
-
-    # Add Vonage application credentials (for JWT / call control)
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_application_id TEXT DEFAULT NULL')
-    except:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN vonage_private_key_pem TEXT DEFAULT NULL')
-    except:
-        pass
-
-    # Add DeepSeek API key column
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN deepseek_api_key TEXT DEFAULT NULL')
-    except:
-        pass
-
-    # Add AI brain provider selection column
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN ai_brain_provider TEXT DEFAULT "openai"')
-    except:
-        pass
-
-    # Backchannel / turn-taking tuning (global)
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN ignore_backchannels_always INTEGER DEFAULT 1')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN backchannel_max_words INTEGER DEFAULT 3')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN min_user_turn_seconds REAL DEFAULT 0.45')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE global_settings ADD COLUMN barge_in_min_speech_seconds REAL DEFAULT 0.55')
-    except:
-        pass
-    
-    # Add account suspension tracking columns
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN is_suspended INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspension_reason TEXT DEFAULT NULL')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspended_at TEXT DEFAULT NULL')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN suspension_count INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE account_settings ADD COLUMN last_flag_details TEXT DEFAULT NULL')
-    except:
-        pass
-    
-    # Initialize global_settings with default empty instructions
-    cursor.execute('INSERT OR IGNORE INTO global_settings (id, global_instructions) VALUES (1, "")')
-    
-    conn.commit()
-    conn.close()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if cursor.fetchone() is None:
+            print("Database is not initialized correctly. Please run 'python setup_database.py'.")
+            exit(1)
+    finally:
+        conn.close()
 
 # Initialize database on startup
 init_database()
@@ -925,6 +545,19 @@ def load_global_api_keys():
                 cursor.execute(f"UPDATE global_settings SET {set_clause} WHERE id = 1", params)
                 conn.commit()
                 logger.info("🔐 Encrypted plaintext API keys in database (migration)")
+
+            # One-time migration: fix trial accounts that have incorrect total_minutes_purchased
+            # Trial accounts should have total_minutes_purchased = 0 (they haven't bought anything)
+            cursor.execute('''
+                UPDATE account_settings 
+                SET total_minutes_purchased = 0 
+                WHERE total_minutes_purchased > 0 
+                  AND trial_start_date IS NOT NULL
+                  AND minutes_remaining <= 60
+            ''')
+            if cursor.rowcount > 0:
+                conn.commit()
+                logger.info(f"✅ Fixed {cursor.rowcount} trial account(s) with incorrect total_minutes_purchased")
 
             # Update CONFIG with decrypted keys from database if they exist
             if speechmatics_key:
@@ -1184,6 +817,251 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
         return None
     
     return user_id
+
+
+# ============================================================================
+# SUPER ADMIN AUTH (SERVER-SIDE)
+# ============================================================================
+
+_SUPER_ADMIN_COOKIE = "website33_super_admin"
+_SUPER_ADMIN_CSRF_COOKIE = "website33_super_admin_csrf"
+_SUPER_ADMIN_SESSION_TTL_SECONDS = int(os.getenv("SUPER_ADMIN_SESSION_TTL_SECONDS", "28800"))  # 8 hours
+
+
+def _get_super_admin_db_config() -> Optional[Tuple[str, str]]:
+    """Return (username, password_hash) from DB if configured."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, password_hash FROM super_admin_config WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        username = (row[0] or "").strip()
+        password_hash = (row[1] or "").strip()
+        if not username or not password_hash:
+            return None
+        return username, password_hash
+    except Exception:
+        return None
+
+
+def _get_configured_super_admin_username() -> str:
+    env_user = (os.getenv("SUPER_ADMIN_USERNAME") or "").strip()
+    if env_user:
+        return env_user
+    db_cfg = _get_super_admin_db_config()
+    if db_cfg:
+        return db_cfg[0]
+    return "admin"
+
+
+def _db_super_admin_password_hash() -> str:
+    cfg = _get_super_admin_db_config()
+    return cfg[1] if cfg else ""
+
+
+def _pbkdf2_sha256(password: str, salt: bytes, iterations: int) -> bytes:
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+
+
+def _parse_password_hash(spec: str) -> Optional[Tuple[int, bytes, bytes]]:
+    """Parse `pbkdf2_sha256$<iterations>$<salt_b64>$<hash_b64>` into components."""
+    try:
+        def _pad(b64: str) -> str:
+            b64 = (b64 or "").strip()
+            return b64 + ("=" * ((4 - (len(b64) % 4)) % 4))
+
+        raw = (spec or "").strip()
+        if not raw:
+            return None
+        parts = raw.split("$")
+        if len(parts) != 4:
+            return None
+        algo, iters_s, salt_b64, hash_b64 = parts
+        if algo != "pbkdf2_sha256":
+            return None
+        iterations = int(iters_s)
+        salt = _py_base64.urlsafe_b64decode(_pad(salt_b64).encode("utf-8"))
+        expected = _py_base64.urlsafe_b64decode(_pad(hash_b64).encode("utf-8"))
+        if iterations < 100_000:
+            return None
+        if not salt or not expected:
+            return None
+        return iterations, salt, expected
+    except Exception:
+        return None
+
+
+def _super_admin_password_configured() -> bool:
+    return bool(
+        (os.getenv("SUPER_ADMIN_PASSWORD_HASH") or "").strip()
+        or (os.getenv("SUPER_ADMIN_PASSWORD") or "").strip()
+        or _db_super_admin_password_hash()
+    )
+
+
+def _verify_super_admin_password(password: str) -> bool:
+    password = (password or "")
+    if not password:
+        return False
+
+    spec = (os.getenv("SUPER_ADMIN_PASSWORD_HASH") or "").strip()
+    parsed = _parse_password_hash(spec) if spec else None
+    if parsed is not None:
+        iterations, salt, expected = parsed
+        actual = _pbkdf2_sha256(password, salt, iterations)
+        return hmac.compare_digest(actual, expected)
+
+    plain = (os.getenv("SUPER_ADMIN_PASSWORD") or "").strip()
+    if not plain:
+        # Fall back to DB-backed hash (local installs).
+        db_spec = _db_super_admin_password_hash()
+        db_parsed = _parse_password_hash(db_spec) if db_spec else None
+        if db_parsed is not None:
+            iterations, salt, expected = db_parsed
+            actual = _pbkdf2_sha256(password, salt, iterations)
+            return hmac.compare_digest(actual, expected)
+        return False
+    return secrets.compare_digest(password, plain)
+
+
+def _make_password_hash_spec(password: str, iterations: int) -> str:
+    salt = secrets.token_bytes(16)
+    dk = _pbkdf2_sha256(password, salt, iterations)
+
+    def _b64(data: bytes) -> str:
+        return _py_base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+    return f"pbkdf2_sha256${iterations}${_b64(salt)}${_b64(dk)}"
+
+
+def _issue_super_admin_session(request: Request) -> Tuple[str, str]:
+    """Create a server-side session and return (session_token, csrf_token)."""
+    session_token = secrets.token_urlsafe(48)
+    csrf_token = secrets.token_urlsafe(32)
+    now = datetime.now()
+    expires = now + timedelta(seconds=_SUPER_ADMIN_SESSION_TTL_SECONDS)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR REPLACE INTO super_admin_sessions (token_sha256, created_at, expires_at, last_used_at, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            _sha256_hex(session_token),
+            now.isoformat(),
+            expires.isoformat(),
+            now.isoformat(),
+            _request_ip(request),
+            (request.headers.get("user-agent") or "")[:500],
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return session_token, csrf_token
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _request_ip(request: Request) -> str:
+    try:
+        if request.client and request.client.host:
+            return str(request.client.host)
+    except Exception:
+        pass
+    return ""
+
+
+def _is_secure_request(request: Request) -> bool:
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if proto in ("https", "http"):
+        return proto == "https"
+    try:
+        return (request.url.scheme or "").lower() == "https"
+    except Exception:
+        return False
+
+
+_super_admin_login_attempts: Dict[str, List[float]] = {}
+
+
+def _rate_limit_super_admin_login(ip: str, max_attempts: int = 8, window_seconds: int = 900) -> bool:
+    now = time.time()
+    key = ip or "unknown"
+    attempts = _super_admin_login_attempts.get(key, [])
+    cutoff = now - window_seconds
+    attempts = [t for t in attempts if t >= cutoff]
+    if len(attempts) >= max_attempts:
+        _super_admin_login_attempts[key] = attempts
+        return False
+    attempts.append(now)
+    _super_admin_login_attempts[key] = attempts
+    return True
+
+
+def _super_admin_session_valid(token: str) -> bool:
+    token = (token or "").strip()
+    if not token:
+        return False
+    token_hash = _sha256_hex(token)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT expires_at FROM super_admin_sessions WHERE token_sha256 = ?",
+            (token_hash,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False
+
+        expires_at = row[0]
+        try:
+            expires_dt = datetime.fromisoformat(expires_at)
+        except Exception:
+            expires_dt = datetime.min
+
+        if expires_dt < datetime.now():
+            cursor.execute("DELETE FROM super_admin_sessions WHERE token_sha256 = ?", (token_hash,))
+            conn.commit()
+            conn.close()
+            return False
+
+        cursor.execute(
+            "UPDATE super_admin_sessions SET last_used_at = ? WHERE token_sha256 = ?",
+            (datetime.now().isoformat(), token_hash),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def _super_admin_require_auth(request: Request) -> None:
+    token = (request.cookies.get(_SUPER_ADMIN_COOKIE) or "").strip()
+    if not token or not _super_admin_session_valid(token):
+        raise HTTPException(status_code=401, detail="Super admin authentication required")
+
+
+def _super_admin_require_csrf(request: Request) -> None:
+    if request.method.upper() in ("GET", "HEAD", "OPTIONS"):
+        return
+
+    csrf_cookie = (request.cookies.get(_SUPER_ADMIN_CSRF_COOKIE) or "").strip()
+    csrf_header = (request.headers.get("x-csrf-token") or "").strip()
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+        raise HTTPException(status_code=403, detail="CSRF validation failed")
+
+    origin = (request.headers.get("origin") or "").strip()
+    if origin:
+        base = str(request.base_url).rstrip("/")
+        if not origin.startswith(base):
+            raise HTTPException(status_code=403, detail="Invalid origin")
 
 # ============================================================================
 # MINUTES TRACKING
@@ -1752,6 +1630,7 @@ class CallSession:
         # Filler injection (post-utterance)
         self._filler_played_for_turn = False
         self._filler_injecting = False
+        self._suppress_filler_for_turn: bool = False
         self._last_filler_phrase: Optional[str] = None
         self._used_fillers_this_call: set = set()  # Track which fillers we've used
         self._suppress_openai_output_until = 0.0
@@ -1771,6 +1650,11 @@ class CallSession:
         self._speechmatics_tts_worker_task: Optional[asyncio.Task] = None
         # Increment to invalidate any in-flight Speechmatics stream (barge-in).
         self._speechmatics_output_generation: int = 0
+
+        # Generic TTS output generation counter (ElevenLabs/Cartesia/Google/PlayHT/OpenAI audio).
+        # Incrementing this invalidates any in-flight TTS stream loops so we stop sending audio
+        # immediately on barge-in.
+        self._tts_output_generation: int = 0
 
         # Vonage websocket framing varies by integration; default to binary.
         # If we detect JSON base64 audio inbound, we mirror it outbound.
@@ -1855,28 +1739,50 @@ class CallSession:
             await asyncio.sleep(delay)
             if not self.is_active or not self.openai_ws:
                 return
-            if not self._caller_speaking:
+            # VAD can briefly flap between speaking/stopped on the caller side.
+            # Treat this as sustained if they are still speaking *or* we saw speech activity
+            # very recently.
+            now_t = asyncio.get_event_loop().time()
+            recently_active = (now_t - (self._last_speech_time or 0.0)) <= 0.25
+            if not self._caller_speaking and not recently_active:
                 return
             if not self._agent_speaking:
                 return
 
-            voice_provider = getattr(self, 'voice_provider', 'openai')
-            logger.info(f"[{self.call_uuid}] Caller interrupted (sustained) - canceling response")
-
-            # Stop any external TTS output (Speechmatics) only for real interruptions.
-            if voice_provider == 'speechmatics':
-                self._barge_in_stop_speechmatics()
-
-            try:
-                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-            except Exception as e:
-                logger.warning(f"[{self.call_uuid}] Failed to cancel OpenAI response: {e}")
-            self._agent_speaking = False
-            self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.0
+            logger.info(f"[{self.call_uuid}] Caller interrupted (sustained) - stopping agent output")
+            await self._interrupt_agent_output("barge_in_sustained")
         except asyncio.CancelledError:
             return
         except Exception as e:
             logger.warning(f"[{self.call_uuid}] Barge-in delay task error: {e}")
+
+    async def _interrupt_agent_output(self, reason: str) -> None:
+        """Best-effort stop of any in-flight agent audio and OpenAI response.
+
+        This is used for barge-in. It invalidates all TTS streams, clears any queued
+        Speechmatics segments, and cancels any active OpenAI response.
+        """
+        # Invalidate all external TTS streams.
+        self._tts_output_generation += 1
+
+        # Invalidate Speechmatics streams/queue.
+        self._barge_in_stop_speechmatics()
+
+        # Stop any filler playback state.
+        self._filler_injecting = False
+        self._suppress_filler_for_turn = True
+
+        # Mark agent not speaking; individual TTS senders will also stop sending.
+        self._agent_speaking = False
+
+        # Drop any trailing OpenAI deltas that might already be in flight.
+        self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.0
+
+        try:
+            if self.openai_ws:
+                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Failed to cancel OpenAI response ({reason}): {e}")
 
     async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
         if not self.vonage_ws:
@@ -2016,8 +1922,8 @@ class CallSession:
                 "type": "conversation.item.create",
                 "item": {
                     "type": "message",
-                    "role": "user",
-                    "content": [{"type": "text", "text": msg}]
+                    "role": "system",
+                    "content": [{"type": "input_text", "text": msg}]
                 }
             }))
         except Exception as e:
@@ -2506,7 +2412,7 @@ Provide your analysis."""
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
+                    "content": [{"type": "input_text", "text": f"[System: Politely end this sales call with: {goodbye_message}]"}]
                 }
             }))
             
@@ -2804,17 +2710,8 @@ You MUST follow these instructions in ALL calls."""
                             "type": "conversation.item.create",
                             "item": {
                                 "type": "message",
-                                "role": "user",
-                                "content": [{"type": "text", "text": global_context}]
-                            }
-                        }))
-                        
-                        await self.openai_ws.send(json.dumps({
-                            "type": "conversation.item.create",
-                            "item": {
-                                "type": "message",
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": "Acknowledged. I will follow all mandatory global instructions for this call."}]
+                                "role": "system",
+                                "content": [{"type": "input_text", "text": global_context}]
                             }
                         }))
                         logger.info(f"[{self.call_uuid}] ✓ Injected GLOBAL instructions into conversation")
@@ -2833,17 +2730,8 @@ You must use ONLY this information when answering questions about services, area
                         "type": "conversation.item.create",
                         "item": {
                             "type": "message",
-                            "role": "user",
-                            "content": [{"type": "text", "text": business_context}]
-                        }
-                    }))
-                    
-                    await self.openai_ws.send(json.dumps({
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "message",
-                            "role": "assistant",
-                            "content": [{"type": "text", "text": "Understood. I will refer to this business information for all responses."}]
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": business_context}]
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
@@ -2923,10 +2811,14 @@ You must use ONLY this information when answering questions about services, area
                     # Reset filler-per-turn state
                     self._filler_played_for_turn = False
                     self._last_filler_phrase = None
+                    # Reset per-turn suppression; we only suppress filler if this becomes a barge-in.
+                    self._suppress_filler_for_turn = False
                     # Don't reset _used_fillers_this_call - keep tracking throughout conversation
 
                     # If agent is speaking, cancel current response to allow interruption
                     if self._agent_speaking:
+                        # Caller is talking over the agent; suppress filler for this turn.
+                        self._suppress_filler_for_turn = True
                         # Delay barge-in slightly: if the caller only says "ok/right/yeah" we keep speaking.
                         # If they keep talking past the threshold, we cancel in _maybe_barge_in_after_delay().
                         if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
@@ -2995,6 +2887,7 @@ You must use ONLY this information when answering questions about services, area
                         and not self._filler_played_for_turn
                         and not self._filler_injecting
                         and not self._agent_speaking
+                        and not self._suppress_filler_for_turn
                         and self._last_speech_duration_seconds >= min_turn
                     ):
                         candidate = self._pick_random_global_filler("sarah")
@@ -3021,6 +2914,18 @@ You must use ONLY this information when answering questions about services, area
                     
                 elif event_type == "conversation.item.input_audio_transcription.completed":
                     transcript = event.get("transcript", "")
+
+                    # If the caller is saying something substantive while the agent is speaking,
+                    # stop the agent output immediately (true barge-in). We only skip this for
+                    # short backchannels like "ok" / "yeah".
+                    if (
+                        transcript
+                        and self._agent_speaking
+                        and not self._is_backchannel_utterance(transcript)
+                    ):
+                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (non-backchannel) - interrupting agent output: {transcript!r}")
+                        await self._interrupt_agent_output("barge_in_transcript")
+
                     # If the caller is just backchanneling while the agent is talking, ignore it:
                     # don't stop TTS, and cancel any auto-response triggered by that utterance.
                     # Also ignore pure backchannels even when the agent is not speaking ("ok", "yeah", etc.)
@@ -3364,10 +3269,15 @@ You must use ONLY this information when answering questions about services, area
                     
                     logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']}: {transcript}")
                     self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {transcript}")
-                    self._agent_speaking = False
                     
                     # Get user's voice provider preference
                     voice_provider = getattr(self, 'voice_provider', 'openai')
+
+                    # NOTE: For Speechmatics, `response.text.done` can arrive while external TTS
+                    # is still streaming (early sentence-by-sentence mode). Do NOT mark the
+                    # agent as not speaking here; `_send_speechmatics_audio()` owns that state.
+                    if voice_provider != 'speechmatics':
+                        self._agent_speaking = False
                     
                     # Only generate audio if we haven't already started (for non-ElevenLabs or if ElevenLabs didn't trigger early)
                     audio_already_started = getattr(self, '_audio_generation_started', False)
@@ -3495,6 +3405,7 @@ You must use ONLY this information when answering questions about services, area
     async def _send_audio_to_vonage(self, audio_b64: str):
         """Send audio from OpenAI to Vonage (with resampling)"""
         try:
+            my_generation = getattr(self, "_tts_output_generation", 0)
             # Decode base64 audio (24kHz from OpenAI)
             audio_24k = np.frombuffer(
                 base64.b64decode(audio_b64), 
@@ -3509,19 +3420,23 @@ You must use ONLY this information when answering questions about services, area
             audio_bytes = (audio_16k * 32767).astype(np.int16).tobytes()
             
             # Send to Vonage WebSocket
-            await self._send_vonage_audio_bytes(audio_bytes)
+            if my_generation == getattr(self, "_tts_output_generation", 0) and not self._caller_speaking:
+                await self._send_vonage_audio_bytes(audio_bytes)
             
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Error sending audio to Vonage: {e}")
     
     async def _send_cartesia_audio(self, text: str) -> bool:
         """Generate audio using Cartesia WebSocket streaming and send to Vonage - ULTRA LOW LATENCY."""
+        my_generation = getattr(self, "_tts_output_generation", 0)
         try:
             # Clean up text
             text = text.strip()
             if not text:
                 logger.warning(f"[{self.call_uuid}] Empty text for Cartesia, skipping")
                 return False
+
+            self._agent_speaking = True
             
             import time
             start_time = time.time()
@@ -3552,11 +3467,18 @@ You must use ONLY this information when answering questions about services, area
                 },
                 stream=True
             ):
+                if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                    logger.info(f"[{self.call_uuid}] 🛑 Cartesia interrupted (barge-in)")
+                    break
+
                 if chunk.audio and self.vonage_ws and self.is_active:
                     chunk_buffer += chunk.audio
                     
                     # Send immediately when buffer reaches minimum - don't wait
                     if len(chunk_buffer) >= min_buffer_size:
+                        if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                            logger.info(f"[{self.call_uuid}] 🛑 Cartesia interrupted before send")
+                            break
                         await self._send_vonage_audio_bytes(chunk_buffer)
                         total_bytes += len(chunk_buffer)
                         chunk_count += 1
@@ -3569,7 +3491,13 @@ You must use ONLY this information when answering questions about services, area
                         chunk_buffer = b''
             
             # Send any remaining audio
-            if chunk_buffer and self.vonage_ws and self.is_active:
+            if (
+                chunk_buffer
+                and self.vonage_ws
+                and self.is_active
+                and my_generation == getattr(self, "_tts_output_generation", 0)
+                and not self._caller_speaking
+            ):
                 await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
@@ -3588,9 +3516,13 @@ You must use ONLY this information when answering questions about services, area
             import traceback
             logger.error(traceback.format_exc())
             return False
+        finally:
+            if my_generation == getattr(self, "_tts_output_generation", 0):
+                self._agent_speaking = False
     
     async def _send_elevenlabs_audio(self, text: str) -> bool:
         """Generate audio using ElevenLabs and send to Vonage. Returns True on success."""
+        my_generation = getattr(self, "_tts_output_generation", 0)
         try:
             logger.info(f"[{self.call_uuid}] 🎙️ Starting ElevenLabs audio generation for: {text[:50]}...")
             
@@ -3621,6 +3553,8 @@ You must use ONLY this information when answering questions about services, area
             )
             
             logger.info(f"[{self.call_uuid}] Streaming audio chunks from ElevenLabs...")
+
+            self._agent_speaking = True
             
             import time
             start_time = time.time()
@@ -3633,11 +3567,18 @@ You must use ONLY this information when answering questions about services, area
             min_buffer_size = 2048  # 2KB for smooth playback (~125ms of audio)
             
             for chunk in audio_generator:
+                if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                    logger.info(f"[{self.call_uuid}] 🛑 ElevenLabs interrupted (barge-in)")
+                    break
+
                 if chunk and self.is_active and self.vonage_ws:
                     chunk_buffer += chunk
                     
                     # Send when we have enough for smooth playback
                     if len(chunk_buffer) >= min_buffer_size:
+                        if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                            logger.info(f"[{self.call_uuid}] 🛑 ElevenLabs interrupted before send")
+                            break
                         await self._send_vonage_audio_bytes(chunk_buffer)
                         total_bytes += len(chunk_buffer)
                         chunk_count += 1
@@ -3650,7 +3591,13 @@ You must use ONLY this information when answering questions about services, area
                         chunk_buffer = b''
             
             # Send any remaining audio
-            if chunk_buffer and self.vonage_ws and self.is_active:
+            if (
+                chunk_buffer
+                and self.vonage_ws
+                and self.is_active
+                and my_generation == getattr(self, "_tts_output_generation", 0)
+                and not self._caller_speaking
+            ):
                 await self._send_vonage_audio_bytes(chunk_buffer)
                 total_bytes += len(chunk_buffer)
                 chunk_count += 1
@@ -3664,13 +3611,15 @@ You must use ONLY this information when answering questions about services, area
             import traceback
             logger.error(traceback.format_exc())
             return False
+        finally:
+            if my_generation == getattr(self, "_tts_output_generation", 0):
+                self._agent_speaking = False
     
     async def _send_speechmatics_audio(self, text: str) -> bool:
         """Generate audio using Speechmatics TTS STREAMING and send to Vonage. Returns True on success."""
+        my_generation = self._speechmatics_output_generation
         try:
             logger.info(f"[{self.call_uuid}] 🎙️ Starting Speechmatics TTS for: {text[:50]}...")
-
-            my_generation = self._speechmatics_output_generation
             
             # Stop any ongoing filler playback - actual response is ready
             self._agent_speaking = True
@@ -3761,6 +3710,12 @@ You must use ONLY this information when answering questions about services, area
             logger.error(traceback.format_exc())
             return False
 
+        finally:
+            # If this generation was superseded via barge-in, we still want to clear speaking.
+            # If a new Speechmatics chunk starts immediately after, it will set `_agent_speaking=True` again.
+            if my_generation <= self._speechmatics_output_generation:
+                self._agent_speaking = False
+
     async def _enqueue_speechmatics_tts(self, text: str) -> None:
         """Queue text for Speechmatics TTS and ensure a single worker streams in order."""
         if not text or not text.strip() or not self.is_active:
@@ -3789,6 +3744,7 @@ You must use ONLY this information when answering questions about services, area
     
     async def _send_google_tts_audio(self, text: str) -> bool:
         """Generate audio using Google Cloud TTS and send to Vonage. Returns True on success."""
+        my_generation = getattr(self, "_tts_output_generation", 0)
         try:
             logger.info(f"[{self.call_uuid}] 🎙️ Starting Google Cloud TTS audio generation for: {text[:50]}...")
             
@@ -3874,10 +3830,16 @@ You must use ONLY this information when answering questions about services, area
             # Audio is already PCM 16kHz
             # Convert to int16 numpy array
             audio_array = np.frombuffer(audio_data, dtype=np.int16)
-            
-            # Send all at once (like OpenAI/ElevenLabs)
+
+            # Send all at once. If a barge-in happened while generating, don't send.
+            if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                logger.info(f"[{self.call_uuid}] 🛑 Google TTS interrupted (barge-in) - skipping send")
+                return True
+
+            self._agent_speaking = True
+
             if self.vonage_ws and self.is_active:
-                await self.vonage_ws.send_bytes(audio_array.tobytes())
+                await self._send_vonage_audio_bytes(audio_array.tobytes())
                 logger.info(f"[{self.call_uuid}] ✅ Google TTS audio sent successfully ({len(audio_data)} bytes)")
             else:
                 logger.warning(f"[{self.call_uuid}] Vonage WS disconnected, cannot send audio")
@@ -3890,9 +3852,13 @@ You must use ONLY this information when answering questions about services, area
             import traceback
             logger.error(traceback.format_exc())
             return False
+        finally:
+            if my_generation == getattr(self, "_tts_output_generation", 0):
+                self._agent_speaking = False
     
     async def _send_playht_audio(self, text: str) -> bool:
         """Generate audio using PlayHT API v2 and send to Vonage. Returns True on success."""
+        my_generation = getattr(self, "_tts_output_generation", 0)
         try:
             logger.info(f"[{self.call_uuid}] 🎙️ Starting PlayHT audio generation for: {text[:50]}...")
             
@@ -3964,10 +3930,16 @@ You must use ONLY this information when answering questions about services, area
             audio = AudioSegment.from_mp3(BytesIO(audio_data))
             audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
             pcm_data = audio.raw_data
-            
-            # Send all at once
+
+            # If barge-in happened while generating/transcoding, don't send.
+            if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                logger.info(f"[{self.call_uuid}] 🛑 PlayHT interrupted (barge-in) - skipping send")
+                return True
+
+            self._agent_speaking = True
+
             if self.vonage_ws and self.is_active:
-                await self.vonage_ws.send_bytes(pcm_data)
+                await self._send_vonage_audio_bytes(pcm_data)
                 logger.info(f"[{self.call_uuid}] ✅ PlayHT audio sent successfully ({len(pcm_data)} bytes)")
             else:
                 logger.warning(f"[{self.call_uuid}] Vonage WS disconnected, cannot send audio")
@@ -3980,6 +3952,9 @@ You must use ONLY this information when answering questions about services, area
             import traceback
             logger.error(traceback.format_exc())
             return False
+        finally:
+            if my_generation == getattr(self, "_tts_output_generation", 0):
+                self._agent_speaking = False
     
     async def _handle_book_appointment(self, call_id: str, arguments: dict):
         """Handle appointment booking function call from AI"""
@@ -4562,6 +4537,42 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.middleware("http")
+async def super_admin_security_middleware(request: Request, call_next):
+    """Enforce server-side authentication for super-admin and admin control APIs."""
+    path = request.url.path or ""
+    try:
+        is_super_admin_api = path.startswith("/api/super-admin")
+        is_admin_api = path.startswith("/api/admin")
+
+        if is_super_admin_api or is_admin_api:
+            # Allow unauthenticated preflight
+            if request.method.upper() == "OPTIONS":
+                return await call_next(request)
+
+            # Allow bootstrap/status/login without an existing session
+            if path in ("/api/super-admin/login", "/api/super-admin/status", "/api/super-admin/bootstrap"):
+                return await call_next(request)
+
+            if not _super_admin_password_configured():
+                raise HTTPException(status_code=503, detail="Super admin is not configured")
+
+            _super_admin_require_auth(request)
+            _super_admin_require_csrf(request)
+
+        response = await call_next(request)
+    except HTTPException as e:
+        response = JSONResponse(status_code=e.status_code, content={"success": False, "error": e.detail})
+    except Exception:
+        response = JSONResponse(status_code=500, content={"success": False, "error": "Internal server error"})
+
+    # Prevent caching of sensitive endpoints/pages.
+    if path.startswith("/api/super-admin") or path.startswith("/api/admin") or path in ("/super-admin", "/super-admin.html"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the landing page"""
@@ -4619,11 +4630,183 @@ async def super_admin():
 
 
 @app.get("/super-admin.html", response_class=HTMLResponse)
-@app.get("/super-admin.html", response_class=HTMLResponse)
 async def super_admin_html():
     """Serve the super admin dashboard"""
     with open("static/super-admin_current.html", "r", encoding="utf-8") as f:
         return f.read()
+
+
+@app.post("/api/super-admin/login")
+async def super_admin_login(request: Request):
+    """Create a super-admin session and set secure cookies."""
+    if not _super_admin_password_configured():
+        raise HTTPException(status_code=503, detail="Super admin is not configured")
+
+    ip = _request_ip(request)
+    if not _rate_limit_super_admin_login(ip):
+        raise HTTPException(status_code=429, detail="Too many login attempts")
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    password = (data.get("password") or "").strip()
+    configured_user = _get_configured_super_admin_username()
+    username = (data.get("username") or configured_user).strip()
+    if configured_user and username != configured_user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not _verify_super_admin_password(password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    try:
+        session_token, csrf_token = _issue_super_admin_session(request)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create session")
+
+    secure = _is_secure_request(request)
+    resp = JSONResponse({"success": True})
+    resp.set_cookie(
+        _SUPER_ADMIN_COOKIE,
+        session_token,
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+        max_age=_SUPER_ADMIN_SESSION_TTL_SECONDS,
+        path="/",
+    )
+    resp.set_cookie(
+        _SUPER_ADMIN_CSRF_COOKIE,
+        csrf_token,
+        httponly=False,
+        secure=secure,
+        samesite="strict",
+        max_age=_SUPER_ADMIN_SESSION_TTL_SECONDS,
+        path="/",
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/api/super-admin/status")
+async def super_admin_status():
+    """Public status endpoint so the UI can show first-time setup when needed."""
+    configured = _super_admin_password_configured()
+    return {
+        "success": True,
+        "configured": bool(configured),
+        "username": _get_configured_super_admin_username() if configured else None,
+        "bootstrap_enabled": (not bool((os.getenv("SUPER_ADMIN_PASSWORD_HASH") or "").strip()) and not bool((os.getenv("SUPER_ADMIN_PASSWORD") or "").strip())),
+    }
+
+
+@app.post("/api/super-admin/bootstrap")
+async def super_admin_bootstrap(request: Request):
+    """One-time super-admin credential setup for local installs.
+
+    Requires env `SUPER_ADMIN_SETUP_TOKEN` and a matching `setup_token`.
+    Only allowed when super-admin credentials are NOT already configured.
+    """
+    # Do not allow bootstrap if already configured (env or DB).
+    if _super_admin_password_configured():
+        raise HTTPException(status_code=409, detail="Super admin is already configured")
+
+    setup_token_expected = (os.getenv("SUPER_ADMIN_SETUP_TOKEN") or "").strip()
+    if not setup_token_expected:
+        raise HTTPException(status_code=503, detail="Bootstrap token is not configured")
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    provided = (data.get("setup_token") or request.headers.get("x-setup-token") or "").strip()
+    if not provided or not secrets.compare_digest(provided, setup_token_expected):
+        raise HTTPException(status_code=403, detail="Invalid setup token")
+
+    username = (data.get("username") or "").strip() or "admin"
+    password = (data.get("password") or "").strip()
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password too short (use at least 6 characters)")
+
+    iterations = int(os.getenv("SUPER_ADMIN_PBKDF2_ITERATIONS", "310000"))
+    password_hash = _make_password_hash_spec(password, iterations)
+    if _parse_password_hash(password_hash) is None:
+        raise HTTPException(status_code=500, detail="Failed to generate password hash")
+
+    now = datetime.now().isoformat()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO super_admin_config (id, username, password_hash, created_at, updated_at) VALUES (1, ?, ?, COALESCE((SELECT created_at FROM super_admin_config WHERE id = 1), ?), ?)",
+            (username, password_hash, now, now),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to save super admin config")
+
+    # Auto-create a session so the user lands in the dashboard immediately.
+    try:
+        session_token, csrf_token = _issue_super_admin_session(request)
+    except Exception:
+        # Setup succeeded; user can still log in manually.
+        return {"success": True, "configured": True, "auto_login": False}
+
+    secure = _is_secure_request(request)
+    resp = JSONResponse({"success": True, "configured": True, "auto_login": True})
+    resp.set_cookie(
+        _SUPER_ADMIN_COOKIE,
+        session_token,
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+        max_age=_SUPER_ADMIN_SESSION_TTL_SECONDS,
+        path="/",
+    )
+    resp.set_cookie(
+        _SUPER_ADMIN_CSRF_COOKIE,
+        csrf_token,
+        httponly=False,
+        secure=secure,
+        samesite="strict",
+        max_age=_SUPER_ADMIN_SESSION_TTL_SECONDS,
+        path="/",
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/api/super-admin/session")
+async def super_admin_session(request: Request):
+    """Check whether the request has a valid super-admin session."""
+    _super_admin_require_auth(request)
+    return {"success": True, "authenticated": True}
+
+
+@app.post("/api/super-admin/logout")
+async def super_admin_logout(request: Request):
+    """Invalidate the super-admin session."""
+    token = (request.cookies.get(_SUPER_ADMIN_COOKIE) or "").strip()
+    if token:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM super_admin_sessions WHERE token_sha256 = ?", (_sha256_hex(token),))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    secure = _is_secure_request(request)
+    resp = JSONResponse({"success": True})
+    # Ensure browser clears cookies.
+    resp.set_cookie(_SUPER_ADMIN_COOKIE, "", max_age=0, httponly=True, secure=secure, samesite="strict", path="/")
+    resp.set_cookie(_SUPER_ADMIN_CSRF_COOKIE, "", max_age=0, httponly=False, secure=secure, samesite="strict", path="/")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.get("/pricing", response_class=HTMLResponse)
@@ -5403,6 +5586,681 @@ async def get_minutes(authorization: Optional[str] = Header(None)):
         logger.error(f"Error getting minutes: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
+# ============================================================================
+# LEMON SQUEEZY PAYMENT INTEGRATION
+# ============================================================================
+
+def _stripe_verify_signature(stripe_sig_header: str, payload: bytes, webhook_secret: str, tolerance_seconds: int = 300) -> bool:
+    """Verify Stripe webhook signature without the Stripe SDK."""
+    if not stripe_sig_header or not webhook_secret:
+        return False
+
+    parts: Dict[str, List[str]] = {}
+    for item in stripe_sig_header.split(','):
+        item = item.strip()
+        if '=' not in item:
+            continue
+        k, v = item.split('=', 1)
+        parts.setdefault(k, []).append(v)
+
+    try:
+        timestamp = int((parts.get('t') or [''])[0])
+    except Exception:
+        return False
+
+    now = int(time.time())
+    if abs(now - timestamp) > tolerance_seconds:
+        return False
+
+    signed_payload = str(timestamp).encode('utf-8') + b'.' + payload
+    expected = hmac.new(webhook_secret.encode('utf-8'), signed_payload, hashlib.sha256).hexdigest()
+    provided = parts.get('v1') or []
+    return any(hmac.compare_digest(expected, sig) for sig in provided)
+
+
+async def _create_stripe_checkout(request: Request, user_id: int) -> str:
+    """Create a Stripe Checkout Session URL for 30p -> +50 credits."""
+    stripe_secret_key = (os.getenv('STRIPE_SECRET_KEY') or '').strip()
+    if not stripe_secret_key:
+        raise HTTPException(status_code=503, detail='Stripe not configured')
+
+    base_url = str(request.base_url).rstrip('/')
+    # Include Stripe session id so we can verify + credit on return even if the webhook is delayed.
+    success_url = f"{base_url}/admin.html?topup=success&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{base_url}/admin.html?topup=cancel"
+
+    # Stripe Checkout API expects form-encoded data
+    data = {
+        'mode': 'payment',
+        'success_url': success_url,
+        'cancel_url': cancel_url,
+        'client_reference_id': str(user_id),
+        'metadata[user_id]': str(user_id),
+        'line_items[0][price_data][currency]': 'gbp',
+        # Stripe enforces a minimum charge amount per currency (GBP: 30p).
+        'line_items[0][price_data][unit_amount]': '30',
+        'line_items[0][price_data][product_data][name]': 'Top Up 50 Credits',
+        'line_items[0][quantity]': '1',
+    }
+
+    try:
+        resp = requests.post(
+            'https://api.stripe.com/v1/checkout/sessions',
+            headers={
+                'Authorization': f'Bearer {stripe_secret_key}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            data=data,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Stripe request error: {e}")
+        raise HTTPException(status_code=500, detail='Stripe payment system error')
+
+    if resp.status_code not in (200, 201):
+        logger.error(f"Stripe API error: {resp.status_code} - {resp.text}")
+        detail = 'Failed to create Stripe checkout session'
+        try:
+            err = resp.json()
+            if isinstance(err, dict) and isinstance(err.get('error'), dict):
+                msg = err['error'].get('message')
+                if msg:
+                    detail = f"Stripe error: {msg}"
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=detail)
+
+    session = resp.json()
+    url = session.get('url')
+    if not url:
+        logger.error(f"Stripe checkout response missing url: {session}")
+        raise HTTPException(status_code=500, detail='Invalid Stripe checkout response')
+    return url
+
+
+@app.post('/api/stripe/verify-session')
+async def stripe_verify_session(payload: Dict, authorization: Optional[str] = Header(None)):
+    """Verify a Stripe Checkout Session and credit the user (fallback if webhook is delayed/missed)."""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    session_id = (payload or {}).get('session_id')
+    if not session_id or not isinstance(session_id, str):
+        raise HTTPException(status_code=400, detail='Missing session_id')
+
+    stripe_secret_key = (os.getenv('STRIPE_SECRET_KEY') or '').strip()
+    if not stripe_secret_key:
+        raise HTTPException(status_code=503, detail='Stripe not configured')
+
+    try:
+        resp = requests.get(
+            f'https://api.stripe.com/v1/checkout/sessions/{session_id}',
+            headers={'Authorization': f'Bearer {stripe_secret_key}'},
+            timeout=15,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Stripe verify request error: {e}")
+        raise HTTPException(status_code=500, detail='Stripe verification failed')
+
+    if resp.status_code != 200:
+        logger.error(f"Stripe verify API error: {resp.status_code} - {resp.text}")
+        raise HTTPException(status_code=400, detail='Invalid Stripe session')
+
+    session = resp.json() or {}
+    payment_status = (session.get('payment_status') or '').lower()
+    if payment_status != 'paid':
+        return JSONResponse({'success': True, 'credited': False, 'reason': 'not_paid'})
+
+    metadata = session.get('metadata') or {}
+    session_user_id = metadata.get('user_id') or session.get('client_reference_id')
+    if not session_user_id or not str(session_user_id).isdigit():
+        raise HTTPException(status_code=400, detail='Session missing user metadata')
+
+    if int(str(session_user_id)) != int(user_id):
+        raise HTTPException(status_code=403, detail='Session does not belong to current user')
+
+    # Idempotency: credit at most once per session_id.
+    event_id = f"session:{session_id}"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'INSERT INTO stripe_processed_events (event_id, session_id, user_id, event_type) VALUES (?, ?, ?, ?)',
+            (event_id, str(session_id), int(user_id), 'session.verify')
+        )
+    except sqlite3.IntegrityError:
+        conn.close()
+        return JSONResponse({'success': True, 'credited': True, 'already_credited': True})
+
+    cursor.execute('INSERT OR IGNORE INTO account_settings (user_id) VALUES (?)', (int(user_id),))
+    cursor.execute(
+        '''
+        UPDATE account_settings
+        SET minutes_remaining = minutes_remaining + 50,
+            total_minutes_purchased = total_minutes_purchased + 50,
+            last_updated = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+        ''',
+        (int(user_id),)
+    )
+    conn.commit()
+    conn.close()
+
+    logger.info(f"✅ Added 50 credits to user {user_id} via Stripe session verify {session_id}")
+    return JSONResponse({'success': True, 'credited': True})
+
+@app.post("/api/create-checkout")
+async def create_checkout(request: Request, authorization: Optional[str] = Header(None)):
+    """Create a Lemon Squeezy checkout session for 10p topup (50 credits)"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Prefer Stripe when configured (you asked to switch to Stripe)
+    if (os.getenv('STRIPE_SECRET_KEY') or '').strip():
+        checkout_url = await _create_stripe_checkout(request, int(user_id))
+        return JSONResponse({"success": True, "checkout_url": checkout_url})
+
+    # Prefilling email is optional. Many existing DBs don’t have a users.email column.
+    user_email: Optional[str] = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT name FROM users WHERE id = ?', (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            cursor.execute('SELECT email FROM users WHERE id = ?', (user_id,))
+            email_row = cursor.fetchone()
+            if email_row:
+                user_email = email_row[0]
+        except Exception:
+            user_email = None
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user for checkout: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user")
+    
+    api_key = os.getenv("LEMONSQUEEZY_API_KEY")
+    store_id = os.getenv("LEMONSQUEEZY_STORE_ID")
+    variant_id = os.getenv("LEMONSQUEEZY_VARIANT_ID")
+    
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Payment system not configured")
+    
+    if not store_id or not variant_id:
+        raise HTTPException(status_code=503, detail="Product not configured. Please set LEMONSQUEEZY_STORE_ID and LEMONSQUEEZY_VARIANT_ID")
+    
+    try:
+        base_url = str(request.base_url).rstrip("/")
+        redirect_url = f"{base_url}/admin.html?topup=success"
+
+        # Create checkout using Lemon Squeezy API
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/vnd.api+json",
+            "Accept": "application/vnd.api+json"
+        }
+
+        # Validate store_id. Users often paste product_id here by mistake.
+        # If the configured store is not accessible, fall back to the first store the API key can access.
+        try:
+            store_check = requests.get(
+                f"https://api.lemonsqueezy.com/v1/stores/{store_id}",
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/vnd.api+json"},
+                timeout=10,
+            )
+            if store_check.status_code == 404:
+                stores_resp = requests.get(
+                    "https://api.lemonsqueezy.com/v1/stores",
+                    headers={"Authorization": f"Bearer {api_key}", "Accept": "application/vnd.api+json"},
+                    timeout=10,
+                )
+                if stores_resp.status_code == 200:
+                    stores_json = stores_resp.json()
+                    first_store_id = (stores_json.get("data") or [{}])[0].get("id")
+                    if first_store_id:
+                        logger.warning(
+                            f"LEMONSQUEEZY_STORE_ID={store_id} not found; falling back to accessible store {first_store_id}"
+                        )
+                        store_id = str(first_store_id)
+        except Exception:
+            pass
+        
+        checkout_data = {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "product_options": {
+                        "redirect_url": redirect_url,
+                        "receipt_button_text": "Back to your dashboard",
+                        "receipt_link_url": redirect_url
+                    },
+                    "checkout_data": {
+                        "custom": {
+                            "user_id": str(user_id)
+                        }
+                    }
+                },
+                "relationships": {
+                    "store": {
+                        "data": {
+                            "type": "stores",
+                            "id": store_id
+                        }
+                    },
+                    "variant": {
+                        "data": {
+                            "type": "variants",
+                            "id": variant_id
+                        }
+                    }
+                }
+            }
+        }
+
+        if user_email:
+            checkout_data["data"]["attributes"]["checkout_data"]["email"] = user_email
+        
+        response = requests.post(
+            "https://api.lemonsqueezy.com/v1/checkouts",
+            headers=headers,
+            json=checkout_data,
+            timeout=10
+        )
+        
+        if response.status_code not in (200, 201):
+            logger.error(f"Lemon Squeezy API error: {response.status_code} - {response.text}")
+            detail = "Failed to create checkout session"
+            try:
+                err_json = response.json()
+                # Lemon Squeezy returns JSON:API errors array
+                if isinstance(err_json, dict) and err_json.get("errors"):
+                    first = err_json["errors"][0]
+                    title = first.get("title")
+                    message = first.get("detail") or first.get("detail")
+                    detail = f"Lemon Squeezy error: {title or ''} {message or ''}".strip()
+            except Exception:
+                pass
+            raise HTTPException(status_code=500, detail=detail)
+        
+        result = response.json()
+        checkout_url = result.get("data", {}).get("attributes", {}).get("url")
+        
+        if not checkout_url:
+            logger.error(f"No checkout URL in response: {result}")
+            raise HTTPException(status_code=500, detail="Invalid checkout response")
+        
+        return JSONResponse({"success": True, "checkout_url": checkout_url})
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error creating Lemon Squeezy checkout: {e}")
+        raise HTTPException(status_code=500, detail="Payment system error")
+
+
+@app.post("/api/webhooks/lemonsqueezy")
+async def lemonsqueezy_webhook(request: Request):
+    """Handle Lemon Squeezy webhook for successful payments"""
+    try:
+        body = await request.body()
+
+        # Verify webhook signature (required for safety)
+        signing_secret = os.getenv("LEMONSQUEEZY_WEBHOOK_SECRET")
+        signature = request.headers.get("X-Signature", "")
+        if not signing_secret:
+            logger.error("LEMONSQUEEZY_WEBHOOK_SECRET not configured; rejecting webhook")
+            raise HTTPException(status_code=503, detail="Webhook not configured")
+
+        expected = hmac.new(signing_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        if not signature or not hmac.compare_digest(expected, signature):
+            logger.warning("Invalid Lemon Squeezy webhook signature")
+            raise HTTPException(status_code=401, detail="Invalid signature")
+
+        payload = json.loads(body.decode("utf-8"))
+
+        # Prefer header, but fall back to payload
+        event_name = request.headers.get("X-Event-Name") or payload.get("meta", {}).get("event_name")
+        if event_name != "order_created":
+            return JSONResponse({"success": True})
+
+        order_id = payload.get("data", {}).get("id")
+        order_attrs = payload.get("data", {}).get("attributes", {}) or {}
+        status = (order_attrs.get("status") or "").lower()
+        if status and status != "paid":
+            # Only credit once the order is actually paid
+            return JSONResponse({"success": True})
+
+        expected_variant_id = os.getenv("LEMONSQUEEZY_VARIANT_ID")
+        first_order_item = order_attrs.get("first_order_item") or {}
+        purchased_variant_id = str(first_order_item.get("variant_id") or "")
+        if expected_variant_id and purchased_variant_id and purchased_variant_id != str(expected_variant_id):
+            logger.info(f"Ignoring order for variant {purchased_variant_id}")
+            return JSONResponse({"success": True})
+
+        user_id_str = payload.get("meta", {}).get("custom_data", {}).get("user_id")
+        if not user_id_str or not str(user_id_str).isdigit():
+            logger.error("Missing/invalid meta.custom_data.user_id; cannot credit")
+            return JSONResponse({"success": True})
+
+        user_id = int(str(user_id_str))
+        if not order_id:
+            logger.error("Missing order id in webhook payload")
+            return JSONResponse({"success": True})
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Idempotency: only process each order once
+        try:
+            cursor.execute(
+                'INSERT INTO lemonsqueezy_processed_orders (order_id, user_id, event_name) VALUES (?, ?, ?)',
+                (str(order_id), user_id, str(event_name))
+            )
+        except sqlite3.IntegrityError:
+            conn.close()
+            logger.info(f"Order {order_id} already processed; skipping")
+            return JSONResponse({"success": True})
+
+        # Ensure account_settings exists, then credit
+        cursor.execute('INSERT OR IGNORE INTO account_settings (user_id) VALUES (?)', (user_id,))
+        cursor.execute(
+            '''
+            UPDATE account_settings
+            SET minutes_remaining = minutes_remaining + 50,
+                total_minutes_purchased = total_minutes_purchased + 50,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            ''',
+            (user_id,)
+        )
+        conn.commit()
+        conn.close()
+
+        logger.info(f"✅ Added 50 credits to user {user_id} via Lemon Squeezy order {order_id}")
+        return JSONResponse({"success": True})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing Lemon Squeezy webhook: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post('/api/webhooks/stripe')
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook to grant credits after successful payment."""
+    try:
+        payload = await request.body()
+        sig = request.headers.get('Stripe-Signature', '')
+        webhook_secret = (os.getenv('STRIPE_WEBHOOK_SECRET') or '').strip()
+
+        if not webhook_secret:
+            logger.error('STRIPE_WEBHOOK_SECRET not configured; rejecting webhook')
+            raise HTTPException(status_code=503, detail='Webhook not configured')
+
+        if not _stripe_verify_signature(sig, payload, webhook_secret):
+            logger.warning('Invalid Stripe webhook signature')
+            raise HTTPException(status_code=401, detail='Invalid signature')
+
+        event = json.loads(payload.decode('utf-8'))
+        event_id = event.get('id')
+        event_type = event.get('type')
+
+        # Only act on successful completed checkout sessions
+        if event_type != 'checkout.session.completed':
+            return JSONResponse({'success': True})
+
+        obj = ((event.get('data') or {}).get('object') or {})
+        session_id = obj.get('id')
+
+        payment_status = (obj.get('payment_status') or '').lower()
+        if payment_status and payment_status != 'paid':
+            return JSONResponse({'success': True})
+
+        metadata = obj.get('metadata') or {}
+        user_id_str = metadata.get('user_id') or obj.get('client_reference_id')
+        if not user_id_str or not str(user_id_str).isdigit():
+            logger.error('Stripe webhook missing metadata.user_id; cannot credit')
+            return JSONResponse({'success': True})
+
+        if not event_id:
+            logger.error('Stripe webhook missing event id; cannot idempotently process')
+            return JSONResponse({'success': True})
+
+        user_id = int(str(user_id_str))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Idempotency: only process each event once
+        try:
+            cursor.execute(
+                'INSERT INTO stripe_processed_events (event_id, session_id, user_id, event_type) VALUES (?, ?, ?, ?)',
+                (str(event_id), str(session_id or ''), user_id, str(event_type or ''))
+            )
+        except sqlite3.IntegrityError:
+            conn.close()
+            logger.info(f"Stripe event {event_id} already processed; skipping")
+            return JSONResponse({'success': True})
+
+        cursor.execute('INSERT OR IGNORE INTO account_settings (user_id) VALUES (?)', (user_id,))
+        cursor.execute(
+            '''
+            UPDATE account_settings
+            SET minutes_remaining = minutes_remaining + 50,
+                total_minutes_purchased = total_minutes_purchased + 50,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            ''',
+            (user_id,)
+        )
+        conn.commit()
+        conn.close()
+
+        logger.info(f"✅ Added 50 credits to user {user_id} via Stripe event {event_id}")
+        return JSONResponse({'success': True})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing Stripe webhook: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@app.get("/api/trial-status")
+async def get_trial_status(authorization: Optional[str] = Header(None)):
+    """Get trial status for current user"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    TRIAL_TOTAL_DAYS = 3
+    conn = None
+    try:
+        from datetime import timezone
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Backward-compatible migration: ensure trial_total_days exists.
+        try:
+            cursor.execute('SELECT trial_total_days FROM account_settings LIMIT 1')
+        except Exception:
+            try:
+                cursor.execute('ALTER TABLE account_settings ADD COLUMN trial_total_days INTEGER DEFAULT 3')
+                cursor.execute('UPDATE account_settings SET trial_total_days = 3 WHERE trial_total_days IS NULL')
+                conn.commit()
+            except Exception:
+                pass
+
+        cursor.execute(
+            '''
+            SELECT trial_start_date, COALESCE(trial_total_days, ?) as trial_total_days
+            FROM account_settings
+            WHERE user_id = ?
+            ''',
+            (TRIAL_TOTAL_DAYS, user_id)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            # Account settings missing for some reason; treat as fresh trial.
+            return JSONResponse({"trial_days_remaining": TRIAL_TOTAL_DAYS, "trial_start_date": None})
+
+        trial_start_date = row[0]
+        trial_total_days = int(row[1] or TRIAL_TOTAL_DAYS)
+        # Safety clamp
+        if trial_total_days < 1:
+            trial_total_days = TRIAL_TOTAL_DAYS
+        if trial_total_days > 5:
+            trial_total_days = 5
+
+        # If trial_start_date is missing, initialize it now.
+        if not trial_start_date:
+            trial_start_date = datetime.now(timezone.utc).isoformat()
+            cursor.execute(
+                '''
+                UPDATE account_settings
+                SET trial_start_date = ?, trial_days_remaining = ?, trial_total_days = ?
+                WHERE user_id = ?
+                ''',
+                (trial_start_date, trial_total_days, trial_total_days, user_id)
+            )
+            conn.commit()
+
+        start_date = datetime.fromisoformat(trial_start_date)
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
+        days_elapsed = max(0, (now - start_date).days)
+        days_remaining = max(0, trial_total_days - days_elapsed)
+
+        # Keep DB in sync (acts as cache / helps other screens).
+        # If trial has expired, zero out credits
+        if days_remaining <= 0:
+            cursor.execute(
+                '''
+                UPDATE account_settings
+                SET trial_days_remaining = ?, minutes_remaining = 0
+                WHERE user_id = ?
+                ''',
+                (days_remaining, user_id)
+            )
+            logger.info(f"⛔ Trial expired for user {user_id} - credits zeroed")
+        else:
+            cursor.execute(
+                '''
+                UPDATE account_settings
+                SET trial_days_remaining = ?
+                WHERE user_id = ?
+                ''',
+                (days_remaining, user_id)
+            )
+        conn.commit()
+
+        return JSONResponse({
+            "trial_days_remaining": days_remaining,
+            "trial_start_date": trial_start_date
+        })
+    except Exception as e:
+        logger.error(f"Error getting trial status: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/reduce-trial-day")
+async def reduce_trial_day(authorization: Optional[str] = Header(None)):
+    """Reduce trial by 1 day (for testing purposes)"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    TRIAL_TOTAL_DAYS = 3
+    conn = None
+    try:
+        from datetime import timezone
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Backward-compatible migration: ensure trial_total_days exists.
+        try:
+            cursor.execute('SELECT trial_total_days FROM account_settings LIMIT 1')
+        except Exception:
+            try:
+                cursor.execute('ALTER TABLE account_settings ADD COLUMN trial_total_days INTEGER DEFAULT 3')
+                cursor.execute('UPDATE account_settings SET trial_total_days = 3 WHERE trial_total_days IS NULL')
+                conn.commit()
+            except Exception:
+                pass
+
+        cursor.execute(
+            '''
+            SELECT trial_start_date, COALESCE(trial_total_days, ?) as trial_total_days
+            FROM account_settings
+            WHERE user_id = ?
+            ''',
+            (TRIAL_TOTAL_DAYS, user_id)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            return JSONResponse({"error": "User not found"}, status_code=404)
+
+        trial_start_date = row[0]
+        trial_total_days = int(row[1] or TRIAL_TOTAL_DAYS)
+        if trial_total_days < 1:
+            trial_total_days = TRIAL_TOTAL_DAYS
+        if trial_total_days > 5:
+            trial_total_days = 5
+        now = datetime.now(timezone.utc)
+
+        # If no start date, initialize it as now first.
+        if trial_start_date:
+            start_date = datetime.fromisoformat(trial_start_date)
+        else:
+            start_date = now
+
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+
+        # Move start date 1 day earlier so computed remaining days decreases by 1.
+        start_date = start_date - timedelta(days=1)
+        new_trial_start_date = start_date.isoformat()
+
+        # Compute remaining after the shift.
+        days_elapsed = max(0, (now - start_date).days)
+        days_remaining = max(0, trial_total_days - days_elapsed)
+
+        cursor.execute(
+            '''
+            UPDATE account_settings
+            SET trial_start_date = ?, trial_days_remaining = ?
+            WHERE user_id = ?
+            ''',
+            (new_trial_start_date, days_remaining, user_id)
+        )
+        conn.commit()
+
+        return JSONResponse({
+            "success": True,
+            "trial_days_remaining": days_remaining,
+            "trial_start_date": new_trial_start_date
+        })
+    except Exception as e:
+        logger.error(f"Error reducing trial day: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
 @app.get("/api/stats/today")
 async def get_today_stats(authorization: Optional[str] = Header(None)):
     """Get stats for today (user-specific)"""
@@ -6152,8 +7010,18 @@ async def signup(request: Request):
                       (name, datetime.now().isoformat()))
         user_id = cursor.lastrowid
         
-        # Create initial account settings for user
-        cursor.execute('INSERT INTO account_settings (user_id, minutes_remaining) VALUES (?, 60)', (user_id,))
+        # Create initial account settings for user with 50 credits and 3-day trial
+        from datetime import timezone
+        trial_start = datetime.now(timezone.utc).isoformat()
+        cursor.execute('''
+            INSERT INTO account_settings (
+                user_id, 
+                minutes_remaining, 
+                total_minutes_purchased,
+                trial_days_remaining, 
+                trial_start_date
+            ) VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, 50, 0, 3, trial_start))
         
         # Create session
         session_token = secrets.token_urlsafe(32)
@@ -7887,18 +8755,21 @@ async def answer_call(request: Request):
             assigned_user_id = cursor.lastrowid
             
             # Create account settings with default values and assign this phone number
+            from datetime import timezone
+            trial_start = datetime.now(timezone.utc).isoformat()
             cursor.execute('''
                 INSERT INTO account_settings (
                     user_id, minutes_remaining, total_minutes_purchased, 
                     phone_number, voice, voice_provider, speechmatics_voice_id,
                     agent_name, agent_personality, agent_instructions,
-                    response_latency, call_mode, calendar_booking_enabled, tasks_enabled
+                    response_latency, call_mode, calendar_booking_enabled, tasks_enabled,
+                    trial_days_remaining, trial_start_date
                 )
-                VALUES (?, 60, 60, ?, 'shimmer', 'speechmatics', 'sarah',
+                VALUES (?, 50, 50, ?, 'shimmer', 'speechmatics', 'sarah',
                     'Sarah', 'Friendly and professional. Keep responses brief and conversational.',
                     'Answer questions about the business. Take messages if needed.',
-                    500, 'realtime', 1, 1)
-            ''', (assigned_user_id, called_digits))
+                    500, 'realtime', 1, 1, 3, ?)
+            ''', (assigned_user_id, called_digits, trial_start))
             
             conn.commit()
             minutes_remaining = 60
@@ -8286,8 +9157,22 @@ async def get_calls_today():
 async def get_all_accounts():
     """Get all user accounts with stats"""
     try:
+        from datetime import timezone
+
+        TRIAL_TOTAL_DAYS = 3
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # Backward-compatible migration: ensure trial_total_days exists.
+        try:
+            cursor.execute('SELECT trial_total_days FROM account_settings LIMIT 1')
+        except Exception:
+            try:
+                cursor.execute('ALTER TABLE account_settings ADD COLUMN trial_total_days INTEGER DEFAULT 3')
+                cursor.execute('UPDATE account_settings SET trial_total_days = 3 WHERE trial_total_days IS NULL')
+                conn.commit()
+            except Exception:
+                pass
         
         cursor.execute('''
             SELECT 
@@ -8296,6 +9181,9 @@ async def get_all_accounts():
                 COALESCE(a.phone_number, '') as phone_number,
                 COALESCE(a.minutes_remaining, 0) as credits,
                 COALESCE(a.total_minutes_purchased, 0) as total_minutes_purchased,
+                COALESCE(a.trial_start_date, NULL) as trial_start_date,
+                COALESCE(a.trial_days_remaining, NULL) as trial_days_remaining,
+                COALESCE(a.trial_total_days, 3) as trial_total_days,
                 COALESCE(a.voice, 'shimmer') as voice,
                 COALESCE(a.use_elevenlabs, 0) as use_elevenlabs,
                 (SELECT COUNT(*) FROM calls c WHERE c.user_id = u.id AND DATE(c.start_time) = DATE('now')) as calls_today,
@@ -8308,17 +9196,55 @@ async def get_all_accounts():
         
         accounts = []
         for row in cursor.fetchall():
+            trial_start_date = row[5]
+            trial_days_remaining_stored = row[6]
+            trial_total_days = int((row[7] or TRIAL_TOTAL_DAYS))
+            if trial_total_days < 1:
+                trial_total_days = TRIAL_TOTAL_DAYS
+            if trial_total_days > 5:
+                trial_total_days = 5
+            total_minutes_purchased = row[4] or 0
+
+            # Compute trial days remaining from trial_start_date when possible.
+            trial_days_remaining = None
+            if trial_start_date:
+                try:
+                    start_date = datetime.fromisoformat(trial_start_date)
+                    if start_date.tzinfo is None:
+                        start_date = start_date.replace(tzinfo=timezone.utc)
+                    now = datetime.now(timezone.utc)
+                    days_elapsed = max(0, (now - start_date).days)
+                    trial_days_remaining = max(0, trial_total_days - days_elapsed)
+                except Exception:
+                    trial_days_remaining = trial_days_remaining_stored
+            else:
+                trial_days_remaining = trial_days_remaining_stored
+
+            if trial_days_remaining is None:
+                trial_days_remaining = trial_total_days
+
+            if total_minutes_purchased > 0:
+                plan_status = "upgraded"
+            else:
+                plan_status = "trial" if trial_days_remaining > 0 else "trial_expired"
+
             accounts.append({
                 "user_id": row[0],
                 "name": row[1],
                 "phone_number": row[2],
                 "credits": row[3],
-                "total_minutes_purchased": row[4],
-                "voice": row[5],
-                "use_elevenlabs": bool(row[6]),
-                "calls_today": row[7],
-                "last_call": row[8],
-                "status": row[9]
+                # Legacy field name used by some super-admin UIs
+                "minutes_remaining": row[3],
+                "total_minutes_purchased": total_minutes_purchased,
+                "trial_start_date": trial_start_date,
+                "trial_days_remaining": trial_days_remaining,
+                "trial_total_days": trial_total_days,
+                "plan_status": plan_status,
+                "voice": row[8],
+                "use_elevenlabs": bool(row[9]),
+                "calls_today": row[10],
+                "last_call": row[11],
+                "status": row[12]
             })
         
         conn.close()
@@ -8588,6 +9514,40 @@ async def add_minutes_to_account(user_id: int, request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.post("/api/super-admin/account/{user_id}/remove-minutes")
+async def remove_minutes_from_account(user_id: int, request: Request):
+    """Remove minutes from user account (clamped at 0)."""
+    try:
+        body = await request.json()
+        minutes = body.get('minutes', 0)
+
+        minutes = int(minutes) if minutes is not None else 0
+        if minutes <= 0:
+            return JSONResponse({"success": False, "error": "minutes must be > 0"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT COALESCE(minutes_remaining, 0) FROM account_settings WHERE user_id = ?', (user_id,))
+        row = cursor.fetchone()
+        current = float(row[0]) if row else 0.0
+        new_balance = max(0.0, current - float(minutes))
+
+        cursor.execute(
+            'UPDATE account_settings SET minutes_remaining = ? WHERE user_id = ?',
+            (new_balance, user_id),
+        )
+
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Removed {minutes} minutes from user {user_id}. New balance={new_balance}")
+        return {"success": True, "minutes_removed": minutes, "new_balance": new_balance}
+    except Exception as e:
+        logger.error(f"Failed to remove minutes: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.post("/api/super-admin/account/{user_id}/reset")
 async def reset_account(user_id: int):
     """Reset account data"""
@@ -8697,6 +9657,148 @@ async def reactivate_account(user_id: int):
         return {"success": True}
     except Exception as e:
         logger.error(f"Failed to reactivate account: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/account/{user_id}/extend-trial")
+async def extend_trial(user_id: int, request: Request):
+    """Extend trial period for a user (max 5 days total)"""
+    try:
+        from datetime import timezone
+        
+        body = await request.json()
+        days_to_add = int(body.get('days', 1))
+        
+        if days_to_add <= 0:
+            return JSONResponse({"success": False, "error": "Days must be positive"}, status_code=400)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Backward-compatible migration: ensure trial_total_days exists.
+        try:
+            cursor.execute('SELECT trial_total_days FROM account_settings LIMIT 1')
+        except Exception:
+            try:
+                cursor.execute('ALTER TABLE account_settings ADD COLUMN trial_total_days INTEGER DEFAULT 3')
+                cursor.execute('UPDATE account_settings SET trial_total_days = 3 WHERE trial_total_days IS NULL')
+                conn.commit()
+            except Exception:
+                pass
+        
+        # Get current trial status
+        cursor.execute(
+            'SELECT trial_start_date, COALESCE(trial_total_days, 3) as trial_total_days FROM account_settings WHERE user_id = ?',
+            (user_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Account not found"}, status_code=404)
+        
+        trial_start_date = row[0]
+        current_total_days = int(row[1] or 3)
+        if current_total_days < 1:
+            current_total_days = 3
+        if current_total_days > 5:
+            current_total_days = 5
+
+        new_total_days = min(5, current_total_days + days_to_add)
+        actual_added = max(0, new_total_days - current_total_days)
+        
+        if not trial_start_date:
+            # No trial start date, initialize it now
+            trial_start_date = datetime.now(timezone.utc).isoformat()
+            # If we're initializing, start from default 3 then add requested days (cap 5)
+            base_total = 3
+            new_total_days = min(5, base_total + days_to_add)
+            actual_added = max(0, new_total_days - base_total)
+            cursor.execute(
+                '''
+                UPDATE account_settings
+                SET trial_start_date = ?, trial_total_days = ?, trial_days_remaining = ?
+                WHERE user_id = ?
+                ''',
+                (trial_start_date, new_total_days, new_total_days, user_id)
+            )
+        else:
+            # Recompute days remaining using the new total trial length.
+            start_date = datetime.fromisoformat(trial_start_date)
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            
+            now = datetime.now(timezone.utc)
+            days_elapsed = max(0, (now - start_date).days)
+
+            new_days_remaining = max(0, new_total_days - days_elapsed)
+            cursor.execute(
+                '''
+                UPDATE account_settings
+                SET trial_total_days = ?, trial_days_remaining = ?
+                WHERE user_id = ?
+                ''',
+                (new_total_days, new_days_remaining, user_id)
+            )
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Extended trial for user {user_id} by {actual_added} day(s) (requested {days_to_add}, new total {new_total_days})")
+        return {"success": True, "days_added": actual_added, "trial_total_days": new_total_days}
+    except Exception as e:
+        logger.error(f"Failed to extend trial: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/super-admin/account/{user_id}/delete")
+async def delete_account(user_id: int):
+    """Delete an account and return any assigned phone number to the available pool."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return JSONResponse({"success": False, "error": "Account not found"}, status_code=404)
+
+        cursor.execute('SELECT COALESCE(phone_number, "") FROM account_settings WHERE user_id = ?', (user_id,))
+        phone_row = cursor.fetchone()
+        assigned_phone = (phone_row[0] if phone_row else '') or ''
+
+        if assigned_phone.strip():
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS number_availability (
+                    phone_number TEXT PRIMARY KEY,
+                    is_available INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute(
+                '''
+                INSERT INTO number_availability (phone_number, is_available, updated_at)
+                VALUES (?, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(phone_number) DO UPDATE SET
+                    is_available = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                ''',
+                (assigned_phone.strip(),),
+            )
+
+        # Delete dependent rows first
+        cursor.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM calls WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM appointments WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM account_settings WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+
+        conn.commit()
+        conn.close()
+
+        logger.info(f"🗑️ Deleted account user_id={user_id}; released_number={assigned_phone!r}")
+        return {"success": True, "released_phone_number": assigned_phone}
+    except Exception as e:
+        logger.error(f"Failed to delete account {user_id}: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 

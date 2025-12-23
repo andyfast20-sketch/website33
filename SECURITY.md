@@ -22,6 +22,13 @@ Rotate/revoke and replace these credentials:
 - Keep `.env` minimal (or empty) and never commit it.
 - Keep `google-credentials.json` **outside** the repo and point `GOOGLE_CREDENTIALS_PATH` to it.
 
+## Super Admin access
+- Super Admin APIs are protected server-side (secure cookie session + CSRF).
+- Configure credentials via `.env`:
+	- `SUPER_ADMIN_USERNAME` (default `admin`)
+	- `SUPER_ADMIN_PASSWORD_HASH` (preferred) or `SUPER_ADMIN_PASSWORD` (dev-only)
+- Helper: run `python generate_super_admin_password_hash.py` to generate a `SUPER_ADMIN_PASSWORD_HASH` line.
+
 ## Recovery
 If voice behavior breaks, revert to the known-good voice baseline tag:
 - `git checkout v100`

@@ -44,7 +44,39 @@ def kill_process_on_port(port=5004):
                     print(f"✅ Killed process {pid}")
                     time.sleep(1)
         else:
-            print(f"✅ Port {port} is free")
+            # Fallback: netstat/taskkill (works even when Get-NetTCPConnection is unavailable)
+            try:
+                netstat = subprocess.run(
+                    ["cmd", "/c", f"netstat -ano | findstr :{port}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                lines = [ln.strip() for ln in (netstat.stdout or "").splitlines() if ln.strip()]
+                pids = set()
+                for ln in lines:
+                    parts = ln.split()
+                    if len(parts) >= 5 and parts[-1].isdigit():
+                        pids.add(parts[-1])
+                if pids:
+                    for pid in sorted(pids):
+                        if pid == "0":
+                            continue
+                        print(f"⚠️  Found process {pid} on port {port} (netstat)")
+                        subprocess.run(
+                            ["cmd", "/c", f"taskkill /PID {pid} /F"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        print(f"✅ Killed process {pid}")
+                        time.sleep(1)
+                else:
+                    print(f"✅ Port {port} is free")
+            except subprocess.TimeoutExpired:
+                print("⚠️  Timeout checking port with netstat - continuing anyway")
+            except Exception as e:
+                print(f"⚠️  Error checking port with netstat: {e}")
     except subprocess.TimeoutExpired:
         print("⚠️  Timeout checking port - continuing anyway")
     except Exception as e:
@@ -60,16 +92,20 @@ def start_server():
     env['PYTHONUNBUFFERED'] = '1'
     
     try:
-        # Start the server (this will run until Ctrl+C)
-        subprocess.run(
+        # Start the server in a detached process so this script can exit.
+        log_path = os.path.join(os.getcwd(), "server_log_new.txt")
+        log_file = open(log_path, "a", encoding="utf-8")
+        proc = subprocess.Popen(
             [sys.executable, "vonage_agent.py"],
             env=env,
-            check=True
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
         )
-    except KeyboardInterrupt:
-        print("\n\n✅ Server stopped by user")
-    except subprocess.CalledProcessError as e:
-        print(f"\n❌ Server exited with error: {e}")
+        print(f"✅ Server started (PID: {proc.pid})")
+        print(f"📝 Logging to: {log_path}")
+    except Exception as e:
+        print(f"\n❌ Failed to start server: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

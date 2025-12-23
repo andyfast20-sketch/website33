@@ -793,14 +793,16 @@
                 </div>
             </div>
             
-            <!-- Transfer Number Input -->
-            <div style="margin-top: 15px;">
-                <label style="display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px;">📲 Transfer Number</label>
-                <div style="position: relative;">
-                    <input type="tel" id="headerTransferNumber" placeholder="07123456789" style="width: 100%; padding: 10px 35px 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; color: white; font-size: 14px; font-weight: 500; outline: none; transition: all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(102, 126, 234, 0.6)'" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(102, 126, 234, 0.3)'" onchange="saveHeaderTransferNumber()">
-                    <button onclick="saveHeaderTransferNumber()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: rgba(102, 126, 234, 0.2); border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;" onmouseover="this.style.background='rgba(102, 126, 234, 0.4)'" onmouseout="this.style.background='rgba(102, 126, 234, 0.2)'">💾</button>
+            <!-- Trial Days Progress Bar -->
+            <div id="trialContainer" style="margin-top: 20px; display: block;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">Free Trial</div>
+                    <div id="trialDaysText" style="font-size: 13px; font-weight: 800; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Loading…</div>
                 </div>
-                <div id="transferNumberStatus" style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px; display: none;"></div>
+                <div style="background: rgba(255,255,255,0.1); border-radius: 10px; height: 8px; overflow: hidden; position: relative;">
+                    <div id="trialProgressBar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FF6B6B 100%); border-radius: 10px; transition: width 0.5s ease; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);"></div>
+                </div>
+                <div style="margin-top: 6px; font-size: 10px; color: rgba(255,255,255,0.4); text-align: center;" id="trialSubtext">Upgrade anytime to unlock full features</div>
             </div>
         </div>
 
@@ -862,7 +864,10 @@
     <!-- Main Content Area -->
     <div style="margin-left: 280px; min-height: 100vh; background: #0f0f23;">
         <!-- New Account Button (Top Right) -->
-        <div style="position: fixed; top: 20px; right: 30px; z-index: 500;">
+        <div style="position: fixed; top: 20px; right: 30px; z-index: 500; display: flex; gap: 10px; align-items: center;">
+            <button id="reduceTrialBtn" onclick="reduceTrialDay()" style="padding: 8px 16px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); border: none; border-radius: 20px; color: white; cursor: pointer; font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); transition: all 0.3s; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Test: Reduce trial by 1 day">
+                ⏱️ -1 Day
+            </button>
             <button onclick="startNewAccountSetup()" style="padding: 8px 16px; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border: none; border-radius: 20px; color: white; cursor: pointer; font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4); transition: all 0.3s; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 ✨ New Account
             </button>
@@ -934,7 +939,10 @@
                         <div style="position: relative; z-index: 1;">
                             <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Available Credits</div>
                             <div style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 4px;" id="creditsRemaining">--</div>
-                            <div style="font-size: 11px; color: rgba(255,255,255,0.5);">Call credits remaining</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Call credits remaining</div>
+                            <button onclick="handleTopUp()" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #1a1a2e; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.3s; width: 100%; box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(255, 215, 0, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(255, 215, 0, 0.3)'">
+                                💰 Top Up 30p → 50 Credits
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1149,6 +1157,14 @@
                             <input type="text" id="callGreeting" placeholder="e.g., Hello, thanks for calling Beryl's Cars, how can I help you?">
                             <div class="example-box">
                                 <strong>Tip:</strong> If set, the AI will say this line exactly first when the call connects.
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="transferNumber">📲 Transfer Number</label>
+                            <input type="text" id="transferNumber" placeholder="e.g., 07958968621">
+                            <div class="example-box">
+                                <strong>Important:</strong> This number will be used when the AI needs to transfer calls or when caller matches one of the transfer triggers below.
                             </div>
                         </div>
 
@@ -1454,9 +1470,31 @@
             if (!isAuthenticated) {
                 return; // Will redirect to signin
             }
+
+            // If returning from Lemon Squeezy after a successful payment, refresh credits.
+            try {
+                const url = new URL(window.location.href);
+                const topup = url.searchParams.get('topup');
+                const sessionId = url.searchParams.get('session_id');
+                if (topup === 'success') {
+                    await handleReturnFromTopUp(sessionId);
+                    url.searchParams.delete('topup');
+                    url.searchParams.delete('session_id');
+                    window.history.replaceState({}, document.title, url.pathname + url.search);
+                }
+            } catch (e) {
+                console.error('Top up return handling failed:', e);
+            }
             
             // Check if first-time user and show welcome modal
             await checkFirstLogin();
+
+            // Load trial status early so it shows even if other init code errors
+            try {
+                loadTrialStatus();
+            } catch (e) {
+                console.error('❌ loadTrialStatus failed during init:', e);
+            }
             
             // Load dashboard as default view
             loadDashboard();
@@ -1468,6 +1506,48 @@
             
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
+        });
+
+        async function handleReturnFromTopUp(sessionId) {
+            // Stripe webhooks can take a moment to arrive (or fail locally). Verify on return if possible.
+            alert('✅ Payment successful! Updating your credits…');
+
+            if (sessionId) {
+                try {
+                    const verifyResp = await fetch('/api/stripe/verify-session', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                    const verifyJson = await verifyResp.json().catch(() => ({}));
+                    if (!verifyResp.ok) {
+                        console.warn('Stripe verify-session failed:', verifyResp.status, verifyJson);
+                    }
+                } catch (e) {
+                    console.warn('Stripe verify-session threw:', e);
+                }
+            }
+
+            const delaysMs = [0, 1500, 3000, 5000, 8000];
+            for (const d of delaysMs) {
+                if (d) {
+                    await new Promise(resolve => setTimeout(resolve, d));
+                }
+                try {
+                    await loadCredits();
+                } catch (e) {
+                    console.warn('loadCredits failed while waiting for topup:', e);
+                }
+            }
+        }
+
+        // Fallback: run again after full page load (covers any delayed DOM/render issues)
+        window.addEventListener('load', () => {
+            try {
+                loadTrialStatus();
+            } catch (e) {
+                console.error('❌ loadTrialStatus failed on window.load:', e);
+            }
         });
 
         async function checkFirstLogin() {
@@ -1927,6 +2007,42 @@
             }
         }
 
+        async function handleTopUp() {
+            // Open a new tab synchronously to avoid popup blockers.
+            // We'll navigate it to the checkout URL once the API call returns.
+            const checkoutWindow = window.open('about:blank', '_blank');
+            try {
+                const response = await fetch('/api/create-checkout', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    if (checkoutWindow && !checkoutWindow.closed) checkoutWindow.close();
+                    alert(error.detail || `Failed to create checkout (HTTP ${response.status}). Please try again.`);
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.checkout_url) {
+                    // Open Lemon Squeezy checkout in new window
+                    if (checkoutWindow && !checkoutWindow.closed) {
+                        checkoutWindow.location = data.checkout_url;
+                    } else {
+                        window.open(data.checkout_url, '_blank');
+                    }
+                } else {
+                    if (checkoutWindow && !checkoutWindow.closed) checkoutWindow.close();
+                    alert('Failed to create checkout session');
+                }
+            } catch (error) {
+                console.error('Top up error:', error);
+                if (checkoutWindow && !checkoutWindow.closed) checkoutWindow.close();
+                alert('Error creating checkout. Please try again.');
+            }
+        }
+
         async function loadCalls(filterPeriod = 'today') {
             try {
                 console.log('Loading calls with filter:', filterPeriod);
@@ -2198,6 +2314,9 @@
                 const callGreetingEl = document.getElementById('callGreeting');
                 if (callGreetingEl) callGreetingEl.value = config.CALL_GREETING || '';
 
+                const transferNumberEl = document.getElementById('transferNumber');
+                if (transferNumberEl) transferNumberEl.value = config.TRANSFER_NUMBER || '';
+
                 // Transfer-by-name people list (up to 5)
                 const people = Array.isArray(config.TRANSFER_PEOPLE) ? config.TRANSFER_PEOPLE : [];
                 for (let i = 1; i <= 5; i++) {
@@ -2407,10 +2526,10 @@
                 const data = await response.json();
                 
                 // Update summary
-                document.getElementById('modalCurrentBalance').textContent = data.current_balance || 0;
-                document.getElementById('modalTotalUsed').textContent = data.total_used || 0;
-                document.getElementById('modalPricePerCall').textContent = data.pricing.per_call || 5;
-                document.getElementById('modalPricePerMinute').textContent = data.pricing.per_minute || 2;
+                document.getElementById('modalCurrentBalance').textContent = Math.round(data.current_balance || 0);
+                document.getElementById('modalTotalUsed').textContent = Math.round(data.total_used || 0);
+                document.getElementById('modalPricePerCall').textContent = Math.round(data.pricing.per_call || 5);
+                document.getElementById('modalPricePerMinute').textContent = Math.round(data.pricing.per_minute || 2);
                 
                 // Filter only calls (not bookings)
                 const calls = data.transactions ? data.transactions.filter(t => t.type === 'call') : [];
@@ -2443,7 +2562,7 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 20px;">
                                 <span style="color: rgba(255,255,255,0.6); font-size: 13px; min-width: 60px; text-align: right;">⏱️ ${duration}</span>
-                                <span style="color: #e74c3c; font-weight: 700; font-size: 15px; min-width: 80px; text-align: right;">-${call.credits} credits</span>
+                                <span style="color: #e74c3c; font-weight: 700; font-size: 15px; min-width: 80px; text-align: right;">-${Math.round(call.credits)} credits</span>
                                 <span style="color: rgba(255,255,255,0.4); font-size: 18px;">ℹ️</span>
                             </div>
                         </div>
@@ -2523,7 +2642,7 @@
                         <div style="font-weight: 600;">📞 Connection Fee</div>
                         <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">One-time per call</div>
                     </td>
-                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #667eea; text-align: right;">${connectionFee.toFixed(2)}</td>
+                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #667eea; text-align: right;">${Math.round(connectionFee)}</td>
                 </tr>
             `;
             
@@ -2534,7 +2653,7 @@
                         <div style="font-weight: 600;">⏱️ Duration Charge</div>
                         <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">${minutes} min × ${pricing.per_minute} credits/min</div>
                     </td>
-                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #2ecc71; text-align: right;">${durationCharge.toFixed(2)}</td>
+                    <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #2ecc71; text-align: right;">${Math.round(durationCharge)}</td>
                 </tr>
             `;
             
@@ -2546,7 +2665,7 @@
                             <div style="font-weight: 600;">📅 Calendar Booking</div>
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-created appointment</div>
                         </td>
-                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${bookingCharge.toFixed(2)}</td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${Math.round(bookingCharge)}</td>
                     </tr>
                 `;
             }
@@ -2559,7 +2678,7 @@
                             <div style="font-weight: 600;">✅ Task Extraction</div>
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-extracted tasks</div>
                         </td>
-                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #9b59b6; text-align: right;">${taskCharge.toFixed(2)}</td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #9b59b6; text-align: right;">${Math.round(taskCharge)}</td>
                     </tr>
                 `;
             }
@@ -2572,7 +2691,7 @@
                             <div style="font-weight: 600;">🎙️ Advanced Voice</div>
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">Premium voice quality</div>
                         </td>
-                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #3498db; text-align: right;">${voiceCharge.toFixed(2)}</td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #3498db; text-align: right;">${Math.round(voiceCharge)}</td>
                     </tr>
                 `;
             }
@@ -2585,7 +2704,7 @@
                             <div style="font-weight: 600;">🚫 Sales Detection</div>
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">AI-powered sales call screening</div>
                         </td>
-                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #e74c3c; text-align: right;">${salesCharge.toFixed(2)}</td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #e74c3c; text-align: right;">${Math.round(salesCharge)}</td>
                     </tr>
                 `;
             }
@@ -2598,7 +2717,7 @@
                             <div style="font-weight: 600;">📞 Call Transfer</div>
                             <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">5 base + 3 credits/min transfer time</div>
                         </td>
-                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${transferCharge.toFixed(2)}</td>
+                        <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #f39c12; text-align: right;">${Math.round(transferCharge)}</td>
                     </tr>
                 `;
             }
@@ -2610,7 +2729,7 @@
             // Update popup content
             document.getElementById('breakdownCallDetails').textContent = `Call from ${callerNumber} - ${formattedDate} at ${formattedTime}`;
             document.getElementById('breakdownCharges').innerHTML = chargesHTML;
-            document.getElementById('breakdownTotal').textContent = `${call.credits} credits`;
+            document.getElementById('breakdownTotal').textContent = `${Math.round(call.credits)} credits`;
             
             // Show popup
             document.getElementById('creditBreakdownPopup').style.display = 'block';
@@ -3651,6 +3770,7 @@
             const agentPersonality = document.getElementById('agentPersonality')?.value || '';
             const agentInstructions = document.getElementById('agentInstructions')?.value || '';
             const callGreeting = document.getElementById('callGreeting')?.value || '';
+            const transferNumber = document.getElementById('transferNumber')?.value || '';
 
             const transferPeople = [];
             for (let i = 1; i <= 5; i++) {
@@ -3712,6 +3832,7 @@
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
                         CALL_GREETING: callGreeting,
+                        TRANSFER_NUMBER: transferNumber,
                         TRANSFER_PEOPLE: transferPeople
                     })
                 });
@@ -3816,6 +3937,123 @@
                 }
             } catch (error) {
                 console.error('Error loading credits:', error);
+            }
+        }
+
+        // Load trial status
+        async function loadTrialStatus() {
+            try {
+                console.log('🔄 Loading trial status...');
+                const trialContainer = document.getElementById('trialContainer');
+                const trialDaysText = document.getElementById('trialDaysText');
+                const trialProgressBar = document.getElementById('trialProgressBar');
+                const trialSubtext = document.getElementById('trialSubtext');
+                const reduceTrialBtn = document.getElementById('reduceTrialBtn');
+
+                // Make sure something is visible even before the fetch completes
+                if (trialContainer) trialContainer.style.display = 'block';
+                if (trialDaysText) trialDaysText.textContent = 'Loading…';
+                if (trialProgressBar) trialProgressBar.style.width = '100%';
+                // Keep the test button visible under "New Account"
+                if (reduceTrialBtn) reduceTrialBtn.style.display = 'inline-flex';
+
+                const response = await fetch('/api/trial-status', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    console.error('❌ Trial status response not OK:', response.status);
+                    if (trialDaysText) trialDaysText.textContent = 'Trial status unavailable';
+                    if (trialSubtext) trialSubtext.textContent = 'Please refresh or contact support';
+                    if (reduceTrialBtn) reduceTrialBtn.style.display = 'inline-flex';
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('✅ Trial status data:', data);
+                
+                if (!trialContainer) {
+                    console.error('❌ Trial container element not found');
+                    return;
+                }
+                
+                if (data.trial_days_remaining !== undefined && data.trial_days_remaining !== null) {
+                    console.log('📊 Showing trial with', data.trial_days_remaining, 'days left');
+                    trialContainer.style.display = 'block';
+                    if (reduceTrialBtn) reduceTrialBtn.style.display = 'inline-flex';
+                    
+                    const daysLeft = data.trial_days_remaining;
+                    const totalTrialDays = 3;
+                    const percentage = (daysLeft / totalTrialDays) * 100;
+                    
+                    // Update text
+                    if (daysLeft === 0) {
+                        trialDaysText.textContent = 'Trial Expired';
+                        trialDaysText.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                        trialSubtext.textContent = 'Please upgrade to continue using the service';
+                    } else if (daysLeft === 1) {
+                        trialDaysText.textContent = '1 day left';
+                        trialDaysText.style.background = 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)';
+                    } else {
+                        trialDaysText.textContent = `${daysLeft} days left`;
+                        trialDaysText.style.background = 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)';
+                    }
+                    
+                    trialDaysText.style.webkitBackgroundClip = 'text';
+                    trialDaysText.style.webkitTextFillColor = 'transparent';
+                    trialDaysText.style.backgroundClip = 'text';
+                    
+                    // Update progress bar
+                    trialProgressBar.style.width = percentage + '%';
+                    
+                    // Change colors based on days left
+                    if (daysLeft === 0) {
+                        trialProgressBar.style.background = 'linear-gradient(90deg, #e74c3c 0%, #c0392b 100%)';
+                        trialProgressBar.style.boxShadow = '0 0 10px rgba(231, 76, 60, 0.6)';
+                    } else if (daysLeft === 1) {
+                        trialProgressBar.style.background = 'linear-gradient(90deg, #e67e22 0%, #d35400 100%)';
+                        trialProgressBar.style.boxShadow = '0 0 10px rgba(230, 126, 34, 0.6)';
+                    }
+                } else {
+                    console.log('ℹ️ No trial data, hiding trial container');
+                    trialContainer.style.display = 'none';
+                    if (reduceTrialBtn) reduceTrialBtn.style.display = 'inline-flex';
+                }
+            } catch (error) {
+                console.error('❌ Error loading trial status:', error);
+                const trialContainer = document.getElementById('trialContainer');
+                const trialDaysText = document.getElementById('trialDaysText');
+                const trialSubtext = document.getElementById('trialSubtext');
+                const reduceTrialBtn = document.getElementById('reduceTrialBtn');
+                if (trialContainer) trialContainer.style.display = 'block';
+                if (trialDaysText) trialDaysText.textContent = 'Trial status unavailable';
+                if (trialSubtext) trialSubtext.textContent = 'Please refresh or contact support';
+                if (reduceTrialBtn) reduceTrialBtn.style.display = 'inline-flex';
+            }
+        }
+
+        // Reduce trial day (test function)
+        async function reduceTrialDay() {
+            try {
+                const response = await fetch('/api/reduce-trial-day', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Trial day reduced:', data);
+                    await loadTrialStatus(); // Reload trial status
+                    
+                    // Show notification
+                    const daysLeft = data.trial_days_remaining;
+                    alert(`Trial reduced! ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining.`);
+                } else {
+                    alert('Failed to reduce trial day');
+                }
+            } catch (error) {
+                console.error('Error reducing trial day:', error);
+                alert('Error reducing trial day');
             }
         }
 

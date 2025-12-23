@@ -45,7 +45,7 @@
         .brain-option input[type="radio"] { display: none; }
         .brain-option-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: white; }
         .brain-option-desc { font-size: 13px; color: rgba(255, 255, 255, 0.7); }
-        .alert { padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; font-weight: 600; display: none; font-size: 15px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+        .alert { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: min(980px, calc(100vw - 40px)); width: calc(100vw - 40px); padding: 15px 20px; border-radius: 8px; font-weight: 600; display: none; font-size: 15px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
         .alert-success { background: rgba(46, 204, 113, 0.3); color: #2ecc71; border: 2px solid #2ecc71; }
         .alert-error { background: rgba(231, 76, 60, 0.3); color: #e74c3c; border: 2px solid #e74c3c; }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -682,6 +682,25 @@
         </div>
         <button class="btn-login" onclick="attemptLogin()">Unlock</button>
         <div class="error-message" id="errorMessage">Incorrect password. Access denied.</div>
+
+        <!-- First-time setup (local installs). Requires SUPER_ADMIN_SETUP_TOKEN on the server. -->
+        <div id="setupBox" style="display:none; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.18); width: 100%;">
+            <div style="font-weight: 900; color: rgba(255,255,255,0.92); margin-bottom: 10px; text-align: center;">First-time setup</div>
+            <div class="input-group">
+                <input type="text" id="setupTokenInput" placeholder="Setup Token (SUPER_ADMIN_SETUP_TOKEN)" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <input type="text" id="setupUsernameInput" placeholder="Super Admin Username (optional)" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <input type="password" id="setupPasswordInput" placeholder="New Password (6+ chars)" autocomplete="new-password">
+            </div>
+            <div class="input-group">
+                <input type="password" id="setupPasswordConfirmInput" placeholder="Confirm Password" autocomplete="new-password">
+            </div>
+            <button class="btn-login" onclick="attemptBootstrap()" style="margin-top: 6px;">Set Password</button>
+            <div class="error-message" id="setupMessage" style="display:none; margin-top: 10px;"></div>
+        </div>
     </div>
 
     <div class="main-container" id="mainDashboard">
@@ -1033,32 +1052,12 @@
         </div>
 
         <div class="panel">
-            <h2>👥 Active Accounts</h2>
-            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">All accounts with their current credit balances.</p>
-            <div id="accountsList" class="accounts-grid" style="max-height: 600px; overflow-y: auto;"></div>
-        </div>
-
-        <div class="panel">            <h2>📊 Call Performance Analysis</h2>
-            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Analyze detailed timing breakdown for recent calls to identify performance bottlenecks.</p>
-            
-            <div class="call-analysis-section">
-                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: white;">Select a Recent Call:</h3>
-                <div class="call-selector" id="recentCallsList">
-                    <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">
-                        Loading recent calls...
-                    </div>
-                </div>
-                
-                <button class="btn-analyze" id="analyzeBtn" onclick="analyzeSelectedCall()" disabled>
-                    🔍 Analyze Call Timing
-                </button>
-                
-                <div id="analysisResults" style="margin-top: 25px; display: none;">
-                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: white;">⏱️ Timing Breakdown:</h3>
-                    <div id="timingStages"></div>
-                    <div id="bottleneckInfo"></div>
-                </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                <h2 style="margin: 0;">👥 Active Accounts</h2>
+                <button type="button" onclick="refreshAccountsList(event)" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.90); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🔄 Refresh</button>
             </div>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">All accounts with their current credit balances.</p>
+            <div id="accountsList" style="max-height: 600px; overflow-y: auto;"></div>
         </div>
 
         <div class="panel">
@@ -1159,10 +1158,195 @@
         let healthData = {};
         let selectedCallUuid = null;
         
-        const CORRECT_PASSWORD = '2389';
-        if (sessionStorage.getItem('superAdminAuth') === 'true') showDashboard();
+        // IMPORTANT: Super Admin security is enforced server-side.
+        // This page only calls /api/super-admin/login to create a secure session cookie.
+
+        function _getCookie(name) {
+            const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+            return match ? decodeURIComponent(match[1]) : '';
+        }
+
+        function _setErr(msg) {
+            const err = document.getElementById('errorMessage');
+            if (!err) return;
+            if (msg) {
+                err.textContent = msg;
+                err.style.display = 'block';
+            } else {
+                err.style.display = 'none';
+            }
+        }
+
+        // Wrap fetch so all Super Admin requests send cookies + CSRF.
+        (function() {
+            const _origFetch = window.fetch.bind(window);
+            function _setHeader(init, k, v) {
+                if (!init.headers) init.headers = {};
+                if (init.headers instanceof Headers) init.headers.set(k, v);
+                else init.headers[k] = v;
+            }
+            window.fetch = async function(input, init) {
+                init = init || {};
+                init.credentials = 'include';
+                const method = String(init.method || 'GET').toUpperCase();
+                if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+                    const csrf = _getCookie('website33_super_admin_csrf');
+                    if (csrf) _setHeader(init, 'X-CSRF-Token', csrf);
+                }
+                const resp = await _origFetch(input, init);
+                // If the session expires, fall back to login screen.
+                if (resp.status === 401) {
+                    document.getElementById('mainDashboard').style.display = 'none';
+                    document.getElementById('loginScreen').style.display = 'flex';
+                }
+                return resp;
+            };
+        })();
+
+        async function checkExistingSession() {
+            try {
+                const resp = await fetch('/api/super-admin/session');
+                if (resp.ok) showDashboard();
+            } catch (_) {
+                // stay on login screen
+            }
+        }
+
+        function _setSetupMessage(msg, ok=false) {
+            const el = document.getElementById('setupMessage');
+            if (!el) return;
+            if (!msg) {
+                el.style.display = 'none';
+                el.textContent = '';
+                return;
+            }
+            el.style.display = 'block';
+            el.textContent = msg;
+            el.style.background = ok ? 'rgba(46, 204, 113, 0.25)' : 'rgba(231, 76, 60, 0.25)';
+            el.style.border = ok ? '1px solid rgba(46, 204, 113, 0.35)' : '1px solid rgba(231, 76, 60, 0.35)';
+            el.style.color = ok ? 'rgba(170, 255, 200, 0.95)' : 'rgba(255, 200, 200, 0.95)';
+            el.style.padding = '10px 12px';
+            el.style.borderRadius = '10px';
+        }
+
+        function _showSetupBox(show=true) {
+            const box = document.getElementById('setupBox');
+            if (!box) return;
+            box.style.display = show ? 'block' : 'none';
+        }
+
+        async function checkSuperAdminStatus() {
+            try {
+                const resp = await fetch('/api/super-admin/status');
+                if (!resp.ok) return;
+                const data = await resp.json().catch(() => ({}));
+                if (data && data.configured === false) {
+                    _showSetupBox(true);
+                    _setErr('Super Admin is not configured yet. Use first-time setup below.');
+                }
+            } catch (_) {}
+        }
+
+        checkExistingSession();
+        checkSuperAdminStatus();
         document.getElementById('passwordInput')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') attemptLogin(); });
-        function attemptLogin() { const pwd = document.getElementById('passwordInput').value; const err = document.getElementById('errorMessage'); if (pwd === CORRECT_PASSWORD) { sessionStorage.setItem('superAdminAuth', 'true'); err.style.display = 'none'; showDashboard(); } else { err.style.display = 'block'; document.getElementById('passwordInput').value = ''; } }
+
+        async function attemptLogin() {
+            const pwd = document.getElementById('passwordInput')?.value || '';
+            _setErr('');
+            try {
+                const resp = await fetch('/api/super-admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd })
+                });
+
+                if (resp.ok) {
+                    document.getElementById('passwordInput').value = '';
+                    showDashboard();
+                    return;
+                }
+
+                const data = await resp.json().catch(() => ({}));
+                const err = data?.error || 'Login failed';
+                _setErr(err);
+                if (resp.status === 503 && String(err).toLowerCase().includes('not configured')) {
+                    _showSetupBox(true);
+                }
+                document.getElementById('passwordInput').value = '';
+            } catch (e) {
+                _setErr('Login failed');
+            }
+        }
+
+        async function attemptBootstrap() {
+            _setSetupMessage('');
+            const token = (document.getElementById('setupTokenInput')?.value || '').trim();
+            const username = (document.getElementById('setupUsernameInput')?.value || '').trim();
+            const password = (document.getElementById('setupPasswordInput')?.value || '').trim();
+            const confirm = (document.getElementById('setupPasswordConfirmInput')?.value || '').trim();
+
+            if (!token) {
+                _setSetupMessage('Setup token is required. Set SUPER_ADMIN_SETUP_TOKEN on the server, then paste it here.');
+                return;
+            }
+            if (password.length < 6) {
+                _setSetupMessage('Password too short (use at least 6 characters).');
+                return;
+            }
+            if (password !== confirm) {
+                _setSetupMessage('Passwords do not match.');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/super-admin/bootstrap', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ setup_token: token, username: username || 'admin', password })
+                });
+                
+                let data = {};
+                try {
+                    data = await resp.json();
+                } catch (jsonErr) {
+                    _setSetupMessage(`Setup failed (HTTP ${resp.status}): Unable to parse server response`);
+                    return;
+                }
+                
+                if (resp.ok && data && data.success) {
+                    _setSetupMessage('Super Admin configured. Loading dashboard…', true);
+                    document.getElementById('setupPasswordInput').value = '';
+                    document.getElementById('setupPasswordConfirmInput').value = '';
+                    document.getElementById('passwordInput').value = '';
+                    // If server auto-logged in, go straight to dashboard.
+                    if (data.auto_login) {
+                        showDashboard();
+                        return;
+                    }
+                    _setErr('Setup complete. Now log in with your new password.');
+                    return;
+                }
+                
+                // Show detailed error
+                let errMsg = data?.error || data?.detail || 'Setup failed';
+                if (resp.status === 403) {
+                    errMsg = `Invalid setup token. Make sure SUPER_ADMIN_SETUP_TOKEN in .env matches what you entered. (${errMsg})`;
+                } else if (resp.status === 503) {
+                    errMsg = `Setup token not configured on server. Add SUPER_ADMIN_SETUP_TOKEN to .env and restart. (${errMsg})`;
+                } else if (resp.status === 409) {
+                    errMsg = `Super Admin is already configured. Use the login form above instead. (${errMsg})`;
+                } else if (resp.status >= 500) {
+                    errMsg = `Server error (${resp.status}): ${errMsg}`;
+                } else {
+                    errMsg = `Setup failed (HTTP ${resp.status}): ${errMsg}`;
+                }
+                _setSetupMessage(errMsg);
+            } catch (e) {
+                _setSetupMessage(`Setup failed: Network error or server is not responding. ${e.message || ''}`);
+                console.error('Bootstrap error:', e);
+            }
+        }
         function showDashboard() { 
             document.getElementById('loginScreen').style.display = 'none'; 
             document.getElementById('mainDashboard').style.display = 'block'; 
@@ -1174,7 +1358,11 @@
                 startHealthMonitoring();
             }, 1000);
         }
-        function logout() { stopStreamingStatusPolling(); sessionStorage.removeItem('superAdminAuth'); location.reload(); }
+        async function logout() {
+            stopStreamingStatusPolling();
+            try { await fetch('/api/super-admin/logout', { method: 'POST' }); } catch (_) {}
+            location.reload();
+        }
         async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadBackchannelSettings(); await loadAccountsList(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
@@ -1564,34 +1752,199 @@
         }
         async function loadAccountsList() { 
             try { 
-                const response = await fetch('/api/super-admin/accounts'); 
+                const response = await fetch(`/api/super-admin/accounts?t=${Date.now()}`); 
                 const data = await response.json(); 
                 const container = document.getElementById('accountsList'); 
                 if (!data.success || !data.accounts || data.accounts.length === 0) { 
-                    container.innerHTML = '<div style="text-align: center; padding: 30px; color: rgba(255,255,255,0.5); grid-column: 1 / -1;">No accounts found</div>'; 
+                    container.innerHTML = '<div style="text-align: center; padding: 30px; color: rgba(255,255,255,0.5);">No accounts found</div>'; 
                     return; 
-                } 
-                container.innerHTML = data.accounts.map(acc => `
-                    <div class="account-card">
-                        <div class="account-info">
-                            <div class="account-name">👤 ${acc.name || 'Unknown'}</div>
-                            <div class="account-phone">📞 ${acc.phone_number || 'No number assigned'}</div>
-                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 5px;">📊 ${acc.calls_today || 0} calls today</div>
-                        </div>
-                        <div class="account-credits">
-                            <div class="credits-amount">${acc.credits || 0}</div>
-                            <div class="credits-label">Minutes</div>
-                            <div class="credit-actions">
-                                <button class="credit-btn add" onclick="manageCredits(${acc.user_id}, '${acc.name}', 'add')" title="Add Credits">➕ Add</button>
-                                <button class="credit-btn remove" onclick="manageCredits(${acc.user_id}, '${acc.name}', 'remove')" title="Remove Credits">➖ Remove</button>
-                            </div>
-                        </div>
+                }
+
+                const escapeHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+                const fmtPlan = (acc) => {
+                    const planStatus = acc.plan_status || 'trial';
+                    const trialDays = Number(acc.trial_days_remaining ?? 0);
+                    if (planStatus === 'upgraded') return '✅ Upgraded';
+                    if (planStatus === 'trial_expired') return '⛔ Trial Expired';
+                    if (trialDays === 1) return `🎁 Free Trial - 1 day left`;
+                    if (trialDays === 0) return `🎁 Free Trial - Last day`;
+                    return `🎁 Free Trial - ${trialDays} days left`;
+                };
+                const canExtendTrial = (acc) => {
+                    const planStatus = acc.plan_status || 'trial';
+                    return planStatus === 'trial' || planStatus === 'trial_expired';
+                };
+                const fmtCredits = (acc) => {
+                    const v = Number(acc.credits ?? acc.minutes_remaining ?? 0);
+                    return String(Math.round(isFinite(v) ? v : 0));
+                };
+                const fmtLastCall = (acc) => {
+                    const v = acc.last_call;
+                    if (!v) return '—';
+                    return escapeHtml(v);
+                };
+                const fmtStatus = (acc) => {
+                    const s = String(acc.status || 'active');
+                    if (s === 'active') return '<span style="background: rgba(46,204,113,0.18); border: 1px solid rgba(46,204,113,0.45); color: #b7ffcf; padding: 4px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;">Active</span>';
+                    if (s === 'suspended') return '<span style="background: rgba(231,76,60,0.20); border: 1px solid rgba(231,76,60,0.55); color: #ffb3b3; padding: 4px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;">Suspended</span>';
+                    if (s === 'banned') return '<span style="background: rgba(231,76,60,0.24); border: 1px solid rgba(231,76,60,0.65); color: #ffb3b3; padding: 4px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;">Banned</span>';
+                    return `<span style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); color: rgba(255,255,255,0.85); padding: 4px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;">${escapeHtml(s)}</span>`;
+                };
+
+                const rows = data.accounts.map(acc => {
+                    const userId = Number(acc.user_id);
+                    const name = escapeHtml(acc.name || 'Unknown');
+                    const phone = escapeHtml(acc.phone_number || '');
+                    const planStatus = acc.plan_status || 'trial';
+                    const trialDays = Number(acc.trial_days_remaining ?? 0);
+                    const plan = escapeHtml(fmtPlan(acc));
+                    let trialLeft = '—';
+                    if (planStatus !== 'upgraded') {
+                        if (planStatus === 'trial_expired') trialLeft = '0';
+                        else if (trialDays === 0) trialLeft = 'Last day';
+                        else trialLeft = `${trialDays}d`;
+                    }
+                    const credits = fmtCredits(acc);
+                    const callsToday = String(Number(acc.calls_today || 0));
+                    const lastCall = fmtLastCall(acc);
+                    const showExtendTrial = canExtendTrial(acc);
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.10);">
+                            <td style="padding: 10px 8px; font-weight: 900; color: white; white-space: nowrap;">${userId}</td>
+                            <td style="padding: 10px 8px;">
+                                <div style="font-weight: 900; color: white;">${name}</div>
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.65);">📞 ${phone || 'No number assigned'}</div>
+                            </td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.85);">${plan}</td>
+                            <td style="padding: 10px 8px; text-align: center; font-weight: 900; color: white;">${trialLeft}</td>
+                            <td style="padding: 10px 8px; text-align: right; font-weight: 900; color: #2ecc71;">${credits}</td>
+                            <td style="padding: 10px 8px; text-align: center; font-weight: 900; color: white;">${callsToday}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.75);">${lastCall}</td>
+                            <td style="padding: 10px 8px;">${fmtStatus(acc)}</td>
+                            <td style="padding: 10px 8px; text-align: right; white-space: nowrap;">
+                                ${showExtendTrial ? `<button type="button" onclick="extendTrial(${userId}, '${name.replace(/'/g, "\\'")}')" style="background: rgba(52, 152, 219, 0.22); border: 1px solid rgba(52, 152, 219, 0.55); color: #cde8ff; padding: 7px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px; margin-right: 6px;">⏰ +Trial</button>` : ''}
+                                <button type="button" class="credit-btn add" onclick="manageCredits(${userId}, '${name.replace(/'/g, "\\'")}', 'add')" title="Add Credits">➕ Add</button>
+                                <button type="button" class="credit-btn remove" onclick="manageCredits(${userId}, '${name.replace(/'/g, "\\'")}', 'remove')" title="Remove Credits" style="margin-left: 6px;">➖ Remove</button>
+                                <button type="button" onclick="deleteAccount(${userId}, '${name.replace(/'/g, "\\'")}', '${phone.replace(/'/g, "\\'")}')" style="margin-left: 8px; background: rgba(231, 76, 60, 0.22); border: 1px solid rgba(231, 76, 60, 0.55); color: #ffb3b3; padding: 7px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🗑️ Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <div style="overflow-x:auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: rgba(255,255,255,0.06); position: sticky; top: 0; backdrop-filter: blur(10px);">
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">ID</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Account</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Plan</th>
+                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Trial Left</th>
+                                    <th style="text-align:right; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Credits</th>
+                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Calls Today</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Last Call</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Status</th>
+                                    <th style="text-align:right; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
                     </div>
-                `).join(''); 
+                `;
             } catch (error) { 
                 console.error('Error loading accounts:', error); 
-                document.getElementById('accountsList').innerHTML = '<div style="text-align: center; padding: 30px; color: #e74c3c; grid-column: 1 / -1;">Error loading accounts</div>'; 
+                document.getElementById('accountsList').innerHTML = '<div style="text-align: center; padding: 30px; color: #e74c3c;">Error loading accounts</div>'; 
             } 
+        }
+
+        function canExtendTrial(acc) {
+            return acc.plan_status === 'trial' || acc.plan_status === 'trial_expired';
+        }
+
+        async function extendTrial(userId, userName) {
+            const daysInput = prompt(`How many days to add to ${userName}'s trial?\n\nNote: Total trial days cannot exceed 5.\n\nEnter days (1-5):`, '1');
+            if (!daysInput) return;
+
+            const days = parseInt(daysInput, 10);
+            if (isNaN(days) || days < 1 || days > 5) {
+                showAlert('Please enter a valid number between 1 and 5', 'error', false);
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/super-admin/account/${userId}/extend-trial`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: days })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showAlert(`Failed to extend trial: ${data.detail || data.error || 'Unknown error'}`, 'error', false);
+                    return;
+                }
+
+                if (data.success) {
+                    const added = Number(data.days_added ?? 0);
+                    if (added > 0) {
+                        showAlert(`✅ Extended ${userName}'s trial by ${added} day(s)`, 'success', false);
+                    } else {
+                        showAlert(`ℹ️ ${userName} is already at the maximum trial length (5 days)`, 'error', false);
+                    }
+                    await loadAccountsList();
+                } else {
+                    showAlert(data.error || 'Failed to extend trial', 'error', false);
+                }
+            } catch (error) {
+                showAlert(`Network error: ${error.message}`, 'error', false);
+            }
+        }
+
+        async function refreshAccountsList(evt) {
+            const btn = evt?.target;
+            const prevText = btn?.textContent;
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.75';
+                    btn.style.cursor = 'not-allowed';
+                    btn.textContent = '⏳ Refreshing…';
+                }
+                await loadAccountsList();
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                    btn.style.cursor = 'pointer';
+                    btn.textContent = prevText || '🔄 Refresh';
+                }
+            }
+        }
+
+        async function deleteAccount(userId, userName, phoneNumber) {
+            console.log('deleteAccount called:', { userId, userName, phoneNumber });
+            const phoneText = phoneNumber ? `\n\nAssigned number: ${phoneNumber}` : '';
+            if (!confirm(`Delete account "${userName}" (ID: ${userId})?${phoneText}\n\nThis cannot be undone.`)) {
+                console.log('User cancelled delete');
+                return;
+            }
+            console.log('Sending DELETE request to:', `/api/super-admin/account/${userId}/delete`);
+            try {
+                const resp = await fetch(`/api/super-admin/account/${userId}/delete`, { method: 'DELETE' });
+                console.log('Response status:', resp.status);
+                const data = await resp.json();
+                console.log('Response data:', data);
+                if (!data || !data.success) throw new Error(data?.error || 'Delete failed');
+                const released = (data.released_phone_number || '').trim();
+                showAlert(released ? `🗑️ Deleted ${userName}. Number returned: ${released}` : `🗑️ Deleted ${userName}`, 'success', false);
+                await loadAccountsList();
+                if (typeof loadFlaggedAccountsBadge === 'function') loadFlaggedAccountsBadge();
+            } catch (e) {
+                console.error('Failed to delete account:', e);
+                showAlert('❌ Failed to delete: ' + (e.message || e), 'error', false);
+            }
         }
         
         async function manageCredits(userId, userName, action) {
@@ -1602,7 +1955,7 @@
             
             const minutesNum = parseInt(minutes);
             if (isNaN(minutesNum) || minutesNum <= 0) {
-                showAlert('Please enter a valid number', 'error');
+                showAlert('Please enter a valid number', 'error', false);
                 return;
             }
             
@@ -1620,14 +1973,14 @@
                     const message = action === 'add' 
                         ? `✅ Added ${data.minutes_added} minutes to ${userName}` 
                         : `✅ Removed ${data.minutes_removed} minutes from ${userName}. New balance: ${data.new_balance} minutes`;
-                    showAlert(message, 'success');
+                    showAlert(message, 'success', false);
                     await loadAccountsList(); // Reload to show updated credits
                 } else {
-                    showAlert(`Failed to ${action} credits: ${data.error || 'Unknown error'}`, 'error');
+                    showAlert(`Failed to ${action} credits: ${data.error || 'Unknown error'}`, 'error', false);
                 }
             } catch (error) {
                 console.error(`Error ${action}ing credits:`, error);
-                showAlert(`Error ${action}ing credits`, 'error');
+                showAlert(`Error ${action}ing credits`, 'error', false);
             }
         }
         
@@ -1649,10 +2002,88 @@
                     </div>
                 `; container.appendChild(card); } } catch (error) { console.error('Error loading filler slots:', error); showAlert('Error loading filler slots', 'error'); } }
         async function playFiller(slot) { try { const audio = new Audio(`/api/super-admin/get-filler/${slot}?voice_id=sarah&t=${Date.now()}`); audio.play(); } catch (error) { console.error('Error playing filler:', error); showAlert('Error playing audio', 'error'); } }
-        async function regenerateFiller(slot) { try { const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Generating...'; const textEl = document.getElementById(`fillerText${slot}`); const customText = (textEl?.value || '').trim(); const response = await fetch(`/api/super-admin/regenerate-filler/${slot}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin', use_ai: true, text: customText }) }); const data = await response.json(); if (data.success) { showAlert(`Filler ${slot} generated successfully`, 'success'); await loadFillerSlots(); } else { showAlert(data.error || 'Failed to generate filler', 'error'); btn.disabled = false; btn.textContent = '🔄 Generate'; } } catch (error) { console.error('Error regenerating filler:', error); showAlert('Error generating filler', 'error'); } }
-        async function deleteFiller(slot) { if (!confirm(`Delete filler ${slot}?`)) return; try { const response = await fetch(`/api/super-admin/delete-filler/${slot}?voice_id=sarah`, { method: 'DELETE' }); const data = await response.json(); if (data.success) { showAlert(`Filler ${slot} deleted`, 'success'); await loadFillerSlots(); } else { showAlert('Failed to delete filler', 'error'); } } catch (error) { console.error('Error deleting filler:', error); showAlert('Error deleting filler', 'error'); } }
-        async function generateAllFillers() { if (!confirm('Generate all 10 filler audio files? This will overwrite existing ones.')) return; try { const statusEl = document.getElementById('generateAllStatus'); statusEl.textContent = '⏳ Generating all 10 fillers...'; statusEl.style.color = '#f39c12'; const response = await fetch('/api/super-admin/generate-speechmatics-fillers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) { showAlert('All 10 fillers generated successfully!', 'success'); statusEl.textContent = '✅ Complete!'; statusEl.style.color = '#2ecc71'; await loadFillerSlots(); setTimeout(() => { statusEl.textContent = ''; }, 3000); } else { showAlert(data.error || 'Failed to generate fillers', 'error'); statusEl.textContent = '❌ Failed'; statusEl.style.color = '#e74c3c'; } } catch (error) { console.error('Error generating all fillers:', error); showAlert('Error generating fillers', 'error'); } }
-        function showAlert(message, type) { 
+        async function regenerateFiller(slot) { 
+            try { 
+                const btn = event.target; 
+                btn.disabled = true; 
+                btn.textContent = '⏳ Generating...'; 
+                const textEl = document.getElementById(`fillerText${slot}`); 
+                let customText = (textEl?.value || '').trim();
+                
+                // Clear the textarea if user wants AI to choose a new word
+                if (!customText) {
+                    console.log('No custom text provided, AI will choose random filler');
+                }
+                
+                const response = await fetch(`/api/super-admin/regenerate-filler/${slot}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        voice_id: 'sarah', 
+                        updated_by: 'super-admin', 
+                        use_ai: true, 
+                        text: customText || '' 
+                    }) 
+                }); 
+                const data = await response.json(); 
+                if (data.success) { 
+                    showAlert(`Filler ${slot} generated successfully`, 'success', false); 
+                    await loadFillerSlots(); 
+                } else { 
+                    showAlert(data.error || 'Failed to generate filler', 'error', false); 
+                    btn.disabled = false; 
+                    btn.textContent = '🔄 Generate'; 
+                } 
+            } catch (error) { 
+                console.error('Error regenerating filler:', error); 
+                showAlert('Error generating filler', 'error', false); 
+            } 
+        }
+        async function deleteFiller(slot) { 
+            if (!confirm(`Delete filler ${slot}?`)) return; 
+            try { 
+                const response = await fetch(`/api/super-admin/delete-filler/${slot}?voice_id=sarah`, { method: 'DELETE' }); 
+                const data = await response.json(); 
+                if (data.success) { 
+                    showAlert(`Filler ${slot} deleted`, 'success', false); 
+                    await loadFillerSlots(); 
+                } else { 
+                    showAlert('Failed to delete filler', 'error', false); 
+                } 
+            } catch (error) { 
+                console.error('Error deleting filler:', error); 
+                showAlert('Error deleting filler', 'error', false); 
+            } 
+        }
+        async function generateAllFillers() { 
+            if (!confirm('Generate all 10 filler audio files? This will overwrite existing ones.')) return; 
+            try { 
+                const statusEl = document.getElementById('generateAllStatus'); 
+                statusEl.textContent = '⏳ Generating all 10 fillers...'; 
+                statusEl.style.color = '#f39c12'; 
+                const response = await fetch('/api/super-admin/generate-speechmatics-fillers', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ voice_id: 'sarah', updated_by: 'super-admin' }) 
+                }); 
+                const data = await response.json(); 
+                if (data.success) { 
+                    showAlert('All 10 fillers generated successfully!', 'success', false); 
+                    statusEl.textContent = '✅ Complete!'; 
+                    statusEl.style.color = '#2ecc71'; 
+                    await loadFillerSlots(); 
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000); 
+                } else { 
+                    showAlert(data.error || 'Failed to generate fillers', 'error', false); 
+                    statusEl.textContent = '❌ Failed'; 
+                    statusEl.style.color = '#e74c3c'; 
+                } 
+            } catch (error) { 
+                console.error('Error generating all fillers:', error); 
+                showAlert('Error generating fillers', 'error', false); 
+            } 
+        }
+        function showAlert(message, type, scrollToTop = false) { 
             const alertBox = document.getElementById('alertBox'); 
             if (!alertBox) {
                 console.error('Alert box not found');
@@ -1665,8 +2096,10 @@
             alertBox.style.display = 'block'; 
             alertBox.style.animation = 'slideIn 0.3s ease-out';
             
-            // Scroll to top to make alert visible
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Optionally scroll to top to make alert visible
+            if (scrollToTop) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
             
             // Auto-hide after 5 seconds
             setTimeout(() => { 
