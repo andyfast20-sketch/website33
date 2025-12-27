@@ -3445,11 +3445,12 @@ You must use ONLY this information when answering questions about services, area
                     if voice_provider == 'speechmatics':
                         try:
                             if not (getattr(self, '_last_caller_transcript', '') or '').strip():
-                                await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.35)
+                                await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.60)
                         except Exception:
                             pass
 
                     last_transcript = getattr(self, '_last_caller_transcript', '') or ''
+                    transcript_missing = not last_transcript.strip()
                     is_explicit_confirmation = self._is_explicit_confirmation_utterance(last_transcript)
                     is_suppressed_phrase = self._is_filler_suppression_phrase(last_transcript)
 
@@ -3493,6 +3494,7 @@ You must use ONLY this information when answering questions about services, area
                         and not self._agent_speaking
                         and not self._suppress_filler_for_turn
                         and self._last_speech_duration_seconds >= min_turn
+                        and not transcript_missing
                         and not is_suppressed_phrase
                     ):
                         candidate = self._pick_random_global_filler("sarah")
@@ -3517,6 +3519,8 @@ You must use ONLY this information when answering questions about services, area
                             self._filler_injecting = False
                     elif is_suppressed_phrase:
                         logger.info(f"[{self.call_uuid}] 👋 Suppressing filler for caller phrase")
+                    elif voice_provider == 'speechmatics' and transcript_missing and self._last_speech_duration_seconds >= min_turn:
+                        logger.info(f"[{self.call_uuid}] 💤 Skipping filler (transcript not ready yet)")
 
                     
                 elif event_type == "conversation.item.input_audio_transcription.completed":
