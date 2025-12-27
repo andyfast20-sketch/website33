@@ -1966,6 +1966,7 @@ class CallSession:
         # Transfer handling
         self._is_transferring = False  # Flag to indicate call is being transferred
         self._transfer_person_name = "them"  # Store person name for failed transfer handling
+        self._transfer_declined_people: set = set()  # Track people the caller declined transferring to (per call)
 
         # Filler injection (post-utterance)
         self._filler_played_for_turn = False
@@ -3743,6 +3744,10 @@ You must use ONLY this information when answering questions about services, area
                             self._pending_transfer_person_name = ""
                             self._pending_transfer_expires_at = 0
                             try:
+                                self._transfer_declined_people.add((pending_name or "").strip().lower())
+                            except Exception:
+                                pass
+                            try:
                                 if self.openai_ws:
                                     await self.openai_ws.send(json.dumps({
                                         "type": "conversation.item.create",
@@ -3751,7 +3756,11 @@ You must use ONLY this information when answering questions about services, area
                                             "role": "user",
                                             "content": [{
                                                 "type": "input_text",
-                                                "text": "[SYSTEM: The caller declined a transfer. Acknowledge and continue helping normally.]"
+                                                "text": (
+                                                    f"[SYSTEM: The caller declined a transfer to {pending_name}. "
+                                                    f"Acknowledge briefly and take a message for {pending_name}. "
+                                                    f"Ask for their name, best callback number, and what it's about. Keep it concise.]"
+                                                )
                                             }]
                                         }
                                     }))
@@ -3770,6 +3779,12 @@ You must use ONLY this information when answering questions about services, area
                             if not p:
                                 continue
                             p_low = p.lower()
+                            # If they've already declined a transfer to this person, don't re-offer.
+                            try:
+                                if p_low in getattr(self, "_transfer_declined_people", set()):
+                                    continue
+                            except Exception:
+                                pass
                             if " " in p_low:
                                 if p_low in low:
                                     matched_person = p
@@ -3798,13 +3813,14 @@ You must use ONLY this information when answering questions about services, area
                             import re
                             p_low = matched_person.lower()
                             identity_patterns = [
-                                rf"\\b(i am|i'm|this is|it'?s|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"\\b(i am|i'm|this is|it'?s|it was|it were|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"\\b(it was|it were)\\s+(?:from\\s+)?(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"\\bcalling from\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"\\bfrom\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"^\\s*(?:the\\s+)?{re.escape(p_low)}\\b"
                             ]
                             if any(re.search(pat, low) for pat in identity_patterns):
-                                logger.info(f"[{self.call_uuid}] 📲 Caller identified as '{matched_person}' - offering transfer")
+                                logger.info(f"[{self.call_uuid}] 📲 Transfer trigger matched: '{matched_person}'")
                                 self._pending_transfer_person_name = matched_person
                                 self._pending_transfer_expires_at = now_ts + 30.0
 
@@ -3825,9 +3841,10 @@ You must use ONLY this information when answering questions about services, area
                                                 "content": [{
                                                     "type": "input_text",
                                                     "text": (
-                                                        f"[SYSTEM: The caller says they are {matched_person}. "
-                                                        f"Offer to transfer them now. Ask a yes/no question. "
-                                                        f"Do not transfer unless they explicitly confirm yes.]"
+                                                        f"[SYSTEM: The caller indicated the call was from {matched_person} (or they are {matched_person}). "
+                                                        f"Say: 'I can try and transfer you to them if you would you like me to?' "
+                                                        f"Wait for a clear yes/no. If yes, proceed with transfer. If no, take a message for {matched_person}. "
+                                                        f"Keep it concise and natural.]"
                                                     )
                                                 }]
                                             }
