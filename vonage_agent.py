@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import os
+import sys
 import subprocess
 import secrets
 import hashlib
@@ -1982,6 +1983,13 @@ class CallSession:
         self._pending_barge_in_started_at: Optional[float] = None
         self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.25))
 
+        # Barge-in robustness: track caller VAD durations and outbound audio timing.
+        # This reduces false barge-ins caused by VAD flapping or far-end echo.
+        self._caller_vad_last_started_at: Optional[float] = None
+        self._caller_vad_last_stopped_at: Optional[float] = None
+        self._last_outbound_audio_sent_at: float = 0.0
+        self._partial_caller_transcript: str = ""
+
         # Turn gating: avoid treating tiny utterances (e.g., "ok") as full turns.
         self._last_speech_started_at: Optional[float] = None
         self._last_speech_duration_seconds: float = 0.0
@@ -2189,13 +2197,21 @@ class CallSession:
             await asyncio.sleep(delay)
             if not self.is_active or not self.openai_ws:
                 return
-            # VAD can briefly flap between speaking/stopped on the caller side.
-            # Treat this as sustained if they are still speaking *or* we saw speech activity
-            # very recently.
             now_t = asyncio.get_event_loop().time()
-            recently_active = (now_t - (self._last_speech_time or 0.0)) <= 0.25
-            if not self._caller_speaking and not recently_active:
-                return
+
+            # VAD can briefly flap between speaking/stopped on the caller side.
+            # Only treat as sustained if either:
+            #  - caller is currently speaking, OR
+            #  - we just saw a stop after a long-enough speech segment (flap).
+            if not self._caller_speaking:
+                started_at = self._caller_vad_last_started_at
+                stopped_at = self._caller_vad_last_stopped_at
+                if not started_at or not stopped_at or stopped_at <= started_at:
+                    return
+                segment_duration = max(0.0, stopped_at - started_at)
+                recently_stopped = (now_t - stopped_at) <= 0.15
+                if not (segment_duration >= delay and recently_stopped):
+                    return
             if not self._agent_speaking:
                 return
 
@@ -2217,6 +2233,14 @@ class CallSession:
 
         # Invalidate Speechmatics streams/queue.
         self._barge_in_stop_speechmatics()
+        self._speechmatics_pending_text = ""
+
+        # Cancel any pending delayed barge-in task; we are already interrupting.
+        try:
+            if self._pending_barge_in_task is not None and not self._pending_barge_in_task.done():
+                self._pending_barge_in_task.cancel()
+        except Exception:
+            pass
 
         # Stop any filler playback state.
         self._filler_injecting = False
@@ -2224,6 +2248,9 @@ class CallSession:
 
         # Mark agent not speaking; individual TTS senders will also stop sending.
         self._agent_speaking = False
+
+        # Reset partial transcript buffer for this turn (avoid late partial triggers).
+        self._partial_caller_transcript = ""
 
         # Drop any trailing OpenAI deltas that might already be in flight.
         self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.0
@@ -2246,6 +2273,12 @@ class CallSession:
             return
 
         logger.info(f"[{self.call_uuid}] 🔊 Sending {len(pcm_bytes)} bytes to Vonage (ws={bool(self.vonage_ws)}, active={self.is_active})")
+
+        # Track outbound audio timing for echo/double-talk guarding.
+        try:
+            self._last_outbound_audio_sent_at = asyncio.get_event_loop().time()
+        except Exception:
+            pass
         
         if getattr(self, "_vonage_audio_mode", "bytes") == "json":
             await self.vonage_ws.send_text(json.dumps({"audio": base64.b64encode(pcm_bytes).decode()}))
@@ -3301,6 +3334,14 @@ You must use ONLY this information when answering questions about services, area
                     self._last_speech_time = asyncio.get_event_loop().time()
                     self._last_speech_started_at = asyncio.get_event_loop().time()
 
+                    # Track VAD start for barge-in robustness.
+                    now_t = asyncio.get_event_loop().time()
+                    self._caller_vad_last_started_at = now_t
+                    self._caller_vad_last_stopped_at = None
+
+                    # Reset partial transcript buffer for this caller turn.
+                    self._partial_caller_transcript = ""
+
                     # Caller resumed; reset silence nudges.
                     self._silence_nudge_count = 0
                     self._last_silence_nudge_at = 0.0
@@ -3331,14 +3372,22 @@ You must use ONLY this information when answering questions about services, area
                         self._suppress_filler_for_turn = True
                         # Delay barge-in slightly: if the caller only says "ok/right/yeah" we keep speaking.
                         # If they keep talking past the threshold, we cancel in _maybe_barge_in_after_delay().
-                        if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
-                            self._pending_barge_in_started_at = asyncio.get_event_loop().time()
-                            self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
+                        # Echo/double-talk guard: if we *just* sent outbound audio, VAD may briefly trigger.
+                        echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
+                        outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
+                        if not outbound_recent:
+                            if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
+                                self._pending_barge_in_started_at = asyncio.get_event_loop().time()
+                                self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
                     logger.debug(f"[{self.call_uuid}] Caller stopped speaking")
                     self._caller_speaking = False
                     self._last_speech_time = asyncio.get_event_loop().time()
+
+                    # Track VAD stop for barge-in robustness.
+                    now_t = asyncio.get_event_loop().time()
+                    self._caller_vad_last_stopped_at = now_t
 
                     # Estimate how long the caller spoke using VAD timing. This lets us ignore tiny
                     # one-word/backchannel bursts before we even have a transcript.
@@ -3348,6 +3397,19 @@ You must use ONLY this information when answering questions about services, area
                     else:
                         self._last_speech_duration_seconds = 0.0
                     self._last_speech_started_at = None
+
+                    # Echo/double-talk guard: if VAD indicates a very short burst while the agent was
+                    # speaking and we just sent outbound audio, cancel any pending barge-in.
+                    try:
+                        if self._agent_speaking:
+                            echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
+                            outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
+                            if outbound_recent and self._last_speech_duration_seconds <= echo_guard_s:
+                                if self._pending_barge_in_task is not None and not self._pending_barge_in_task.done():
+                                    self._pending_barge_in_task.cancel()
+                                    logger.debug(f"[{self.call_uuid}] 🔇 Echo-guard: cancelled pending barge-in")
+                    except Exception:
+                        pass
 
                     # Mark time when user stops speaking for latency tracking (use time.time() for consistency)
                     import time
@@ -3456,6 +3518,46 @@ You must use ONLY this information when answering questions about services, area
                         self._turn_transcript_ready.set()
                     except Exception:
                         pass
+
+                    # Clear partial transcript buffer (a completed transcript supersedes it).
+                    self._partial_caller_transcript = ""
+
+                elif event_type in {
+                    "conversation.item.input_audio_transcription.delta",
+                    "conversation.item.input_audio_transcription.partial",
+                    "input_audio_transcription.delta",
+                }:
+                    # Earlier barge-in: use partial transcript to interrupt sooner than waiting for
+                    # transcription.completed. Keep it conservative to avoid cancelling on "ok/yeah".
+                    delta_text = event.get("delta") or event.get("transcript") or ""
+                    if not delta_text:
+                        continue
+                    self._partial_caller_transcript = (self._partial_caller_transcript + str(delta_text))[-200:]
+
+                    if not self._agent_speaking:
+                        continue
+
+                    t_norm = self._normalize_backchannel_text(self._partial_caller_transcript)
+                    if not t_norm:
+                        continue
+
+                    # Heuristics: interrupt quickly for likely intentful interjections.
+                    strong_starters = (
+                        "no",
+                        "wait",
+                        "hold on",
+                        "actually",
+                        "sorry",
+                        "excuse me",
+                        "hang on",
+                        "stop",
+                    )
+                    looks_like_sentence = (" " in t_norm) or (len(t_norm) >= 14)
+                    looks_strong = any(t_norm.startswith(s) for s in strong_starters)
+
+                    if (looks_strong or looks_like_sentence) and (not self._is_backchannel_utterance(t_norm)):
+                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (partial transcript) - interrupting agent output: {t_norm!r}")
+                        await self._interrupt_agent_output("barge_in_partial_transcript")
 
                     # If the caller is saying something substantive while the agent is speaking,
                     # stop the agent output immediately (true barge-in). We only skip this for
