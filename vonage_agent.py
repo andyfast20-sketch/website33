@@ -3813,11 +3813,11 @@ You must use ONLY this information when answering questions about services, area
                             import re
                             p_low = matched_person.lower()
                             identity_patterns = [
-                                rf"\\b(i am|i'm|i was|we are|we're|this is|it'?s|it was|it were|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
-                                rf"\\b(it was|it were)\\s+(?:from\\s+)?(?:the\\s+)?{re.escape(p_low)}\\b",
-                                rf"\\bcalling from\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
-                                rf"\\bfrom\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
-                                rf"^\\s*(?:the\\s+)?{re.escape(p_low)}\\b"
+                                rf"\b(i am|i'm|i was|we are|we're|this is|it'?s|it was|it were|my name is)\s+(?:the\s+)?{re.escape(p_low)}\b",
+                                rf"\b(it was|it were)\s+(?:from\s+)?(?:the\s+)?{re.escape(p_low)}\b",
+                                rf"\bcalling from\s+(?:the\s+)?{re.escape(p_low)}\b",
+                                rf"\bfrom\s+(?:the\s+)?{re.escape(p_low)}\b",
+                                rf"^\s*(?:the\s+)?{re.escape(p_low)}\b"
                             ]
                             if any(re.search(pat, low) for pat in identity_patterns):
                                 logger.info(f"[{self.call_uuid}] 📲 Transfer trigger matched: '{matched_person}'")
