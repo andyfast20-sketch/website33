@@ -3774,6 +3774,20 @@ You must use ONLY this information when answering questions about services, area
                         low = transcript.lower()
                         matched_person = None
 
+                        def _transfer_person_aliases(p_low_in: str) -> list:
+                            p_low_in = (p_low_in or "").strip().lower()
+                            aliases = {p_low_in}
+                            # Basic singular/plural normalization (doctors -> doctor, vets -> vet)
+                            if p_low_in.endswith("s") and len(p_low_in) > 3:
+                                aliases.add(p_low_in[:-1])
+                            # Common caller shorthand
+                            if p_low_in in {"doctor", "doctors", "dr", "drs"}:
+                                aliases.update({"doctor", "doctors", "dr", "drs"})
+                            if p_low_in in {"vet", "vets", "veterinary", "veterinarian", "veterinarians"}:
+                                aliases.update({"vet", "vets", "veterinary", "veterinarian", "veterinarians"})
+                            # Stable ordering (longer first helps avoid tiny-token weirdness)
+                            return sorted(aliases, key=lambda s: (-len(s), s))
+
                         for person in transfer_people[:5]:
                             p = (person or "").strip()
                             if not p:
@@ -3792,7 +3806,19 @@ You must use ONLY this information when answering questions about services, area
                             else:
                                 try:
                                     import re
-                                    if re.search(r"\b" + re.escape(p_low) + r"\b", low):
+                                    matched_alias = None
+                                    for alias in _transfer_person_aliases(p_low):
+                                        if not alias:
+                                            continue
+                                        # Allow optional dot for dr/drs
+                                        if alias in {"dr", "drs"}:
+                                            pat = r"\b" + re.escape(alias) + r"\.?\b"
+                                        else:
+                                            pat = r"\b" + re.escape(alias) + r"\b"
+                                        if re.search(pat, low):
+                                            matched_alias = alias
+                                            break
+                                    if matched_alias is not None:
                                         matched_person = p
                                         break
                                 except Exception:
@@ -3812,14 +3838,30 @@ You must use ONLY this information when answering questions about services, area
                         if matched_person:
                             import re
                             p_low = matched_person.lower()
+                            alias_targets = _transfer_person_aliases(p_low)
                             identity_patterns = [
-                                rf"\b(i am|i'm|i was|we are|we're|this is|it'?s|it was|it were|my name is)\s+(?:the\s+)?{re.escape(p_low)}\b",
-                                rf"\b(it was|it were)\s+(?:from\s+)?(?:the\s+)?{re.escape(p_low)}\b",
-                                rf"\bcalling from\s+(?:the\s+)?{re.escape(p_low)}\b",
-                                rf"\bfrom\s+(?:the\s+)?{re.escape(p_low)}\b",
-                                rf"^\s*(?:the\s+)?{re.escape(p_low)}\b"
+                                rf"\b(i am|i'm|i was|we are|we're|this is|it'?s|it was|it were|my name is)\s+(?:the\s+)?{{TARGET}}\b",
+                                rf"\b(it was|it were)\s+(?:from\s+)?(?:the\s+)?{{TARGET}}\b",
+                                rf"\bcalling from\s+(?:the\s+)?{{TARGET}}\b",
+                                rf"\bfrom\s+(?:the\s+)?{{TARGET}}\b",
+                                rf"^\s*(?:the\s+)?{{TARGET}}\b"
                             ]
-                            if any(re.search(pat, low) for pat in identity_patterns):
+
+                            def _identity_match() -> bool:
+                                for target in alias_targets:
+                                    if not target:
+                                        continue
+                                    if target in {"dr", "drs"}:
+                                        target_re = re.escape(target) + r"\.?"
+                                    else:
+                                        target_re = re.escape(target)
+                                    for pat in identity_patterns:
+                                        compiled = pat.replace("{TARGET}", target_re)
+                                        if re.search(compiled, low):
+                                            return True
+                                return False
+
+                            if _identity_match():
                                 logger.info(f"[{self.call_uuid}] 📲 Transfer trigger matched: '{matched_person}'")
                                 self._pending_transfer_person_name = matched_person
                                 self._pending_transfer_expires_at = now_ts + 30.0
