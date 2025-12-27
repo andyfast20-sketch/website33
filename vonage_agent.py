@@ -312,6 +312,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VonageAgent")
 
+# Avoid leaking secrets in http client logs (e.g., Vonage api_secret in query params).
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def _normalize_msisdn(raw: str) -> str:
+    """Normalize a phone number into digits-only MSISDN (best-effort E.164 without '+').
+
+    - Strips spaces, hyphens, parentheses.
+    - Converts leading '+' or '00' international prefix.
+    - UK convenience: converts leading '07xxxxxxxxx' -> '447xxxxxxxxx'.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return ""
+
+    # Keep digits and '+' only, then normalize prefixes.
+    cleaned = "".join(ch for ch in s if ch.isdigit() or ch == "+")
+    if cleaned.startswith("+"):
+        cleaned = cleaned[1:]
+    if cleaned.startswith("00"):
+        cleaned = cleaned[2:]
+
+    # UK mobile normalization (common local format)
+    if cleaned.startswith("07") and len(cleaned) == 11:
+        cleaned = "44" + cleaned[1:]
+
+    return "".join(ch for ch in cleaned if ch.isdigit())
+
 # ============================================================================
 # ELEVENLABS CLIENT
 # ============================================================================
@@ -633,6 +661,62 @@ def load_global_filler_words() -> List[str]:
         return []
 
 
+def _parse_phrase_lines(raw: str) -> List[str]:
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    parts: List[str] = []
+    for line in raw.splitlines():
+        if ',' in line:
+            parts.extend([p.strip() for p in line.split(',')])
+        else:
+            parts.append(line.strip())
+    return [p for p in parts if p]
+
+
+def _ensure_global_settings_schema(conn) -> None:
+    """Best-effort migrations for global_settings used by the running server."""
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(global_settings)")
+        cols = {str(r[1]).lower() for r in (cur.fetchall() or [])}
+
+        if "filler_suppression_phrases" not in cols:
+            cur.execute("ALTER TABLE global_settings ADD COLUMN filler_suppression_phrases TEXT DEFAULT ''")
+
+        # Ensure singleton row exists.
+        cur.execute("INSERT OR IGNORE INTO global_settings (id) VALUES (1)")
+        conn.commit()
+    except Exception:
+        # Don't crash server if migrations fail.
+        pass
+
+
+def load_global_filler_suppression_phrases() -> List[str]:
+    """Load caller phrases that should suppress filler playback for that turn.
+
+    Expected format: newline-separated phrases (commas also accepted).
+    """
+    try:
+        conn = get_db_connection()
+        _ensure_global_settings_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute('SELECT filler_suppression_phrases FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+
+        raw = (row[0] if row else "") or ""
+        return _parse_phrase_lines(raw)
+    except Exception as e:
+        logger.error(f"Failed to load filler suppression phrases: {e}")
+        return []
+
+
+def refresh_filler_suppression_cache() -> None:
+    """Refresh cached suppression phrases in CONFIG."""
+    CONFIG["FILLER_SUPPRESSION_PHRASES"] = load_global_filler_suppression_phrases()
+
+
 def default_filler_phrases() -> List[str]:
     return [
         "Um...",
@@ -724,31 +808,120 @@ def _save_global_filler_meta(filler_dir: str, filler_num: int, meta: Dict) -> No
 # Load API keys from database on startup
 load_global_api_keys()
 
+# Ensure global_settings schema exists for runtime features
+try:
+    _conn = get_db_connection()
+    _ensure_global_settings_schema(_conn)
+    _conn.close()
+except Exception:
+    pass
+
 
 def load_backchannel_settings() -> None:
     """Load turn-taking/backchannel tuning from global_settings into CONFIG."""
     defaults = {
         "IGNORE_BACKCHANNELS_ALWAYS": True,
-        "BACKCHANNEL_MAX_WORDS": 3,
-        "MIN_USER_TURN_SECONDS": 0.45,
-        "BARGE_IN_MIN_SPEECH_SECONDS": 0.55,
+        "BACKCHANNEL_MAX_WORDS": 2,
+        "MIN_USER_TURN_SECONDS": 0.30,
+        "BARGE_IN_MIN_SPEECH_SECONDS": 0.25,
     }
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT ignore_backchannels_always, backchannel_max_words, min_user_turn_seconds, barge_in_min_speech_seconds '
+            'SELECT ignore_backchannels_always, backchannel_max_words, min_user_turn_seconds, barge_in_min_speech_seconds, updated_by '
             'FROM global_settings WHERE id = 1'
         )
         row = cursor.fetchone()
-        conn.close()
-
+        
+        # If the row is missing, attempt to persist defaults (best-effort), then fall back.
         if not row:
+            try:
+                cursor.execute(
+                    '''
+                    INSERT OR IGNORE INTO global_settings
+                    (id, ignore_backchannels_always, backchannel_max_words, min_user_turn_seconds, barge_in_min_speech_seconds, last_updated, updated_by)
+                    VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                    ''',
+                    (
+                        1 if defaults["IGNORE_BACKCHANNELS_ALWAYS"] else 0,
+                        int(defaults["BACKCHANNEL_MAX_WORDS"]),
+                        float(defaults["MIN_USER_TURN_SECONDS"]),
+                        float(defaults["BARGE_IN_MIN_SPEECH_SECONDS"]),
+                        "system-defaults",
+                    ),
+                )
+                conn.commit()
+            except Exception:
+                pass
+            finally:
+                conn.close()
             for k, v in defaults.items():
                 CONFIG[k] = v
             return
 
-        ignore_always_raw, max_words_raw, min_turn_raw, barge_in_raw = row
+        ignore_always_raw, max_words_raw, min_turn_raw, barge_in_raw, updated_by_raw = row
+
+        # If auto-tuning ever ran in the past, force-reset to hard defaults.
+        try:
+            updated_by_str = (updated_by_raw or "").strip().lower()
+            if updated_by_str.startswith("auto-tune"):
+                cursor.execute(
+                    '''
+                    UPDATE global_settings
+                    SET ignore_backchannels_always = ?,
+                        backchannel_max_words = ?,
+                        min_user_turn_seconds = ?,
+                        barge_in_min_speech_seconds = ?,
+                        last_updated = CURRENT_TIMESTAMP,
+                        updated_by = ?
+                    WHERE id = 1
+                    ''',
+                    (
+                        1 if defaults["IGNORE_BACKCHANNELS_ALWAYS"] else 0,
+                        int(defaults["BACKCHANNEL_MAX_WORDS"]),
+                        float(defaults["MIN_USER_TURN_SECONDS"]),
+                        float(defaults["BARGE_IN_MIN_SPEECH_SECONDS"]),
+                        "system-defaults",
+                    ),
+                )
+                conn.commit()
+                ignore_always_raw = 1 if defaults["IGNORE_BACKCHANNELS_ALWAYS"] else 0
+                max_words_raw = int(defaults["BACKCHANNEL_MAX_WORDS"])
+                min_turn_raw = float(defaults["MIN_USER_TURN_SECONDS"])
+                barge_in_raw = float(defaults["BARGE_IN_MIN_SPEECH_SECONDS"])
+        except Exception:
+            pass
+
+        # Persist required defaults if any values are NULL (do NOT overwrite explicit admin choices).
+        try:
+            needs_update = any(v is None for v in (ignore_always_raw, max_words_raw, min_turn_raw, barge_in_raw))
+            if needs_update:
+                cursor.execute(
+                    '''
+                    UPDATE global_settings
+                    SET ignore_backchannels_always = COALESCE(ignore_backchannels_always, ?),
+                        backchannel_max_words = COALESCE(backchannel_max_words, ?),
+                        min_user_turn_seconds = COALESCE(min_user_turn_seconds, ?),
+                        barge_in_min_speech_seconds = COALESCE(barge_in_min_speech_seconds, ?),
+                        last_updated = CURRENT_TIMESTAMP,
+                        updated_by = COALESCE(updated_by, ?)
+                    WHERE id = 1
+                    ''',
+                    (
+                        1 if defaults["IGNORE_BACKCHANNELS_ALWAYS"] else 0,
+                        int(defaults["BACKCHANNEL_MAX_WORDS"]),
+                        float(defaults["MIN_USER_TURN_SECONDS"]),
+                        float(defaults["BARGE_IN_MIN_SPEECH_SECONDS"]),
+                        "system-defaults",
+                    ),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
         CONFIG["IGNORE_BACKCHANNELS_ALWAYS"] = bool(ignore_always_raw) if ignore_always_raw is not None else defaults["IGNORE_BACKCHANNELS_ALWAYS"]
 
         try:
@@ -772,8 +945,130 @@ def load_backchannel_settings() -> None:
             CONFIG[k] = v
 
 
+TURN_TAKING_MASTER_PROMPT = """🎧 AI TELEPHONE AGENT — TURN-TAKING & LISTENING BEHAVIOUR
+
+Role
+You are a calm, human-sounding AI telephone answering agent.
+Your highest priority is listening correctly, never interrupting, and responding only when the caller has finished their turn.
+
+TURN-TAKING RULES (STRICT)
+
+Never interrupt the caller
+
+Do not speak while the caller is talking.
+
+Only respond after the caller has finished speaking and an end-of-speech silence has occurred (approximately 600–900ms).
+
+Do NOT ignore speech based on word position
+
+Never ignore the first words of a caller’s response.
+
+Never ignore speech purely because it is short.
+
+Backchannel handling
+
+Treat the following as backchannels when they occur without a direct question:
+
+ok, okay, yeah, right, thanks
+
+Backchannels alone should NOT trigger a response.
+
+Explicit confirmation override
+
+ALWAYS treat the following as valid, complete answers when you have asked a question:
+
+yes
+
+no
+
+correct
+
+that’s right
+
+yes thank you
+
+no that’s fine
+
+These responses must be acted on immediately and must never be ignored.
+
+SPEECH LENGTH & TIMING LOGIC
+
+Short speech filtering
+
+Ignore non-verbal or meaningless sounds under 0.30 seconds (e.g. “uh”, breathing, noise).
+
+Do NOT ignore short verbal answers that convey intent.
+
+Caller interruption (barge-in)
+
+If the caller speaks for 0.25 seconds or longer while you are talking:
+
+Stop speaking immediately.
+
+Yield the turn to the caller.
+
+CONTEXT-AWARE LISTENING
+
+Adapt to the question type
+
+If you asked a yes/no question, expect and accept very short answers.
+
+If you asked an open question, allow longer pauses before responding.
+
+If the caller pauses briefly mid-sentence, wait.
+
+Acknowledge briefly
+
+When appropriate, respond with a short acknowledgement (e.g. “Okay”, “Got it”, “Thank you”) before continuing.
+
+Never over-acknowledge or fill silence unnecessarily.
+
+ERROR HANDLING
+
+Only ask for repetition if truly necessary
+
+Do not ask the caller to repeat themselves if their intent was clear.
+
+If clarification is needed, ask a short, polite follow-up question.
+
+PRIMARY OBJECTIVE
+
+Overall behaviour goal
+
+Sound patient, calm, and human.
+
+Prioritise listening over speaking.
+
+Never rush, interrupt, or talk over the caller.
+
+Make every interaction feel natural and respectful.
+
+🚨 IMPLEMENTATION NOTE FOR ENGINEERS (DO NOT IGNORE)
+
+The Super Admin UI settings control audio-level behaviour
+
+This prompt controls decision-level behaviour
+
+Both must remain aligned for correct performance
+
+OPTIONAL (HIGHLY RECOMMENDED — BUT NOT REQUIRED)
+
+If supported later:
+
+Log cases where:
+
+a backchannel was ignored
+
+a short confirmation was accepted
+
+Use logs for manual review, not auto-tuning."""
+
+
 # Load backchannel settings from database on startup
 load_backchannel_settings()
+
+# Cache filler suppression phrases on startup
+refresh_filler_suppression_cache()
 
 # ============================================================================
 # AUTHENTICATION HELPER
@@ -1317,6 +1612,11 @@ class MinutesTracker:
         conn.close()
 
 # ============================================================================
+# AUTO-TUNING FOR BACKCHANNEL SETTINGS
+# ============================================================================
+# Disabled: backchannel settings must remain hard-set unless manually changed.
+
+# ============================================================================
 # CALL LOGGING
 # ============================================================================
 
@@ -1503,6 +1803,89 @@ class CallLogger:
                 else:
                     logger.info(f"[{call_uuid}] Tasks disabled - skipping task extraction (user turned off bundle)")
                 
+                # Generate learning report with performance critique
+                try:
+                    logger.info(f"[{call_uuid}] Generating learning report with performance critique")
+                    
+                    critique_prompt = f"""Analyze this phone conversation and score the AI agent's performance.
+
+Transcript:
+{transcript}
+
+Provide your analysis in JSON format with these exact metrics:
+{{
+    "overall_score": <integer 1-10>,
+    "human_likeness": <integer 1-10>,
+    "response_timing": <integer 1-10>,
+    "turn_taking": <integer 1-10>,
+    "relevance": <integer 1-10>,
+    "short_utterance_handling": <integer 1-10>,
+    "topic_focus": <integer 1-10>,
+    "verbosity_control": <integer 1-10>,
+    "overall_flow": <integer 1-10>,
+    "next_call_improvements": "<3-5 specific, concise improvements - use bullet points, max 15 words each>"
+}}
+
+For next_call_improvements: Be extremely specific and actionable. Use format:
+• [Specific action]: [Exact behavior change]
+Keep each point under 15 words. Focus on concrete changes."""
+
+                    critique_response = client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": "You are an expert AI call quality analyst. Provide concise, actionable critiques in JSON format. Keep improvement suggestions under 15 words each."},
+                            {"role": "user", "content": critique_prompt}
+                        ],
+                        max_tokens=600
+                    )
+                    
+                    critique_text = critique_response.choices[0].message.content.strip()
+                    logger.info(f"[{call_uuid}] Critique response: {critique_text[:200]}...")
+                    
+                    # Parse JSON from critique
+                    import json
+                    import re
+                    
+                    # Extract JSON from markdown code blocks if present
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', critique_text, re.DOTALL)
+                    if json_match:
+                        critique_json = json.loads(json_match.group(1))
+                    else:
+                        # Try to parse the whole response as JSON
+                        critique_json = json.loads(critique_text)
+                    
+                    overall_score = critique_json.get('overall_score', 5)
+                    next_call_improvements = critique_json.get('next_call_improvements', '')
+                    
+                    # Store individual scores as JSON with new metrics
+                    scores = {
+                        'human_likeness': critique_json.get('human_likeness', 5),
+                        'response_timing': critique_json.get('response_timing', 5),
+                        'turn_taking': critique_json.get('turn_taking', 5),
+                        'relevance': critique_json.get('relevance', 5),
+                        'short_utterance_handling': critique_json.get('short_utterance_handling', 5),
+                        'topic_focus': critique_json.get('topic_focus', 5),
+                        'verbosity_control': critique_json.get('verbosity_control', 5),
+                        'overall_flow': critique_json.get('overall_flow', 5)
+                    }
+                    scores_json = json.dumps(scores)
+                    
+                    # Insert into call_learning_reports
+                    cursor.execute('''
+                        INSERT INTO call_learning_reports 
+                        (call_uuid, user_id, overall_score, scores_json, next_call_improvements)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (call_uuid, user_id, overall_score, scores_json, next_call_improvements))
+                    conn.commit()
+                    
+                    logger.info(f"[{call_uuid}] Learning report saved: overall_score={overall_score}")
+                    # Backchannel settings are hard-set; do not auto-adjust.
+                    
+                except Exception as e:
+                    logger.error(f"[{call_uuid}] Failed to generate learning report: {e}")
+                    import traceback
+                    logger.error(f"[{call_uuid}] Learning report traceback: {traceback.format_exc()}")
+                
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to generate summary: {e}")
                 import traceback
@@ -1589,16 +1972,20 @@ class CallSession:
         self._timeout_task = None  # Task for timeout checking
         self._agent_speaking = False  # Track if agent is currently speaking
 
+        # Proactive silence handling
+        self._last_silence_nudge_at: float = 0.0
+        self._silence_nudge_count: int = 0
+
         # Barge-in control: avoid stopping agent speech for tiny backchannel utterances
         self._caller_speaking: bool = False
         self._pending_barge_in_task: Optional[asyncio.Task] = None
         self._pending_barge_in_started_at: Optional[float] = None
-        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55))
+        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.25))
 
         # Turn gating: avoid treating tiny utterances (e.g., "ok") as full turns.
         self._last_speech_started_at: Optional[float] = None
         self._last_speech_duration_seconds: float = 0.0
-        self._min_user_turn_seconds: float = float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45))
+        self._min_user_turn_seconds: float = float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.30))
         
         # Response time tracking
         self._speech_stopped_time = None  # Timestamp when user stops speaking (initialized to None)
@@ -1634,6 +2021,9 @@ class CallSession:
         self._last_filler_phrase: Optional[str] = None
         self._used_fillers_this_call: set = set()  # Track which fillers we've used
         self._suppress_openai_output_until = 0.0
+
+        # Transcript timing: transcription.completed can arrive after speech_stopped.
+        self._turn_transcript_ready: asyncio.Event = asyncio.Event()
         
         # Speechmatics optimization: persistent HTTP client (avoids TLS handshake delay)
         import httpx
@@ -1679,6 +2069,32 @@ class CallSession:
         return t
 
     @classmethod
+    def _is_explicit_confirmation_utterance(cls, transcript: str) -> bool:
+        """Return True for short confirmations that must never be ignored."""
+        t = cls._normalize_backchannel_text(transcript)
+        if not t:
+            return False
+
+        confirmations = {
+            "yes",
+            "no",
+            "correct",
+            "thats right",
+            "that's right",
+            "yes thank you",
+            "no thats fine",
+            "no that's fine",
+        }
+
+        if t in confirmations:
+            return True
+
+        # Also accept common variants that include leading/trailing polite words.
+        if t.startswith("yes ") or t.startswith("no "):
+            return True
+        return False
+
+    @classmethod
     def _is_backchannel_utterance(cls, transcript: str) -> bool:
         """Return True for short acknowledgements that should not interrupt the agent."""
         t = cls._normalize_backchannel_text(transcript)
@@ -1687,11 +2103,11 @@ class CallSession:
 
         # Word-count guard: only treat very short utterances as backchannel.
         words = t.split()
-        max_words = CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)
+        max_words = CONFIG.get("BACKCHANNEL_MAX_WORDS", 2)
         try:
             max_words = int(max_words)
         except Exception:
-            max_words = 3
+            max_words = 2
         if len(words) > max_words:
             return False
 
@@ -1726,6 +2142,40 @@ class CallSession:
         if len(words) == 2 and words[0] == words[1] and words[0] in {"ok", "okay", "yeah", "yep", "yup", "right"}:
             return True
 
+        return False
+
+    def _is_filler_suppression_phrase(self, transcript: str) -> bool:
+        """True if transcript contains a phrase that should suppress filler.
+
+        Uses built-in closing phrases plus Super Admin configured phrases.
+        Matching is done on normalized text with basic word-boundary checks.
+        """
+        t_norm = self._normalize_backchannel_text(transcript)
+        if not t_norm:
+            return False
+
+        closing_phrases = [
+            'thank you',
+            'thanks',
+            'goodbye',
+            'good bye',
+            'have a good day',
+            'cheerio',
+            'see ya',
+            'thanks again',
+            'bye',
+            'see you',
+        ]
+        custom_suppress = CONFIG.get("FILLER_SUPPRESSION_PHRASES", []) or []
+        suppression_phrases = closing_phrases + [str(p).strip().lower() for p in custom_suppress if str(p).strip()]
+
+        hay = f" {t_norm} "
+        for phrase in suppression_phrases:
+            p_norm = self._normalize_backchannel_text(phrase)
+            if not p_norm:
+                continue
+            if f" {p_norm} " in hay:
+                return True
         return False
 
     async def _maybe_barge_in_after_delay(self) -> None:
@@ -2483,6 +2933,51 @@ Provide your analysis."""
                         logger.info(f"[{self.call_uuid}] Applied global instructions")
                 except Exception as e:
                     logger.warning(f"[{self.call_uuid}] Could not load global instructions: {e}")
+
+                # Turn-taking & listening master prompt (hard rules; must remain aligned with Super Admin settings)
+                instructions_parts.append(f"\n{TURN_TAKING_MASTER_PROMPT}")
+                
+                # Load most recent learning report to apply improvements (aim for 9/10!)
+                import json
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        SELECT overall_score, scores_json, next_call_improvements, created_at
+                        FROM call_learning_reports
+                        WHERE user_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ''', (getattr(self, 'user_id', None),))
+                    report = cursor.fetchone()
+                    conn.close()
+                    
+                    if report and report[2]:  # If we have improvement suggestions
+                        overall_score, scores_json, improvements, created_at = report
+                        
+                        # Parse scores for detailed feedback
+                        try:
+                            scores = json.loads(scores_json) if scores_json else {}
+                        except:
+                            scores = {}
+                        
+                        improvement_section = f"""
+📊 LAST CALL PERFORMANCE: {overall_score}/10 - TARGET: 9/10+
+Human-likeness: {scores.get('human_likeness', 'N/A')}/10 | Response timing: {scores.get('response_timing', 'N/A')}/10 | Turn-taking: {scores.get('turn_taking', 'N/A')}/10
+Relevance: {scores.get('relevance', 'N/A')}/10 | Short-utterance: {scores.get('short_utterance_handling', 'N/A')}/10 | Topic focus: {scores.get('topic_focus', 'N/A')}/10
+Verbosity: {scores.get('verbosity_control', 'N/A')}/10 | Flow: {scores.get('overall_flow', 'N/A')}/10
+
+🎯 APPLY THESE IMPROVEMENTS NOW (MANDATORY):
+{improvements}
+
+⚠️ These changes are REQUIRED for 9/10+ score. Focus on metrics below 9.
+"""
+                        instructions_parts.append(improvement_section)
+                        logger.info(f"[{self.call_uuid}] ✅ Applied learning improvements from last call (score: {overall_score}/10, target: 9/10)")
+                    else:
+                        logger.info(f"[{self.call_uuid}] No previous learning reports found - establishing baseline")
+                except Exception as e:
+                    logger.warning(f"[{self.call_uuid}] Could not load learning report: {e}")
                 
                 # Use session-specific business info (per user)
                 business_info = getattr(self, 'business_info', '')
@@ -2578,6 +3073,13 @@ Provide your analysis."""
 
                 # If Speechmatics is selected but not configured, fall back to OpenAI audio.
                 if voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
+                    # Keys can be updated at runtime via Super Admin; refresh before falling back.
+                    try:
+                        load_global_api_keys()
+                    except Exception:
+                        pass
+
+                if voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
                     logger.warning(
                         f"[{self.call_uuid}] Speechmatics selected but SPEECHMATICS_API_KEY missing; falling back to OpenAI audio"
                     )
@@ -2588,14 +3090,11 @@ Provide your analysis."""
                         pass
 
                 # Configure modalities based on voice provider
-                # - For external TTS providers, we typically only need text.
-                # - For Speechmatics, we also request OpenAI audio as a reliability fallback.
-                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht']:
+                # - For external TTS providers (including Speechmatics), we only need text from OpenAI
+                # - For OpenAI voice, we need both text and audio
+                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht', 'speechmatics']:
                     modalities = ["text"]
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
-                elif voice_provider == 'speechmatics':
-                    modalities = ["text", "audio"]
-                    logger.info(f"[{self.call_uuid}] Using Speechmatics for TTS - OpenAI audio enabled as fallback")
                 else:
                     modalities = ["text", "audio"]
                     logger.info(f"[{self.call_uuid}] Using OpenAI for TTS")
@@ -2802,6 +3301,17 @@ You must use ONLY this information when answering questions about services, area
                     self._last_speech_time = asyncio.get_event_loop().time()
                     self._last_speech_started_at = asyncio.get_event_loop().time()
 
+                    # Caller resumed; reset silence nudges.
+                    self._silence_nudge_count = 0
+                    self._last_silence_nudge_at = 0.0
+
+                    # Transcription for this turn may arrive later; reset readiness.
+                    try:
+                        self._turn_transcript_ready.clear()
+                    except Exception:
+                        pass
+                    self._last_caller_transcript = ""
+
                     voice_provider = getattr(self, 'voice_provider', 'openai')
                     # Only stop Speechmatics output immediately if we're currently injecting filler.
                     # For agent speech, we delay barge-in to avoid cancelling on tiny acknowledgements.
@@ -2858,13 +3368,30 @@ You must use ONLY this information when answering questions about services, area
                     except Exception:
                         min_turn = self._min_user_turn_seconds
 
-                    # IMPORTANT: if the agent is currently speaking, a short backchannel ("ok/yeah") can produce
-                    # speech_stopped events; do not trigger a new response in that case.
+                    # Wait briefly for transcription to arrive (it can lag speech_stopped).
+                    # This avoids playing filler on "thanks/bye" just because transcript wasn't ready yet.
+                    if voice_provider == 'speechmatics':
+                        try:
+                            if not (getattr(self, '_last_caller_transcript', '') or '').strip():
+                                await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.35)
+                        except Exception:
+                            pass
+
+                    last_transcript = getattr(self, '_last_caller_transcript', '') or ''
+                    is_explicit_confirmation = self._is_explicit_confirmation_utterance(last_transcript)
+                    is_suppressed_phrase = self._is_filler_suppression_phrase(last_transcript)
+
+                    # IMPORTANT: if the agent is currently speaking, a speech_stopped can fire from tiny
+                    # acknowledgements; do not trigger a new response in that case.
                     if (
                         voice_provider == 'speechmatics'
                         and self.openai_ws
                         and not self._agent_speaking
-                        and self._last_speech_duration_seconds >= min_turn
+                        and (
+                            self._last_speech_duration_seconds >= min_turn
+                            or is_explicit_confirmation
+                            or is_suppressed_phrase
+                        )
                     ):
                         # Start the LLM response immediately (best-effort cancel prior).
                         try:
@@ -2873,15 +3400,20 @@ You must use ONLY this information when answering questions about services, area
                             pass
                         try:
                             await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                            logger.info(f"[{self.call_uuid}] ✅ AI response triggered immediately (overlapping with filler)")
+                            logger.info(f"[{self.call_uuid}] ✅ AI response triggered immediately")
                         except Exception as e:
                             logger.warning(f"[{self.call_uuid}] Failed to create response: {e}")
-                    elif voice_provider == 'speechmatics' and not self._agent_speaking and self._last_speech_duration_seconds < min_turn:
+                    elif (
+                        voice_provider == 'speechmatics'
+                        and not self._agent_speaking
+                        and self._last_speech_duration_seconds < min_turn
+                        and not is_explicit_confirmation
+                        and not is_suppressed_phrase
+                    ):
                         logger.info(
                             f"[{self.call_uuid}] 💤 Ignoring very short utterance ({self._last_speech_duration_seconds:.2f}s) - no filler/response"
                         )
-
-                    # Play ONE filler after the user stops speaking (Speechmatics only)
+                    
                     if (
                         voice_provider == 'speechmatics'
                         and not self._filler_played_for_turn
@@ -2889,6 +3421,7 @@ You must use ONLY this information when answering questions about services, area
                         and not self._agent_speaking
                         and not self._suppress_filler_for_turn
                         and self._last_speech_duration_seconds >= min_turn
+                        and not is_suppressed_phrase
                     ):
                         candidate = self._pick_random_global_filler("sarah")
                         if candidate and self.vonage_ws:
@@ -2910,10 +3443,19 @@ You must use ONLY this information when answering questions about services, area
                             # User requested: wait ~0.5s after filler.
                             await asyncio.sleep(0.5)
                             self._filler_injecting = False
+                    elif is_suppressed_phrase:
+                        logger.info(f"[{self.call_uuid}] 👋 Suppressing filler for caller phrase")
 
                     
                 elif event_type == "conversation.item.input_audio_transcription.completed":
                     transcript = event.get("transcript", "")
+                    
+                    # Store the latest caller transcript for filler detection
+                    self._last_caller_transcript = transcript
+                    try:
+                        self._turn_transcript_ready.set()
+                    except Exception:
+                        pass
 
                     # If the caller is saying something substantive while the agent is speaking,
                     # stop the agent output immediately (true barge-in). We only skip this for
@@ -2931,7 +3473,8 @@ You must use ONLY this information when answering questions about services, area
                     # Also ignore pure backchannels even when the agent is not speaking ("ok", "yeah", etc.)
                     # to prevent filler/LLM turns from firing on acknowledgements.
                     ignore_always = bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True))
-                    if self._is_backchannel_utterance(transcript) and (ignore_always or self._agent_speaking or self._caller_speaking):
+                    exempt = self._is_explicit_confirmation_utterance(transcript) or self._is_filler_suppression_phrase(transcript)
+                    if (not exempt) and self._is_backchannel_utterance(transcript) and (ignore_always or self._agent_speaking or self._caller_speaking):
                         logger.info(f"[{self.call_uuid}] 💤 Ignoring backchannel: {transcript!r}")
 
                         # Best-effort: delete the underlying conversation item so it doesn't linger in context
@@ -3228,30 +3771,24 @@ You must use ONLY this information when answering questions about services, area
                             self._audio_generation_started = True
 
                     # Speechmatics: start TTS sentence-by-sentence as soon as we have a
-                    # complete sentence. This reduces the post-filler wait dramatically.
-                    if voice_provider == 'speechmatics' and text:
-                        if not hasattr(self, '_speechmatics_pending_text'):
-                            self._speechmatics_pending_text = ""
-                        self._speechmatics_pending_text += text
-
-                        # Extract complete sentences from pending buffer.
-                        # (Simple heuristic; good enough for conversational replies.)
-                        import re
-                        while True:
-                            match = re.search(r'(.+?[.!?])(\s+|$)', self._speechmatics_pending_text)
-                            if not match:
-                                break
-                            sentence = match.group(1).strip()
-                            # Remove processed part (including trailing whitespace)
-                            self._speechmatics_pending_text = self._speechmatics_pending_text[match.end():]
-
-                            # Avoid ultra-short fragments
-                            if len(sentence) < 10:
-                                continue
-
-                            # Mark audio started so response.text.done won't generate full-duplicate audio
-                            self._audio_generation_started = True
-                            await self._enqueue_speechmatics_tts(sentence)
+                    # DISABLED sentence-by-sentence streaming to prevent cutoffs
+                    # Will now generate full audio on response.text.done event instead
+                    # if voice_provider == 'speechmatics' and text:
+                    #     if not hasattr(self, '_speechmatics_pending_text'):
+                    #         self._speechmatics_pending_text = ""
+                    #     self._speechmatics_pending_text += text
+                    #     import re
+                    #     while True:
+                    #         match = re.search(r'(.+?[.!?])(\s+|$)', self._speechmatics_pending_text)
+                    #         if not match:
+                    #             break
+                    #         sentence = match.group(1).strip()
+                    #         self._speechmatics_pending_text = self._speechmatics_pending_text[match.end():]
+                    #         if len(sentence) < 10:
+                    #             continue
+                    #         self._audio_generation_started = True
+                    #         await self._enqueue_speechmatics_tts(sentence)
+                    pass
                     
                 elif event_type == "response.text.done":
                     import time
@@ -3297,13 +3834,12 @@ You must use ONLY this information when answering questions about services, area
                     else:
                         logger.info(f"[{self.call_uuid}] ⚡ Audio already streaming, skipping duplicate generation")
 
-                    # If Speechmatics is doing early sentence TTS, flush any remaining tail.
-                    # Only do this if we already started sentence-by-sentence generation
-                    if voice_provider == 'speechmatics' and audio_already_started:
-                        tail = getattr(self, '_speechmatics_pending_text', '').strip()
-                        if tail:
-                            logger.info(f"[{self.call_uuid}] 📝 Flushing remaining Speechmatics tail: {tail[:50]}...")
-                            await self._enqueue_speechmatics_tts(tail)
+                    # DISABLED tail flush since we're no longer doing sentence-by-sentence
+                    # if voice_provider == 'speechmatics' and audio_already_started:
+                    #     tail = getattr(self, '_speechmatics_pending_text', '').strip()
+                    #     if tail:
+                    #         logger.info(f"[{self.call_uuid}] 📝 Flushing remaining Speechmatics tail: {tail[:50]}...")
+                    #         await self._enqueue_speechmatics_tts(tail)
                     
                     # Always clear pending text buffer
                     if voice_provider == 'speechmatics':
@@ -4126,7 +4662,11 @@ You must use ONLY this information when answering questions about services, area
             await self.openai_ws.send(json.dumps({"type": "response.create"}))
     
     async def _monitor_timeout(self):
-        """Monitor for caller silence and end call after 15 seconds of no speech"""
+        """Monitor for caller silence.
+
+        - After ~6 seconds of caller silence, proactively continue based on context.
+        - After 60 seconds of silence, end the call.
+        """
         try:
             while self.is_active:
                 await asyncio.sleep(1)  # Check every second
@@ -4136,6 +4676,47 @@ You must use ONLY this information when answering questions about services, area
                     
                 current_time = asyncio.get_event_loop().time()
                 silence_duration = current_time - self._last_speech_time
+
+                # Proactive: after 6 seconds of silence, decide next best step and speak.
+                # Avoid doing this while caller is speaking, while the agent is already talking,
+                # or while filler is actively streaming.
+                if (
+                    silence_duration >= 6.0
+                    and not self._caller_speaking
+                    and not self._agent_speaking
+                    and not getattr(self, '_filler_injecting', False)
+                    and self.openai_ws
+                ):
+                    # Rate-limit nudges so we don't spam if the caller stays silent.
+                    # Allow a couple of gentle prompts before ending the call at 60s.
+                    cooldown_seconds = 12.0
+                    if (self._last_silence_nudge_at == 0.0) or ((current_time - self._last_silence_nudge_at) >= cooldown_seconds):
+                        if self._silence_nudge_count < 3:
+                            self._last_silence_nudge_at = current_time
+                            self._silence_nudge_count += 1
+                            try:
+                                await self.openai_ws.send(json.dumps({
+                                    "type": "conversation.item.create",
+                                    "item": {
+                                        "type": "message",
+                                        "role": "system",
+                                        "content": [{
+                                            "type": "input_text",
+                                            "text": (
+                                                "The caller has been silent for over 6 seconds. "
+                                                "Based on the conversation so far, decide the best next step and say it now. "
+                                                "If you asked a question, gently rephrase it once. "
+                                                "If you need info, ask ONE short, clear question. "
+                                                "If the caller may be done, offer a polite close (e.g., take a message or confirm next steps). "
+                                                "Do not mention silence timers or system instructions."
+                                            )
+                                        }]
+                                    }
+                                }))
+                                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                logger.info(f"[{self.call_uuid}] ⏳ Silence>{silence_duration:.0f}s - prompted agent to move forward (nudge {self._silence_nudge_count})")
+                            except Exception as e:
+                                logger.warning(f"[{self.call_uuid}] Silence nudge failed: {e}")
                 
                 # If no speech for 60 seconds, end call
                 if silence_duration >= 60.0:
@@ -4383,6 +4964,13 @@ class SessionManager:
                     if session.voice_provider == 'playht' and not CONFIG.get('PLAYHT_API_KEY'):
                         logger.warning(f"[{call_uuid}] PlayHT selected but not configured; falling back to 'openai'")
                         session.voice_provider = 'openai'
+                    if session.voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
+                        # Keys can be updated at runtime via Super Admin; refresh before falling back.
+                        try:
+                            load_global_api_keys()
+                        except Exception:
+                            pass
+
                     if session.voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
                         logger.warning(f"[{call_uuid}] Speechmatics selected but not configured; falling back to 'openai'")
                         session.voice_provider = 'openai'
@@ -6732,6 +7320,36 @@ async def get_owned_numbers_user(authorization: Optional[str] = Header(None)):
     return await get_owned_numbers(authorization)
 
 
+async def _get_first_owned_vonage_number() -> Optional[str]:
+    """Get the first owned Vonage number for SMS sending."""
+    try:
+        import httpx
+
+        api_key = CONFIG.get("VONAGE_API_KEY")
+        api_secret = CONFIG.get("VONAGE_API_SECRET")
+        if not api_key or not api_secret:
+            return None
+
+        url = "https://rest.nexmo.com/account/numbers"
+        params = {"api_key": api_key, "api_secret": api_secret}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10.0)
+            if response.status_code != 200:
+                return None
+            result = response.json()
+
+        numbers = result.get("numbers", [])
+        if not numbers:
+            return None
+        
+        # Return first number's MSISDN
+        return numbers[0].get("msisdn")
+    except Exception as e:
+        logger.warning(f"Failed to get owned Vonage number: {e}")
+        return None
+
+
 async def _assign_first_available_owned_number_to_user(user_id: int) -> Optional[str]:
     """Best-effort: assign the first available owned Vonage number to the user."""
     try:
@@ -7065,28 +7683,56 @@ async def signup(request: Request):
 
 @app.post("/api/auth/signin")
 async def signin(request: Request):
-    """Sign in existing user"""
+    """Sign in existing user with username and password"""
     conn = None
     try:
         data = await request.json()
-        name = data.get('name', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
         
-        if not name:
-            return JSONResponse({"success": False, "error": "Name is required"}, status_code=400)
+        # Legacy support: also check for 'name' field
+        if not username:
+            username = data.get('name', '').strip()
+        
+        if not username:
+            return JSONResponse({"success": False, "error": "Username is required"}, status_code=400)
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Find user and check status
-        cursor.execute('SELECT id, status, suspension_message FROM users WHERE name = ?', (name,))
+        # Find user by username (try both username and name columns for backwards compatibility)
+        cursor.execute('''
+            SELECT id, name, username, password_hash, status, suspension_message 
+            FROM users 
+            WHERE username = ? OR name = ?
+        ''', (username, username))
         user = cursor.fetchone()
         
         if not user:
-            return JSONResponse({"success": False, "error": "User not found"}, status_code=404)
+            return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
         
         user_id = user[0]
-        status = user[1] or 'active'
-        suspension_message = user[2]
+        name = user[1]
+        db_username = user[2]
+        password_hash = user[3]
+        status = user[4] or 'active'
+        suspension_message = user[5]
+        
+        # Verify password if user has password_hash (new accounts)
+        if password_hash:
+            if not password:
+                return JSONResponse({"success": False, "error": "Password required"}, status_code=400)
+            
+            parsed = _parse_password_hash(password_hash)
+            if not parsed:
+                return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
+            
+            iterations, salt, expected = parsed
+            actual = _pbkdf2_sha256(password, salt, iterations)
+            
+            if not hmac.compare_digest(actual, expected):
+                return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
+        # Legacy accounts without password_hash can still login with just username/name
         
         # Check if account is suspended or banned
         if status == 'banned':
@@ -7115,7 +7761,7 @@ async def signin(request: Request):
         
         conn.commit()
         
-        logger.info(f"User signed in: {name} (ID: {user_id})")
+        logger.info(f"User signed in: {username} (ID: {user_id})")
         
         return JSONResponse({
             "success": True,
@@ -7156,6 +7802,354 @@ async def logout(request: Request):
     except Exception as e:
         logger.error(f"Logout error: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/auth/send-verification")
+async def send_verification(request: Request):
+    """Send SMS verification code to mobile number"""
+    conn = None
+    try:
+        data = await request.json()
+        business_name = data.get('businessName', '').strip()
+        full_name = data.get('fullName', '').strip()
+        address = data.get('address', '').strip()
+        mobile_number = _normalize_msisdn(data.get('mobileNumber', ''))
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+
+        # Validate inputs
+        if not all([business_name, full_name, address, mobile_number, username, password]):
+            return JSONResponse({"success": False, "error": "All fields are required"}, status_code=400)
+
+        if len(password) < 6:
+            return JSONResponse({"success": False, "error": "Password must be at least 6 characters"}, status_code=400)
+
+        # Basic sanity check after normalization
+        if len(mobile_number) < 10 or len(mobile_number) > 15:
+            return JSONResponse({"success": False, "error": "Please enter a valid mobile number (include country code, e.g. 447...)"}, status_code=400)
+
+        # Check if username already exists
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+        if cursor.fetchone():
+            conn.close()
+            return JSONResponse({"success": False, "error": "Username already taken"}, status_code=400)
+        conn.close()
+        conn = None
+
+        # Generate 5-digit code
+        code = ''.join([str(secrets.randbelow(10)) for _ in range(5)])
+        
+        # Hash the code with PBKDF2
+        iterations = 100000
+        code_hash = _make_password_hash_spec(code, iterations)
+
+        # Store verification in database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        created_at = datetime.now().isoformat()
+        expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
+        
+        # Store all signup data as JSON
+        import json
+        signup_data = json.dumps({
+            'businessName': business_name,
+            'fullName': full_name,
+            'address': address,
+            'mobileNumber': mobile_number,
+            'username': username,
+            'password': password
+        })
+        
+        cursor.execute('''
+            INSERT INTO sms_verifications (mobile_number, code_hash, created_at, expires_at, verified, signup_data)
+            VALUES (?, ?, ?, ?, 0, ?)
+        ''', (mobile_number, code_hash, created_at, expires_at, signup_data))
+        
+        verification_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        conn = None
+
+        # Send SMS via Vonage
+        api_key = CONFIG.get("VONAGE_API_KEY")
+        api_secret = CONFIG.get("VONAGE_API_SECRET")
+        
+        if not api_key or not api_secret:
+            logger.error("Vonage API credentials not configured for SMS")
+            return JSONResponse({"success": False, "error": "SMS service not configured"}, status_code=500)
+
+        # Get a Vonage number to send from
+        from_number = await _get_first_owned_vonage_number()
+        if not from_number:
+            logger.error("No Vonage numbers available for SMS")
+            return JSONResponse({"success": False, "error": "SMS service not available"}, status_code=500)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://rest.nexmo.com/sms/json",
+                    json={
+                        "api_key": api_key,
+                        "api_secret": api_secret,
+                        "to": mobile_number,
+                        "from": from_number,
+                        "text": f"Your VoiceAI verification code is: {code}. Valid for 10 minutes."
+                    },
+                    timeout=10.0
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Vonage SMS API error: {response.status_code} - {response.text}")
+                    return JSONResponse({"success": False, "error": "Failed to send SMS"}, status_code=500)
+                
+                result = response.json()
+                logger.info(f"Vonage SMS response: {result}")
+                
+                if result.get('messages', [{}])[0].get('status') != '0':
+                    error_text = result.get('messages', [{}])[0].get('error-text', 'Unknown error')
+                    logger.error(f"Vonage SMS send failed: {error_text}")
+                    return JSONResponse({"success": False, "error": f"SMS failed: {error_text}"}, status_code=500)
+
+        except Exception as sms_error:
+            logger.error(f"SMS sending error: {sms_error}")
+            return JSONResponse({"success": False, "error": "Failed to send verification code"}, status_code=500)
+
+        logger.info(f"Verification code sent to {mobile_number} (ID: {verification_id})")
+        
+        return JSONResponse({
+            "success": True,
+            "verification_id": verification_id,
+            "message": "Verification code sent"
+        })
+
+    except Exception as e:
+        logger.error(f"Send verification error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.post("/api/auth/verify-code")
+async def verify_code(request: Request):
+    """Verify SMS code and create user account"""
+    conn = None
+    try:
+        data = await request.json()
+        verification_id = data.get('verification_id')
+        code = data.get('code', '').strip()
+
+        if not verification_id or not code:
+            return JSONResponse({"success": False, "error": "Verification ID and code required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get verification record
+        cursor.execute('''
+            SELECT mobile_number, code_hash, expires_at, verified, signup_data
+            FROM sms_verifications
+            WHERE id = ?
+        ''', (verification_id,))
+        
+        record = cursor.fetchone()
+        
+        if not record:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Invalid verification ID"}, status_code=400)
+
+        mobile_number, code_hash, expires_at, verified, signup_data_json = record
+
+        # Check if already verified
+        if verified:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Code already used"}, status_code=400)
+
+        # Check expiration
+        if datetime.now() > datetime.fromisoformat(expires_at):
+            conn.close()
+            return JSONResponse({"success": False, "error": "Verification code expired"}, status_code=400)
+
+        # Verify code
+        parsed = _parse_password_hash(code_hash)
+        if not parsed:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Invalid code format"}, status_code=500)
+
+        iterations, salt, expected = parsed
+        actual = _pbkdf2_sha256(code, salt, iterations)
+        
+        if not hmac.compare_digest(actual, expected):
+            conn.close()
+            return JSONResponse({"success": False, "error": "Invalid verification code"}, status_code=400)
+
+        # Parse signup data
+        import json
+        signup_data = json.loads(signup_data_json)
+        
+        business_name = signup_data['businessName']
+        full_name = signup_data['fullName']
+        address = signup_data['address']
+        username = signup_data['username']
+        password = signup_data['password']
+
+        # Hash password
+        password_hash = _make_password_hash_spec(password, 310000)
+
+        # Create user account
+        cursor.execute('''
+            INSERT INTO users (
+                name, username, password_hash, business_name, full_name, 
+                address, mobile_number, last_login
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (full_name, username, password_hash, business_name, full_name, address, mobile_number, datetime.now().isoformat()))
+        
+        user_id = cursor.lastrowid
+
+        # Create account settings with 50 credits and 3-day trial
+        from datetime import timezone
+        trial_start = datetime.now(timezone.utc).isoformat()
+        cursor.execute('''
+            INSERT INTO account_settings (
+                user_id, minutes_remaining, total_minutes_purchased,
+                phone_number, trial_days_remaining, trial_start_date
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, 50, 0, '', 3, trial_start))
+
+        # Mark verification as used
+        cursor.execute('UPDATE sms_verifications SET verified = 1 WHERE id = ?', (verification_id,))
+        
+        conn.commit()
+        
+        # Close before external API call
+        conn.close()
+        conn = None
+
+        # Best-effort: auto-assign phone number
+        try:
+            assigned_number = await _assign_first_available_owned_number_to_user(user_id)
+            if assigned_number:
+                logger.info(f"✅ Auto-assigned phone number {assigned_number} to new user {user_id}")
+        except Exception as e:
+            logger.warning(f"Account created but auto-assign number failed for user {user_id}: {e}")
+
+        logger.info(f"New user account created via SMS verification: {username} (ID: {user_id})")
+
+        return JSONResponse({
+            "success": True,
+            "message": "Account created successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Verify code error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.post("/api/auth/resend-verification")
+async def resend_verification(request: Request):
+    """Resend verification code"""
+    conn = None
+    try:
+        data = await request.json()
+        verification_id = data.get('verification_id')
+
+        if not verification_id:
+            return JSONResponse({"success": False, "error": "Verification ID required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get existing verification
+        cursor.execute('SELECT mobile_number FROM sms_verifications WHERE id = ?', (verification_id,))
+        record = cursor.fetchone()
+        
+        if not record:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Invalid verification ID"}, status_code=400)
+
+        mobile_number = _normalize_msisdn(record[0])
+        if len(mobile_number) < 10 or len(mobile_number) > 15:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Stored mobile number is invalid; please restart signup with a valid number"}, status_code=400)
+
+        # Generate new code
+        code = ''.join([str(secrets.randbelow(10)) for _ in range(5)])
+        iterations = 100000
+        code_hash = _make_password_hash_spec(code, iterations)
+
+        # Update verification record
+        expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
+        cursor.execute('''
+            UPDATE sms_verifications 
+            SET code_hash = ?, expires_at = ?
+            WHERE id = ?
+        ''', (code_hash, expires_at, verification_id))
+        
+        conn.commit()
+        conn.close()
+        conn = None
+
+        # Send SMS
+        api_key = CONFIG.get("VONAGE_API_KEY")
+        api_secret = CONFIG.get("VONAGE_API_SECRET")
+        
+        if not api_key or not api_secret:
+            return JSONResponse({"success": False, "error": "SMS service not configured"}, status_code=500)
+
+        # Get a Vonage number to send from
+        from_number = await _get_first_owned_vonage_number()
+        if not from_number:
+            logger.error("No Vonage numbers available for SMS resend")
+            return JSONResponse({"success": False, "error": "SMS service not available"}, status_code=500)
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://rest.nexmo.com/sms/json",
+                json={
+                    "api_key": api_key,
+                    "api_secret": api_secret,
+                    "to": mobile_number,
+                    "from": from_number,
+                    "text": f"Your VoiceAI verification code is: {code}. Valid for 10 minutes."
+                },
+                timeout=10.0
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Vonage SMS resend error: {response.status_code} - {response.text}")
+                return JSONResponse({"success": False, "error": "Failed to send SMS"}, status_code=500)
+            
+            result = response.json()
+            logger.info(f"Vonage SMS resend response: {result}")
+
+            if result.get('messages', [{}])[0].get('status') != '0':
+                error_text = result.get('messages', [{}])[0].get('error-text', 'Unknown error')
+                logger.error(f"Vonage SMS resend failed: {error_text}")
+                return JSONResponse({"success": False, "error": f"SMS failed: {error_text}"}, status_code=500)
+
+        logger.info(f"Verification code resent to {mobile_number}")
+        
+        return JSONResponse({
+            "success": True,
+            "message": "New code sent"
+        })
+
+    except Exception as e:
+        logger.error(f"Resend verification error: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.get("/api/auth/verify")
@@ -7652,12 +8646,12 @@ async def test_speechmatics_voice(request: Request):
                 status_code=400,
             )
 
-        async def _speechmatics_tts_wav_16000(text: str, voice: str) -> bytes:
+        async def _speechmatics_tts_pcm_16000(text: str, voice: str) -> bytes:
             url = f"https://preview.tts.speechmatics.com/generate/{voice}"
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(
                     url,
-                    params={"output_format": "wav_16000"},
+                    params={"output_format": "pcm_16000"},
                     headers={
                         "Authorization": f"Bearer {speechmatics_api_key}",
                         "Content-Type": "application/json",
@@ -7673,11 +8667,24 @@ async def test_speechmatics_voice(request: Request):
                 raise Exception("Speechmatics TTS returned empty audio")
             return audio
 
-        audio_data = await _speechmatics_tts_wav_16000(sample_text, voice_id)
-        logger.info(f"✅ Speechmatics sample generated: {len(audio_data)} bytes")
+        pcm_data = await _speechmatics_tts_pcm_16000(sample_text, voice_id)
+        logger.info(f"✅ Speechmatics PCM sample generated: {len(pcm_data)} bytes")
+
+        # Convert raw PCM to WAV for browser playback
+        import io
+        import wave
+
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(16000)
+            wav_file.writeframes(pcm_data)
+
+        wav_data = wav_buffer.getvalue()
 
         return Response(
-            content=audio_data,
+            content=wav_data,
             media_type="audio/wav",
             headers={"Content-Disposition": "inline; filename=speechmatics_sample.wav"},
         )
@@ -9926,11 +10933,224 @@ async def update_global_instructions(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+def _ensure_learning_guardrails_schema(conn: sqlite3.Connection) -> None:
+    """Ensure the global_settings table has the learning_guardrails column."""
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(global_settings)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if "learning_guardrails" not in columns:
+        cursor.execute("ALTER TABLE global_settings ADD COLUMN learning_guardrails TEXT DEFAULT ''")
+        cursor.execute("INSERT OR IGNORE INTO global_settings (id) VALUES (1)")
+        conn.commit()
+
+
+def _ensure_learning_reports_schema(conn: sqlite3.Connection) -> None:
+    """Ensure the call_learning_reports table exists."""
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS call_learning_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            call_uuid TEXT,
+            user_id INTEGER,
+            overall_score INTEGER DEFAULT NULL,
+            scores_json TEXT DEFAULT NULL,
+            next_call_improvements TEXT DEFAULT '',
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+        '''
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_call_learning_reports_created_at ON call_learning_reports(created_at)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_call_learning_reports_call_uuid ON call_learning_reports(call_uuid)"
+    )
+    conn.commit()
+
+
+@app.get("/api/performance-report/{call_uuid}")
+async def get_performance_report(call_uuid: str):
+    """Get the performance report for a specific call."""
+    try:
+        conn = get_db_connection()
+        _ensure_learning_reports_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT overall_score, scores_json, next_call_improvements, created_at
+            FROM call_learning_reports
+            WHERE call_uuid = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            ''',
+            (call_uuid,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return {"success": False, "error": "No performance report found for this call"}
+
+        overall_score, scores_json, improvements, created_at = row
+        
+        import json
+        try:
+            scores = json.loads(scores_json) if scores_json else {}
+        except:
+            scores = {}
+
+        return {
+            "success": True,
+            "overall_score": overall_score,
+            "scores": scores,
+            "improvements": improvements,
+            "created_at": created_at
+        }
+    except Exception as e:
+        logger.error(f"Failed to get performance report for {call_uuid}: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/learning-guardrails")
+async def get_learning_guardrails():
+    """Get the super-admin editable 'Voice Agent Behaviour & Learning Guardrails' text."""
+    try:
+        conn = get_db_connection()
+        _ensure_learning_guardrails_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(learning_guardrails, ''), last_updated, updated_by FROM global_settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return {"success": True, "guardrails": "", "last_updated": None, "updated_by": None}
+
+        guardrails, last_updated, updated_by = row
+        return {
+            "success": True,
+            "guardrails": guardrails or "",
+            "last_updated": last_updated,
+            "updated_by": updated_by,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get learning guardrails: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/learning-guardrails")
+async def update_learning_guardrails(request: Request):
+    """Update the super-admin editable 'Voice Agent Behaviour & Learning Guardrails' text."""
+    try:
+        body = await request.json()
+        guardrails = body.get("guardrails", body.get("learning_guardrails", ""))
+        updated_by = body.get("updated_by", "admin")
+
+        conn = get_db_connection()
+        _ensure_learning_guardrails_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET learning_guardrails = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (guardrails, updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        logger.info(f"✅ Learning guardrails updated by {updated_by} (length: {len(str(guardrails or ''))} chars)")
+        return {"success": True, "message": "Learning guardrails saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to update learning guardrails: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/learning-reports")
+async def list_learning_reports(limit: int = 200):
+    """List post-call learning reports (newest first)."""
+    try:
+        limit = int(limit) if limit is not None else 200
+    except Exception:
+        limit = 200
+    limit = max(1, min(1000, limit))
+
+    try:
+        conn = get_db_connection()
+        _ensure_learning_reports_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            SELECT id, created_at, call_uuid, user_id, overall_score, scores_json, next_call_improvements
+            FROM call_learning_reports
+            ORDER BY datetime(created_at) DESC, id DESC
+            LIMIT ?
+            ''',
+            (limit,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        reports = []
+        for row in rows:
+            (
+                report_id,
+                created_at,
+                call_uuid,
+                user_id,
+                overall_score,
+                scores_json,
+                next_call_improvements,
+            ) = row
+            reports.append(
+                {
+                    "id": report_id,
+                    "created_at": created_at,
+                    "call_uuid": call_uuid,
+                    "user_id": user_id,
+                    "overall_score": overall_score,
+                    "scores_json": scores_json,
+                    "next_call_improvements": next_call_improvements or "",
+                }
+            )
+
+        return {"success": True, "reports": reports}
+    except Exception as e:
+        logger.error(f"Failed to list learning reports: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/super-admin/learning-reports/{report_id}")
+async def delete_learning_report(report_id: int):
+    """Delete a post-call learning report by id."""
+    try:
+        conn = get_db_connection()
+        _ensure_learning_reports_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM call_learning_reports WHERE id = ?", (int(report_id),))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if not deleted:
+            return JSONResponse({"success": False, "error": "Report not found"}, status_code=404)
+
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Failed to delete learning report {report_id}: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/filler-words")
 async def get_filler_words():
     """Get global filler words/phrases (newline-separated)."""
     try:
         conn = get_db_connection()
+        _ensure_global_settings_schema(conn)
         cursor = conn.cursor()
         cursor.execute('SELECT filler_words, last_updated, updated_by FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
@@ -9964,6 +11184,7 @@ async def update_filler_words(request: Request):
         updated_by = body.get('updated_by', 'admin')
 
         conn = get_db_connection()
+        _ensure_global_settings_schema(conn)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE global_settings
@@ -9982,6 +11203,60 @@ async def update_filler_words(request: Request):
         }
     except Exception as e:
         logger.error(f"Failed to update filler words: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/filler-suppression-phrases")
+async def get_filler_suppression_phrases():
+    """Get caller phrases that should suppress filler playback (newline-separated)."""
+    try:
+        conn = get_db_connection()
+        _ensure_global_settings_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute('SELECT filler_suppression_phrases, last_updated, updated_by FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return {
+                "success": True,
+                "phrases": result[0] or "",
+                "last_updated": result[1],
+                "updated_by": result[2],
+            }
+        return {"success": True, "phrases": "", "last_updated": None, "updated_by": None}
+    except Exception as e:
+        logger.error(f"Failed to get filler suppression phrases: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/filler-suppression-phrases")
+async def update_filler_suppression_phrases(request: Request):
+    """Update caller phrases that should suppress filler playback (newline-separated)."""
+    try:
+        body = await request.json()
+        phrases = body.get('phrases', '')
+        updated_by = body.get('updated_by', 'admin')
+
+        conn = get_db_connection()
+        _ensure_global_settings_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE global_settings
+            SET filler_suppression_phrases = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+        ''', (phrases, updated_by))
+        conn.commit()
+        conn.close()
+
+        refresh_filler_suppression_cache()
+
+        logger.info(f"✅ Filler suppression phrases updated by {updated_by}")
+        return {"success": True, "message": "Filler suppression phrases updated successfully"}
+    except Exception as e:
+        logger.error(f"Failed to update filler suppression phrases: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -10004,9 +11279,9 @@ async def get_backchannel_settings():
                 "success": True,
                 "settings": {
                     "ignore_backchannels_always": bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True)),
-                    "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)),
-                    "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45)),
-                    "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55)),
+                    "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 2)),
+                    "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.30)),
+                    "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.25)),
                 },
                 "last_updated": None,
                 "updated_by": None,
@@ -10025,9 +11300,9 @@ async def get_backchannel_settings():
             "success": True,
             "settings": {
                 "ignore_backchannels_always": bool(ignore_backchannels_always) if ignore_backchannels_always is not None else True,
-                "backchannel_max_words": int(backchannel_max_words) if backchannel_max_words is not None else 3,
-                "min_user_turn_seconds": float(min_user_turn_seconds) if min_user_turn_seconds is not None else 0.45,
-                "barge_in_min_speech_seconds": float(barge_in_min_speech_seconds) if barge_in_min_speech_seconds is not None else 0.55,
+                "backchannel_max_words": int(backchannel_max_words) if backchannel_max_words is not None else 2,
+                "min_user_turn_seconds": float(min_user_turn_seconds) if min_user_turn_seconds is not None else 0.30,
+                "barge_in_min_speech_seconds": float(barge_in_min_speech_seconds) if barge_in_min_speech_seconds is not None else 0.25,
             },
             "last_updated": last_updated,
             "updated_by": updated_by,
@@ -10048,21 +11323,21 @@ async def update_backchannel_settings(request: Request):
         ignore_backchannels_always = 1 if bool(settings.get("ignore_backchannels_always", True)) else 0
 
         try:
-            backchannel_max_words = int(settings.get("backchannel_max_words", 3))
+            backchannel_max_words = int(settings.get("backchannel_max_words", 2))
         except Exception:
-            backchannel_max_words = 3
+            backchannel_max_words = 2
         backchannel_max_words = max(1, min(8, backchannel_max_words))
 
         try:
-            min_user_turn_seconds = float(settings.get("min_user_turn_seconds", 0.45))
+            min_user_turn_seconds = float(settings.get("min_user_turn_seconds", 0.30))
         except Exception:
-            min_user_turn_seconds = 0.45
+            min_user_turn_seconds = 0.30
         min_user_turn_seconds = max(0.1, min(2.0, min_user_turn_seconds))
 
         try:
-            barge_in_min_speech_seconds = float(settings.get("barge_in_min_speech_seconds", 0.55))
+            barge_in_min_speech_seconds = float(settings.get("barge_in_min_speech_seconds", 0.25))
         except Exception:
-            barge_in_min_speech_seconds = 0.55
+            barge_in_min_speech_seconds = 0.25
         barge_in_min_speech_seconds = max(0.1, min(2.0, barge_in_min_speech_seconds))
 
         conn = get_db_connection()
@@ -10097,9 +11372,9 @@ async def update_backchannel_settings(request: Request):
             "message": "Backchannel settings updated",
             "settings": {
                 "ignore_backchannels_always": bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True)),
-                "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 3)),
-                "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45)),
-                "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55)),
+                "backchannel_max_words": int(CONFIG.get("BACKCHANNEL_MAX_WORDS", 2)),
+                "min_user_turn_seconds": float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.30)),
+                "barge_in_min_speech_seconds": float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.25)),
             },
         }
     except Exception as e:

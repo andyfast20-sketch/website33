@@ -1133,17 +1133,16 @@
                         </div>
 
                         <!-- Voice Selection -->
-                        <div id="speechmaticsVoiceSection" style="display: none;">
+                        <div id="speechmaticsVoiceSection" style="display: block;">
                             <div class="form-group">
                                 <label for="speechmaticsVoice">Agent Voice</label>
                                 <select id="speechmaticsVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
                                     <option value="sarah">Sarah (UK Female - Natural & Clear)</option>
-                                    <option value="will" style="display: none;">Will (UK Male - Professional)</option>
                                 </select>
                                 <button onclick="testSpeechmaticsVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
                                     🔊 Test Voice
                                 </button>
-                                <div class="example-box" style="display: none;">
+                                <div class="example-box">
                                     <strong>Real-Time Streaming:</strong> Speechmatics provides natural UK voices with real-time streaming capabilities for low latency conversations.
                                 </div>
                             </div>
@@ -1997,6 +1996,54 @@
             }
         }
 
+        async function showPerformanceReport(callUuid) {
+            try {
+                const response = await fetch(`/api/performance-report/${callUuid}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('No performance report available for this call yet.');
+                    return;
+                }
+                
+                const scores = data.scores || {};
+                const improvements = data.improvements || 'No improvements suggested.';
+                
+                const modal = document.createElement('div');
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+                modal.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 50px rgba(0,0,0,0.5);">
+                        <h2 style="color: white; margin-bottom: 20px; font-size: 24px;">📊 Performance Report</h2>
+                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                            <div style="font-size: 32px; font-weight: 700; color: ${data.overall_score >= 9 ? '#66ea96' : data.overall_score >= 7 ? '#f1c40f' : '#ff6b6b'}; text-align: center; margin-bottom: 15px;">
+                                Overall: ${data.overall_score}/10
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; color: white; font-size: 14px;">
+                                <div><strong>Human-likeness:</strong> ${scores.human_likeness || 'N/A'}/10</div>
+                                <div><strong>Response timing:</strong> ${scores.response_timing || 'N/A'}/10</div>
+                                <div><strong>Turn-taking:</strong> ${scores.turn_taking || 'N/A'}/10</div>
+                                <div><strong>Relevance:</strong> ${scores.relevance || 'N/A'}/10</div>
+                                <div><strong>Short-utterance:</strong> ${scores.short_utterance_handling || 'N/A'}/10</div>
+                                <div><strong>Topic focus:</strong> ${scores.topic_focus || 'N/A'}/10</div>
+                                <div><strong>Verbosity control:</strong> ${scores.verbosity_control || 'N/A'}/10</div>
+                                <div><strong>Overall flow:</strong> ${scores.overall_flow || 'N/A'}/10</div>
+                            </div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                            <h3 style="color: white; margin-bottom: 10px; font-size: 16px;">🎯 Next Call Improvements:</h3>
+                            <div style="color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${improvements}</div>
+                        </div>
+                        <button onclick="this.closest('div[style*=fixed]').remove()" style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px; border-radius: 10px; color: white; font-size: 16px; font-weight: 600; cursor: pointer;">Close</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            } catch (error) {
+                console.error('Error loading performance report:', error);
+                alert('Failed to load performance report');
+            }
+        }
+
         async function loadDashboard() {
             try {
                 // Dashboard loads stats via loadTodayStats() and loadCredits()
@@ -2163,6 +2210,7 @@
                                                 ? '<button disabled style="background: rgba(100,255,100,0.2); border: 1px solid rgba(100,255,100,0.4); padding: 8px 16px; border-radius: 8px; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600; cursor: not-allowed;">✓ Complete</button>'
                                                 : `<button onclick="markCallComplete('${call.call_uuid}')" style="background: linear-gradient(135deg, #66ea96 0%, #66c8ea 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Mark Complete</button>`
                                             }
+                                            <button onclick="showPerformanceReport('${call.call_uuid}')" style="background: rgba(100,100,255,0.2); border: 1px solid rgba(100,100,255,0.4); padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">📊 Performance</button>
                                             <button onclick="deleteCall('${call.call_uuid}')" style="background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.4); padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">🗑️ Delete</button>
                                         </div>
                                     </div>
@@ -3229,14 +3277,9 @@
             document.getElementById('googleVoiceSection').style.display = 'none';
             document.getElementById('elevenLabsVoiceSection').style.display = 'none';
             document.getElementById('playhtVoiceSection').style.display = 'none';
-            document.getElementById('speechmaticsVoiceSection').style.display = 'none';
             
-            // Show the selected provider section
-            if (provider === 'openai') {
-                document.getElementById('openaiVoiceSection').style.display = 'block';
-            } else if (provider === 'speechmatics') {
-                document.getElementById('speechmaticsVoiceSection').style.display = 'block';
-            }
+            // Always show Speechmatics section since it's the only option
+            document.getElementById('speechmaticsVoiceSection').style.display = 'block';
             
             // Force a repaint to ensure dropdown is visible
             await new Promise(resolve => setTimeout(resolve, 0));

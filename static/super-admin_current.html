@@ -1052,6 +1052,29 @@
         </div>
 
         <div class="panel">
+            <h2>🧠 Voice Agent Behaviour &amp; Learning Guardrails</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Edit the master guardrails text and review the latest post-call learning outputs. Newest reports appear at the top.</p>
+
+            <div class="filler-section" style="margin-bottom: 20px;">
+                <h3 style="color: #667eea; margin-bottom: 10px; font-size: 16px;">🛡️ Guardrails Text (Editable)</h3>
+                <textarea id="learningGuardrails" placeholder="Paste your Voice Agent Behaviour & Learning Guardrails here" style="min-height: 220px;"></textarea>
+                <div class="hint">This text is stored in the database and can be updated anytime.</div>
+                <button class="btn-save" onclick="saveLearningGuardrails()" style="margin-top: 12px;">💾 Save Guardrails</button>
+            </div>
+
+            <div class="filler-section" style="margin-bottom: 0;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 10px;">
+                    <h3 style="color: #667eea; margin: 0; font-size: 16px;">📊 Post-Call Performance Scores &amp; Next-Call Improvements</h3>
+                    <button type="button" onclick="loadLearningReports()" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.90); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🔄 Refresh</button>
+                </div>
+                <div id="learningReportsMeta" class="hint" style="margin-top: 0;">Loading…</div>
+                <div id="learningReportsTable" style="max-height: 420px; overflow-y: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22);">
+                    <div style="padding: 16px; color: rgba(255,255,255,0.75);">Loading…</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
             <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
                 <h2 style="margin: 0;">👥 Active Accounts</h2>
                 <button type="button" onclick="refreshAccountsList(event)" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.90); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🔄 Refresh</button>
@@ -1063,8 +1086,8 @@
         <div class="panel">
             <h2>🎛️ Backchannel / Turn-Taking Tuning</h2>
             <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
-                Use this to stop the agent treating short acknowledgements like “ok/yeah/right” as full turns.
-                Higher thresholds = harder to trigger filler + AI response.
+                Defaults are hard-set for correct turn-taking and will persist unless you manually change them here.
+                This prevents short acknowledgements like “ok/yeah/right/thanks” from triggering filler + a response.
             </p>
 
             <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
@@ -1073,31 +1096,31 @@
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Ignore Backchannels</div>
                         <label style="display:flex; gap: 10px; align-items:center; font-size: 13px; color: rgba(255,255,255,0.85);">
-                            <input type="checkbox" id="ignoreBackchannelsAlways" style="transform: scale(1.15);">
+                            <input type="checkbox" id="ignoreBackchannelsAlways" style="transform: scale(1.15);" checked>
                             Ignore “ok/yeah/right/thanks” even when agent is silent
                         </label>
                         <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">
-                            Recommended ON to prevent “ok” from triggering filler + response.
+                            Default ON.
                         </div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Backchannel Max Words</div>
-                        <input id="backchannelMaxWords" type="number" min="1" max="8" step="1" value="3" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
+                        <input id="backchannelMaxWords" type="number" min="1" max="8" step="1" value="2" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
                         <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">If an utterance has more than this many words, it’s treated as a real request.</div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Min User Turn (seconds)</div>
-                        <input id="minUserTurnSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.45" style="width: 100%;">
-                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="minUserTurnSecondsLabel">0.45</span>s</div>
+                        <input id="minUserTurnSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.30" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="minUserTurnSecondsLabel">0.30</span>s</div>
                         <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">Utterances shorter than this won’t trigger filler/AI in Speechmatics mode.</div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Barge-in Min Speech (seconds)</div>
-                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.55" style="width: 100%;">
-                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.55</span>s</div>
+                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.25" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.25</span>s</div>
                         <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">How long caller must talk before we cancel agent speech (interrupt).</div>
                     </div>
 
@@ -1113,6 +1136,24 @@
 
         <div class="panel">            <h2>�💬 Filler Words (Sarah Voice)</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">10 audio files using Speechmatics Sarah voice. These will be randomly played during pauses to cover latency.</p>
+
+            <div style="margin-bottom: 16px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
+                <div style="font-size: 13px; font-weight: 900; color: rgba(255,255,255,0.90); margin-bottom: 8px;">🚫 No-Filler-After Phrases</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.70); margin-bottom: 10px; line-height: 1.35;">
+                    If the caller says any of these phrases, the system will NOT play a filler after their turn.
+                    The OpenAI response will still continue as normal.
+                </div>
+                <textarea id="fillerSuppressionPhrases" placeholder="One phrase per line (examples):
+thank you
+bye
+no thanks
+that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;"></textarea>
+                <div style="margin-top: 10px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                    <button class="btn-save" onclick="saveFillerSuppressionPhrases()">💾 Save Phrases</button>
+                    <button class="btn-save" onclick="loadFillerSuppressionPhrases()" style="background: rgba(255,255,255,0.12);">↻ Reload</button>
+                    <span id="fillerSuppressionStatus" style="font-size: 13px; opacity: 0.85;"></span>
+                </div>
+            </div>
             
             <div style="margin-bottom: 25px;">
                 <button class="btn-save" onclick="generateAllFillers()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 28px;">
@@ -1363,7 +1404,133 @@
             try { await fetch('/api/super-admin/logout', { method: 'POST' }); } catch (_) {}
             location.reload();
         }
-        async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadBackchannelSettings(); await loadAccountsList(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
+        async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadLearningGuardrails(); await loadLearningReports(); await loadBackchannelSettings(); await loadAccountsList(); await loadFillerSuppressionPhrases(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
+
+        async function loadLearningGuardrails() {
+            try {
+                const resp = await fetch('/api/super-admin/learning-guardrails');
+                const data = await resp.json();
+                if (!data || !data.success) return;
+                const el = document.getElementById('learningGuardrails');
+                if (el) el.value = data.guardrails || '';
+            } catch (error) {
+                console.error('Error loading learning guardrails:', error);
+            }
+        }
+
+        async function saveLearningGuardrails() {
+            try {
+                const el = document.getElementById('learningGuardrails');
+                if (!el) return;
+                const guardrails = el.value || '';
+                const resp = await fetch('/api/super-admin/learning-guardrails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guardrails, updated_by: 'super-admin' })
+                });
+                const data = await resp.json();
+                if (data && data.success) showAlert('✅ Learning guardrails saved', 'success');
+                else showAlert('❌ Failed to save guardrails: ' + (data?.error || data?.detail || 'Unknown error'), 'error');
+            } catch (error) {
+                console.error('Error saving learning guardrails:', error);
+                showAlert('❌ Error saving guardrails: ' + (error.message || error), 'error');
+            }
+        }
+
+        function _escapeHtmlLite(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        async function loadLearningReports() {
+            const tableEl = document.getElementById('learningReportsTable');
+            const metaEl = document.getElementById('learningReportsMeta');
+            if (tableEl) tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">Loading…</div>';
+            if (metaEl) metaEl.textContent = 'Loading…';
+
+            try {
+                const resp = await fetch('/api/super-admin/learning-reports?limit=200');
+                const data = await resp.json();
+                if (!data || !data.success) throw new Error(data?.error || data?.detail || 'Failed to load');
+
+                const reports = Array.isArray(data.reports) ? data.reports : [];
+                if (metaEl) metaEl.textContent = `${reports.length} report(s)`;
+
+                if (!tableEl) return;
+                if (reports.length === 0) {
+                    tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">No learning reports yet.</div>';
+                    return;
+                }
+
+                const rows = reports.map(r => {
+                    const id = Number(r.id);
+                    const createdAt = _escapeHtmlLite(r.created_at || '');
+                    const callUuid = _escapeHtmlLite(r.call_uuid || '');
+                    const userId = _escapeHtmlLite(r.user_id ?? '');
+                    const score = (r.overall_score === null || r.overall_score === undefined || r.overall_score === '') ? '—' : String(r.overall_score);
+                    const scoresJson = _escapeHtmlLite(r.scores_json || '');
+                    const improvements = _escapeHtmlLite(r.next_call_improvements || '');
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.10);">
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.78); white-space: nowrap;">${createdAt || '—'}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.92);">${callUuid || '—'}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.92); text-align: center; white-space: nowrap;">${userId || '—'}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; font-weight: 900; color: rgba(255,255,255,0.95); text-align: center; white-space: nowrap;">${_escapeHtmlLite(score)}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.88); white-space: pre-wrap; word-break: break-word;">${scoresJson || '—'}</td>
+                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.90); white-space: pre-wrap; word-break: break-word;">${improvements || '—'}</td>
+                            <td style="padding: 10px 8px; text-align: right; white-space: nowrap;">
+                                <button onclick="deleteLearningReport(${id})" style="background: rgba(231, 76, 60, 0.8); color: white; border: none; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🗑 Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                tableEl.innerHTML = `
+                    <div style="overflow-x:auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: rgba(255,255,255,0.06);">
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">When</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Call UUID</th>
+                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">User</th>
+                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Score</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Scores</th>
+                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Next-call improvements</th>
+                                    <th style="text-align:right; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading learning reports:', error);
+                if (metaEl) metaEl.textContent = 'Failed to load';
+                if (tableEl) tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">Failed to load reports: ' + _escapeHtmlLite(error.message || error) + '</div>';
+            }
+        }
+
+        async function deleteLearningReport(reportId) {
+            if (!reportId) return;
+            if (!confirm('Delete this learning report?')) return;
+            try {
+                const resp = await fetch(`/api/super-admin/learning-reports/${reportId}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data && data.success) {
+                    showAlert('✅ Report deleted', 'success');
+                    loadLearningReports();
+                } else {
+                    showAlert('❌ Delete failed: ' + (data?.error || data?.detail || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting learning report:', error);
+                showAlert('❌ Error deleting report: ' + (error.message || error), 'error');
+            }
+        }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
         function _setBackchannelStatus(msg, ok=true) {
@@ -1985,6 +2152,46 @@
         }
         
         async function saveFillerWords() { try { const fillerWords = document.getElementById('fillerWords').value.trim(); const response = await fetch('/api/super-admin/filler-words', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filler_words: fillerWords, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert('Filler words saved successfully', 'success'); else showAlert('Failed to save filler words', 'error'); } catch (error) { console.error('Error saving filler words:', error); showAlert('Error saving filler words', 'error'); } }
+
+        async function loadFillerSuppressionPhrases() {
+            try {
+                const status = document.getElementById('fillerSuppressionStatus');
+                if (status) status.textContent = 'Loading…';
+                const resp = await fetch('/api/super-admin/filler-suppression-phrases');
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+                const el = document.getElementById('fillerSuppressionPhrases');
+                if (el) el.value = (data.phrases || '').trim();
+                if (status) status.textContent = data.last_updated ? `Loaded (${data.last_updated})` : 'Loaded';
+            } catch (e) {
+                console.error('Error loading filler suppression phrases:', e);
+                const status = document.getElementById('fillerSuppressionStatus');
+                if (status) status.textContent = 'Failed to load';
+            }
+        }
+
+        async function saveFillerSuppressionPhrases() {
+            try {
+                const el = document.getElementById('fillerSuppressionPhrases');
+                const phrases = (el?.value || '').trim();
+                const status = document.getElementById('fillerSuppressionStatus');
+                if (status) status.textContent = 'Saving…';
+                const resp = await fetch('/api/super-admin/filler-suppression-phrases', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phrases, updated_by: 'super-admin' })
+                });
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+                if (status) status.textContent = 'Saved';
+                showAlert('No-filler-after phrases saved', 'success');
+            } catch (e) {
+                console.error('Error saving filler suppression phrases:', e);
+                const status = document.getElementById('fillerSuppressionStatus');
+                if (status) status.textContent = 'Failed to save';
+                showAlert('Error saving no-filler-after phrases', 'error');
+            }
+        }
         async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; const fillerText = (filler?.text || ''); card.innerHTML = `
                     <div class="filler-slot-header">
                         <div class="filler-slot-title">🎙️ Filler ${i}</div>

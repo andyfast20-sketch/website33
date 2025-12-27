@@ -22,7 +22,7 @@ def kill_process_on_port(port=5004):
         result = subprocess.run(
             [
                 "powershell", "-Command",
-                f"(Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue).OwningProcess"
+                f"(Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue).OwningProcess"
             ],
             capture_output=True,
             text=True,
@@ -52,7 +52,11 @@ def kill_process_on_port(port=5004):
                     text=True,
                     timeout=5,
                 )
-                lines = [ln.strip() for ln in (netstat.stdout or "").splitlines() if ln.strip()]
+                lines = [
+                    ln.strip()
+                    for ln in (netstat.stdout or "").splitlines()
+                    if ln.strip() and "LISTENING" in ln
+                ]
                 pids = set()
                 for ln in lines:
                     parts = ln.split()
