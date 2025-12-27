@@ -7,6 +7,14 @@
 # Logs
 *.log
 server_log.txt
+server_log*.txt
+server_startup.log
+
+# Audio artifacts
+*.wav
+
+# Static backups
+static/*_old.html
 
 # Google credentials
 google-credentials.json
