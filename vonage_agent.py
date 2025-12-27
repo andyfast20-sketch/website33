@@ -3827,13 +3827,28 @@ You must use ONLY this information when answering questions about services, area
                                         break
 
                         if matched_person:
-                            # Only trigger when the caller is identifying themselves (not when asking for that person)
-                            asked_for_markers = [
-                                "speak to", "talk to", "put me through", "connect me", "connect us", "transfer me to",
-                                "can i speak", "could i speak", "can i talk", "could i talk"
-                            ]
-                            if any(m in low for m in asked_for_markers):
-                                matched_person = None
+                            # Only suppress if the caller is asking to speak to the matched label itself
+                            # (e.g., "can I speak to the doctors?") — not if they're asking for someone else
+                            # and then identify as the matched label (e.g., "can I speak to Barry... it's the doctor's calling").
+                            try:
+                                import re
+                                requested_aliases = _transfer_person_aliases(matched_person.lower())
+                                for alias in requested_aliases:
+                                    if not alias:
+                                        continue
+                                    if alias in {"dr", "drs"}:
+                                        alias_re = re.escape(alias) + r"\.?"
+                                    else:
+                                        alias_re = re.escape(alias)
+                                    suppress_patterns = [
+                                        rf"\b(?:speak\s+to|talk\s+to|put\s+me\s+through\s+to|connect\s+me\s+to|connect\s+us\s+to|transfer\s+me\s+to)\s+(?:the\s+)?{alias_re}\b",
+                                        rf"\b(?:can\s+i|could\s+i)\s+(?:please\s+)?(?:speak|talk)\s+to\s+(?:the\s+)?{alias_re}\b",
+                                    ]
+                                    if any(re.search(pat, low) for pat in suppress_patterns):
+                                        matched_person = None
+                                        break
+                            except Exception:
+                                pass
 
                         if matched_person:
                             import re
