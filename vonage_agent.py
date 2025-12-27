@@ -3372,13 +3372,12 @@ You must use ONLY this information when answering questions about services, area
                         self._suppress_filler_for_turn = True
                         # Delay barge-in slightly: if the caller only says "ok/right/yeah" we keep speaking.
                         # If they keep talking past the threshold, we cancel in _maybe_barge_in_after_delay().
-                        # Echo/double-talk guard: if we *just* sent outbound audio, VAD may briefly trigger.
-                        echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
-                        outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
-                        if not outbound_recent:
-                            if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
-                                self._pending_barge_in_started_at = asyncio.get_event_loop().time()
-                                self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
+                        # Always schedule the delayed barge-in check.
+                        # Echo/double-talk is filtered on speech_stopped (short-burst cancel) and by the
+                        # sustained-speech requirements inside `_maybe_barge_in_after_delay()`.
+                        if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
+                            self._pending_barge_in_started_at = asyncio.get_event_loop().time()
+                            self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
                     logger.debug(f"[{self.call_uuid}] Caller stopped speaking")
