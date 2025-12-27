@@ -2220,7 +2220,10 @@ class CallSession:
                 if not started_at or not stopped_at or stopped_at <= started_at:
                     return
                 segment_duration = max(0.0, stopped_at - started_at)
-                recently_stopped = (now_t - stopped_at) <= 0.15
+                # Allow some scheduling jitter / ASR lag; still require the speech segment itself
+                # to be long enough.
+                recently_window = float(CONFIG.get("BARGE_IN_RECENTLY_STOPPED_SECONDS", 0.60))
+                recently_stopped = (now_t - stopped_at) <= recently_window
                 if not (segment_duration >= delay and recently_stopped):
                     return
             if not self._agent_speaking:
@@ -3407,6 +3410,41 @@ You must use ONLY this information when answering questions about services, area
                     else:
                         self._last_speech_duration_seconds = 0.0
                     self._last_speech_started_at = None
+
+                    # If the agent is speaking and the caller spoke for long enough to be more than
+                    # a tiny backchannel, interrupt immediately (even if ASR transcript arrives later).
+                    # This is what makes "several words" cut Sarah off mid-sentence.
+                    try:
+                        if self._agent_speaking and self.openai_ws:
+                            barge_delay = CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds)
+                            try:
+                                barge_delay = float(barge_delay)
+                            except Exception:
+                                barge_delay = self._barge_in_min_speech_seconds
+
+                            # Use whichever is larger: your barge-in delay or minimum user turn.
+                            min_turn = CONFIG.get("MIN_USER_TURN_SECONDS", self._min_user_turn_seconds)
+                            try:
+                                min_turn = float(min_turn)
+                            except Exception:
+                                min_turn = self._min_user_turn_seconds
+
+                            threshold = max(barge_delay, min_turn)
+
+                            # Echo/double-talk guard: if it was a *very* short burst right after we sent
+                            # audio, treat it as likely echo and do not interrupt.
+                            echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
+                            outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
+                            likely_echo_burst = outbound_recent and self._last_speech_duration_seconds <= echo_guard_s
+
+                            if (not likely_echo_burst) and self._last_speech_duration_seconds >= threshold:
+                                logger.info(
+                                    f"[{self.call_uuid}] 🛑 Barge-in (VAD-duration) - interrupting agent output "
+                                    f"(dur={self._last_speech_duration_seconds:.2f}s, threshold={threshold:.2f}s)"
+                                )
+                                await self._interrupt_agent_output("barge_in_vad_duration")
+                    except Exception:
+                        pass
 
                     # Echo/double-talk guard: if VAD indicates a very short burst while the agent was
                     # speaking and we just sent outbound audio, cancel any pending barge-in.
