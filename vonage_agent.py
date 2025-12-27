@@ -3413,53 +3413,27 @@ You must use ONLY this information when answering questions about services, area
                         self._last_speech_duration_seconds = 0.0
                     self._last_speech_started_at = None
 
-                    # If the agent is speaking and the caller spoke for long enough to be more than
-                    # a tiny backchannel, interrupt immediately (even if ASR transcript arrives later).
-                    # This is what makes "several words" cut Sarah off mid-sentence.
-                    try:
-                        if self._agent_speaking and self.openai_ws:
-                            barge_delay = CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds)
-                            try:
-                                barge_delay = float(barge_delay)
-                            except Exception:
-                                barge_delay = self._barge_in_min_speech_seconds
+                    # Immediate barge-in on sustained caller speech (cleaner than delayed task).
+                    # If the agent is speaking and the caller spoke long enough, interrupt NOW.
+                    if self._agent_speaking and self.openai_ws:
+                        barge_delay = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds))
+                        
+                        # Echo/double-talk guard: if it was a very short burst right after we sent
+                        # audio, treat it as likely echo and do not interrupt.
+                        echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
+                        outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
+                        likely_echo_burst = outbound_recent and self._last_speech_duration_seconds <= echo_guard_s
 
-                            # Use whichever is larger: your barge-in delay or minimum user turn.
-                            min_turn = CONFIG.get("MIN_USER_TURN_SECONDS", self._min_user_turn_seconds)
-                            try:
-                                min_turn = float(min_turn)
-                            except Exception:
-                                min_turn = self._min_user_turn_seconds
+                        # Interrupt if caller spoke for at least the barge-in threshold and it's not echo.
+                        if (not likely_echo_burst) and self._last_speech_duration_seconds >= barge_delay:
+                            logger.info(
+                                f"[{self.call_uuid}] 🛑 Barge-in (sustained speech {self._last_speech_duration_seconds:.2f}s) - stopping agent"
+                            )
+                            await self._interrupt_agent_output("barge_in_sustained_speech")
 
-                            threshold = max(barge_delay, min_turn)
-
-                            # Echo/double-talk guard: if it was a *very* short burst right after we sent
-                            # audio, treat it as likely echo and do not interrupt.
-                            echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
-                            outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
-                            likely_echo_burst = outbound_recent and self._last_speech_duration_seconds <= echo_guard_s
-
-                            if (not likely_echo_burst) and self._last_speech_duration_seconds >= threshold:
-                                logger.info(
-                                    f"[{self.call_uuid}] 🛑 Barge-in (VAD-duration) - interrupting agent output "
-                                    f"(dur={self._last_speech_duration_seconds:.2f}s, threshold={threshold:.2f}s)"
-                                )
-                                await self._interrupt_agent_output("barge_in_vad_duration")
-                    except Exception:
-                        pass
-
-                    # Echo/double-talk guard: if VAD indicates a very short burst while the agent was
-                    # speaking and we just sent outbound audio, cancel any pending barge-in.
-                    try:
-                        if self._agent_speaking:
-                            echo_guard_s = float(CONFIG.get("BARGE_IN_ECHO_GUARD_SECONDS", 0.18))
-                            outbound_recent = (asyncio.get_event_loop().time() - float(getattr(self, "_last_outbound_audio_sent_at", 0.0))) <= echo_guard_s
-                            if outbound_recent and self._last_speech_duration_seconds <= echo_guard_s:
-                                if self._pending_barge_in_task is not None and not self._pending_barge_in_task.done():
-                                    self._pending_barge_in_task.cancel()
-                                    logger.debug(f"[{self.call_uuid}] 🔇 Echo-guard: cancelled pending barge-in")
-                    except Exception:
-                        pass
+                    # Cancel any pending delayed barge-in task since we already handled it above.
+                    if self._pending_barge_in_task is not None and not self._pending_barge_in_task.done():
+                        self._pending_barge_in_task.cancel()
 
                     # Mark time when user stops speaking for latency tracking (use time.time() for consistency)
                     import time
@@ -3494,9 +3468,11 @@ You must use ONLY this information when answering questions about services, area
                     is_explicit_confirmation = self._is_explicit_confirmation_utterance(last_transcript)
                     is_suppressed_phrase = self._is_filler_suppression_phrase(last_transcript)
 
-                    # IMPORTANT: if the agent is currently speaking, a speech_stopped can fire from tiny
-                    # acknowledgements; do not trigger a new response in that case.
-                    if (
+                    # Only trigger a response if:
+                    # 1. Agent is NOT speaking (if agent was speaking, barge-in already handled it above)
+                    # 2. Caller spoke long enough OR said something explicit (yes/no/hi/thanks)
+                    # 3. Using Speechmatics (OpenAI handles its own VAD-based responses)
+                    should_respond = (
                         voice_provider == 'speechmatics'
                         and self.openai_ws
                         and not self._agent_speaking
@@ -3505,7 +3481,9 @@ You must use ONLY this information when answering questions about services, area
                             or is_explicit_confirmation
                             or is_suppressed_phrase
                         )
-                    ):
+                    )
+
+                    if should_respond:
                         # Start the LLM response immediately (best-effort cancel prior).
                         try:
                             await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
@@ -3513,7 +3491,7 @@ You must use ONLY this information when answering questions about services, area
                             pass
                         try:
                             await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                            logger.info(f"[{self.call_uuid}] ✅ AI response triggered immediately")
+                            logger.info(f"[{self.call_uuid}] ✅ AI response triggered (dur={self._last_speech_duration_seconds:.2f}s)")
                         except Exception as e:
                             logger.warning(f"[{self.call_uuid}] Failed to create response: {e}")
                     elif (
@@ -3524,7 +3502,7 @@ You must use ONLY this information when answering questions about services, area
                         and not is_suppressed_phrase
                     ):
                         logger.info(
-                            f"[{self.call_uuid}] 💤 Ignoring very short utterance ({self._last_speech_duration_seconds:.2f}s) - no filler/response"
+                            f"[{self.call_uuid}] 💤 Ignoring short utterance ({self._last_speech_duration_seconds:.2f}s < {min_turn:.2f}s)"
                         )
                     
                     if (
