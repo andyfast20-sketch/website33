@@ -3813,7 +3813,7 @@ You must use ONLY this information when answering questions about services, area
                             import re
                             p_low = matched_person.lower()
                             identity_patterns = [
-                                rf"\\b(i am|i'm|this is|it'?s|it was|it were|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
+                                rf"\\b(i am|i'm|i was|we are|we're|this is|it'?s|it was|it were|my name is)\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"\\b(it was|it were)\\s+(?:from\\s+)?(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"\\bcalling from\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
                                 rf"\\bfrom\\s+(?:the\\s+)?{re.escape(p_low)}\\b",
