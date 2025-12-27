@@ -1981,7 +1981,9 @@ class CallSession:
         self._caller_speaking: bool = False
         self._pending_barge_in_task: Optional[asyncio.Task] = None
         self._pending_barge_in_started_at: Optional[float] = None
-        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.25))
+        # Barge-in should feel immediate for multi-word interruptions, while still
+        # ignoring tiny backchannels like "ok".
+        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.15))
 
         # Barge-in robustness: track caller VAD durations and outbound audio timing.
         # This reduces false barge-ins caused by VAD flapping or far-end echo.
@@ -4348,7 +4350,8 @@ You must use ONLY this information when answering questions about services, area
             first_chunk_time = None
             chunks_sent = 0
             buffered = b""
-            chunk_size = 6400  # ~200ms at 16kHz, 16-bit mono
+            # Smaller chunks reduce how much audio can be "in flight" after a barge-in.
+            chunk_size = 3200  # ~100ms at 16kHz, 16-bit mono
 
             # Stream bytes as they arrive. If Speechmatics buffers server-side,
             # this still avoids an extra full-download wait on our side.
