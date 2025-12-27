@@ -3777,6 +3777,29 @@ You must use ONLY this information when answering questions about services, area
                         def _transfer_person_aliases(p_low_in: str) -> list:
                             p_low_in = (p_low_in or "").strip().lower()
                             aliases = {p_low_in}
+
+                            # If the configured label has multiple words (e.g. "the doctors or millgate surgery"),
+                            # also match on significant tokens so callers can say just "doctors".
+                            if " " in p_low_in:
+                                try:
+                                    import re
+                                    # Split on whitespace and punctuation; keep non-trivial words.
+                                    for token in re.split(r"[^a-z0-9']+", p_low_in):
+                                        token = (token or "").strip("' ")
+                                        if not token:
+                                            continue
+                                        if token in {"the", "a", "an", "or", "and", "of", "to", "from", "for"}:
+                                            continue
+                                        if len(token) < 3:
+                                            continue
+                                        aliases.add(token)
+                                except Exception:
+                                    # Best-effort fallback
+                                    for token in p_low_in.split():
+                                        token = token.strip()
+                                        if token and len(token) >= 3:
+                                            aliases.add(token)
+
                             # Basic singular/plural normalization (doctors -> doctor, vets -> vet)
                             if p_low_in.endswith("s") and len(p_low_in) > 3:
                                 aliases.add(p_low_in[:-1])
