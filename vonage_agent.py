@@ -2174,8 +2174,19 @@ class CallSession:
             'bye',
             'see you',
         ]
+
+        # Also suppress filler on simple greetings; playing a filler after "hi" sounds broken.
+        greeting_phrases = [
+            'hi',
+            'hello',
+            'hey',
+            'hiya',
+            'good morning',
+            'good afternoon',
+            'good evening',
+        ]
         custom_suppress = CONFIG.get("FILLER_SUPPRESSION_PHRASES", []) or []
-        suppression_phrases = closing_phrases + [str(p).strip().lower() for p in custom_suppress if str(p).strip()]
+        suppression_phrases = closing_phrases + greeting_phrases + [str(p).strip().lower() for p in custom_suppress if str(p).strip()]
 
         hay = f" {t_norm} "
         for phrase in suppression_phrases:
