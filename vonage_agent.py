@@ -3522,43 +3522,6 @@ You must use ONLY this information when answering questions about services, area
                     # Clear partial transcript buffer (a completed transcript supersedes it).
                     self._partial_caller_transcript = ""
 
-                elif event_type in {
-                    "conversation.item.input_audio_transcription.delta",
-                    "conversation.item.input_audio_transcription.partial",
-                    "input_audio_transcription.delta",
-                }:
-                    # Earlier barge-in: use partial transcript to interrupt sooner than waiting for
-                    # transcription.completed. Keep it conservative to avoid cancelling on "ok/yeah".
-                    delta_text = event.get("delta") or event.get("transcript") or ""
-                    if not delta_text:
-                        continue
-                    self._partial_caller_transcript = (self._partial_caller_transcript + str(delta_text))[-200:]
-
-                    if not self._agent_speaking:
-                        continue
-
-                    t_norm = self._normalize_backchannel_text(self._partial_caller_transcript)
-                    if not t_norm:
-                        continue
-
-                    # Heuristics: interrupt quickly for likely intentful interjections.
-                    strong_starters = (
-                        "no",
-                        "wait",
-                        "hold on",
-                        "actually",
-                        "sorry",
-                        "excuse me",
-                        "hang on",
-                        "stop",
-                    )
-                    looks_like_sentence = (" " in t_norm) or (len(t_norm) >= 14)
-                    looks_strong = any(t_norm.startswith(s) for s in strong_starters)
-
-                    if (looks_strong or looks_like_sentence) and (not self._is_backchannel_utterance(t_norm)):
-                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (partial transcript) - interrupting agent output: {t_norm!r}")
-                        await self._interrupt_agent_output("barge_in_partial_transcript")
-
                     # If the caller is saying something substantive while the agent is speaking,
                     # stop the agent output immediately (true barge-in). We only skip this for
                     # short backchannels like "ok" / "yeah".
@@ -3779,6 +3742,46 @@ You must use ONLY this information when answering questions about services, area
                     # Check for sales call in background (non-blocking) - don't wait for result
                     if self.sales_detector_enabled:
                         asyncio.create_task(self._check_sales_in_background())
+
+                elif event_type in {
+                    "conversation.item.input_audio_transcription.delta",
+                    "conversation.item.input_audio_transcription.partial",
+                    "input_audio_transcription.delta",
+                }:
+                    # Earlier barge-in: use partial transcript to interrupt sooner than waiting for
+                    # transcription.completed. Keep it conservative to avoid cancelling on "ok/yeah".
+                    delta_text = event.get("delta") or event.get("transcript") or ""
+                    if not delta_text:
+                        continue
+                    self._partial_caller_transcript = (self._partial_caller_transcript + str(delta_text))[-200:]
+
+                    if not self._agent_speaking:
+                        continue
+
+                    t_norm = self._normalize_backchannel_text(self._partial_caller_transcript)
+                    if not t_norm:
+                        continue
+
+                    # Heuristics: interrupt quickly for likely intentful interjections.
+                    strong_starters = (
+                        "no",
+                        "wait",
+                        "hold on",
+                        "actually",
+                        "sorry",
+                        "excuse me",
+                        "hang on",
+                        "stop",
+                    )
+                    looks_like_sentence = (" " in t_norm) or (len(t_norm) >= 14)
+                    looks_strong = any(t_norm.startswith(s) for s in strong_starters)
+
+                    if (looks_strong or looks_like_sentence) and (not self._is_backchannel_utterance(t_norm)):
+                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (partial transcript) - interrupting agent output: {t_norm!r}")
+                        await self._interrupt_agent_output("barge_in_partial_transcript")
+
+                    # We've handled this partial transcription event.
+                    continue
                 
                 elif event_type == "response.audio.delta":
                     # Drop any in-flight output right after we cancel a response.
