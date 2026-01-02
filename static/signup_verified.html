@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Sign Up - VoiceAI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .signup-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 450px;
+        }
+        h1 { color: #667eea; font-size: 28px; margin-bottom: 10px; text-align: center; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 14px; }
+        input, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+        .checkbox-group label {
+            margin: 0;
+            font-weight: normal;
+            font-size: 13px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .message {
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .links a { color: #667eea; text-decoration: none; font-weight: 600; }
+        .links a:hover { text-decoration: underline; }
+        .step { display: none; }
+        .step.active { display: block; }
+        .verification-code {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .verification-code input {
+            width: 60px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-container">
+        <h1>🎯 Create Your Account</h1>
+        <p class="subtitle">Start your AI phone assistant journey</p>
+
+        <div id="message" class="message"></div>
+
+        <!-- Step 1: Account Details -->
+        <div id="step1" class="step active">
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" placeholder="John Smith" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" id="username" placeholder="johnsmith" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" placeholder="john@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="mobile">Mobile Number *</label>
+                    <input type="tel" id="mobile" placeholder="+44 7700 900000" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="business_name">Business Name *</label>
+                    <input type="text" id="business_name" placeholder="Your Business Ltd" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="website_url">Website (optional)</label>
+                    <input type="url" id="website_url" placeholder="https://example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password *</label>
+                    <input type="password" id="password" placeholder="Min 8 characters" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password2">Confirm Password *</label>
+                    <input type="password" id="password2" placeholder="Re-enter password" required>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="confirm_adult" required>
+                    <label for="confirm_adult">I confirm I am 18 years or older *</label>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">Continue →</button>
+            </form>
+        </div>
+
+        <!-- Step 2: SMS Verification -->
+        <div id="step2" class="step">
+            <p style="text-align: center; margin-bottom: 20px; color: #666;">
+                📱 We sent a 4-digit code to<br>
+                <strong id="maskedPhone"></strong>
+            </p>
+
+            <form id="verifyForm">
+                <div class="verification-code">
+                    <input type="text" maxlength="1" id="code1" required autocomplete="off">
+                    <input type="text" maxlength="1" id="code2" required autocomplete="off">
+                    <input type="text" maxlength="1" id="code3" required autocomplete="off">
+                    <input type="text" maxlength="1" id="code4" required autocomplete="off">
+                </div>
+
+                <button type="submit" class="btn" id="verifyBtn">Verify & Create Account</button>
+            </form>
+
+            <p style="text-align: center; margin-top: 20px; font-size: 13px; color: #999;">
+                Didn't receive the code? <a href="#" onclick="resendCode(); return false;" style="color: #667eea;">Resend</a>
+            </p>
+        </div>
+
+        <div class="links">
+            <a href="/">← Back to Home</a> | 
+            <a href="/signin.html">Already have an account?</a>
+        </div>
+    </div>
+
+    <script>
+        let signupToken = '';
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const messageEl = document.getElementById('message');
+            
+            const data = {
+                name: document.getElementById('name').value.trim(),
+                username: document.getElementById('username').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                mobile: document.getElementById('mobile').value.trim(),
+                business_name: document.getElementById('business_name').value.trim(),
+                website_url: document.getElementById('website_url').value.trim() || null,
+                password: document.getElementById('password').value,
+                password2: document.getElementById('password2').value,
+                confirm_adult: document.getElementById('confirm_adult').checked,
+                captcha_token: '' // Add Turnstile if needed
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending code...';
+
+            try {
+                const response = await fetch('/api/auth/signup/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    signupToken = result.signup_token;
+                    document.getElementById('maskedPhone').textContent = data.mobile;
+                    showMessage(result.message || 'Code sent!', 'success');
+                    
+                    // Switch to verification step
+                    document.getElementById('step1').classList.remove('active');
+                    document.getElementById('step2').classList.add('active');
+                    document.getElementById('code1').focus();
+                } else {
+                    showMessage(result.error || 'Signup failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Continue →';
+            }
+        });
+
+        document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const code = document.getElementById('code1').value + 
+                        document.getElementById('code2').value + 
+                        document.getElementById('code3').value + 
+                        document.getElementById('code4').value;
+
+            if (code.length !== 4) {
+                showMessage('Please enter all 4 digits', 'error');
+                return;
+            }
+
+            const verifyBtn = document.getElementById('verifyBtn');
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = 'Verifying...';
+
+            try {
+                const response = await fetch('/api/auth/signup/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        signup_token: signupToken,
+                        code: code
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('✅ Account created! Redirecting...', 'success');
+                    localStorage.setItem('session_token', result.session_token);
+                    localStorage.setItem('user_name', result.user_name);
+                    localStorage.setItem('user_id', result.user_id);
+                    setTimeout(() => {
+                        window.location.href = '/admin.html';
+                    }, 1500);
+                } else {
+                    showMessage(result.error || 'Verification failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Verify & Create Account';
+            }
+        });
+
+        // Auto-advance verification code inputs
+        const codeInputs = [
+            document.getElementById('code1'),
+            document.getElementById('code2'),
+            document.getElementById('code3'),
+            document.getElementById('code4')
+        ];
+
+        codeInputs.forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                if (e.target.value.length === 1 && index < 3) {
+                    codeInputs[index + 1].focus();
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    codeInputs[index - 1].focus();
+                }
+            });
+
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').trim();
+                if (/^\d{4}$/.test(pastedData)) {
+                    pastedData.split('').forEach((char, i) => {
+                        if (codeInputs[i]) codeInputs[i].value = char;
+                    });
+                    codeInputs[3].focus();
+                }
+            });
+        });
+
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function resendCode() {
+            showMessage('Resending code...', 'success');
+            // Would need to implement resend endpoint
+            // For now, tell user to refresh
+            alert('Please refresh the page and try again to receive a new code.');
+        }
+    </script>
+</body>
+</html>
