@@ -32,14 +32,14 @@ cmd = [
     "--backlog", "2048"  # Queue up to 2048 pending connections
 ]
 
-print("🚀 Starting production server...")
-print(f"📊 Max concurrent connections: 100")
-print(f"🔌 WebSocket-optimized (single worker with async)")
-print(f"⚡ Production mode enabled (reduced logging)")
-print(f"🌐 Server will be available at http://0.0.0.0:5004")
+print("Starting production server...")
+print("Max concurrent connections: 100")
+print("WebSocket-optimized (single worker with async)")
+print("Production mode enabled (reduced logging)")
+print("Server will be available at http://0.0.0.0:5004")
 print("-" * 60)
 
 try:
     subprocess.run(cmd)
 except KeyboardInterrupt:
-    print("\n✅ Server stopped")
+    print("\nServer stopped")

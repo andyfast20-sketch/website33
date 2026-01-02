@@ -167,13 +167,12 @@ def setup_database():
             vonage_private_key_pem TEXT DEFAULT NULL,
             ai_brain_provider TEXT DEFAULT 'openai',
             filler_words TEXT DEFAULT '',
-            filler_suppression_phrases TEXT DEFAULT '',
             last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_by TEXT DEFAULT 'admin',
             ignore_backchannels_always INTEGER DEFAULT 1,
-            backchannel_max_words INTEGER DEFAULT 2,
-            min_user_turn_seconds REAL DEFAULT 0.30,
-            barge_in_min_speech_seconds REAL DEFAULT 0.25
+            backchannel_max_words INTEGER DEFAULT 3,
+            min_user_turn_seconds REAL DEFAULT 0.45,
+            barge_in_min_speech_seconds REAL DEFAULT 0.55
         )
     ''')
     cursor.execute('INSERT OR IGNORE INTO global_settings (id, global_instructions) VALUES (1, "")')

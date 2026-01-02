@@ -1133,16 +1133,17 @@
                         </div>
 
                         <!-- Voice Selection -->
-                        <div id="speechmaticsVoiceSection" style="display: block;">
+                        <div id="speechmaticsVoiceSection" style="display: none;">
                             <div class="form-group">
                                 <label for="speechmaticsVoice">Agent Voice</label>
                                 <select id="speechmaticsVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
                                     <option value="sarah">Sarah (UK Female - Natural & Clear)</option>
+                                    <option value="will" style="display: none;">Will (UK Male - Professional)</option>
                                 </select>
                                 <button onclick="testSpeechmaticsVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
                                     🔊 Test Voice
                                 </button>
-                                <div class="example-box">
+                                <div class="example-box" style="display: none;">
                                     <strong>Real-Time Streaming:</strong> Speechmatics provides natural UK voices with real-time streaming capabilities for low latency conversations.
                                 </div>
                             </div>
@@ -1168,16 +1169,10 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Offer Transfer When Caller Is (Up to 5)</label>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                                <input type="text" id="transferPerson1" placeholder="Caller 1 (e.g., Doctors)">
-                                <input type="text" id="transferPerson2" placeholder="Caller 2">
-                                <input type="text" id="transferPerson3" placeholder="Caller 3">
-                                <input type="text" id="transferPerson4" placeholder="Caller 4">
-                                <input type="text" id="transferPerson5" placeholder="Caller 5" style="grid-column: 1 / -1;">
-                            </div>
+                            <label>Transfer Instructions</label>
+                            <textarea id="transferInstructions" rows="4" placeholder="Provide guidance on when and how to transfer calls..."></textarea>
                             <div class="example-box">
-                                <strong>How it works:</strong> If the caller says they are one of these (e.g. "This is Doctors"), the AI will offer to transfer them using your <strong>Transfer Number</strong>.
+                                <strong>How it works:</strong> Use this to guide the AI on when to transfer calls. For example: "Transfer to Bob if they ask for the manager or owner. Transfer to reception for general inquiries. Transfer to Sarah for appointment bookings." The AI will ask who's calling and offer to transfer to the appropriate person using your <strong>Transfer Number</strong>. If declined, it will take a message.
                             </div>
                         </div>
                     </div>
@@ -1353,6 +1348,13 @@
                     </div>
                     <div class="diagnostic-item">
                         <div>
+                            <span class="status-indicator" id="cloudflareIndicator"></span>
+                            <strong>Cloudflare Tunnel</strong>
+                        </div>
+                        <span id="cloudflareStatus">Checking...</span>
+                    </div>
+                    <div class="diagnostic-item">
+                        <div>
                             <span class="status-indicator status-ok"></span>
                             <strong>OpenAI Connection</strong>
                         </div>
@@ -1379,6 +1381,28 @@
 
     <script>
         // Authentication check on page load
+        function showAccountRestrictionOverlay(title, message) {
+            const overlay = document.getElementById('accountRestrictionOverlay');
+            const titleEl = document.getElementById('accountRestrictionTitle');
+            const msgEl = document.getElementById('accountRestrictionMessage');
+            const iconEl = document.getElementById('accountRestrictionIcon');
+
+            if (!overlay || !titleEl || !msgEl) {
+                alert((title || 'Account Restricted') + "\n\n" + (message || 'Please contact support.'));
+                return;
+            }
+
+            const safeTitle = String(title || 'Account Restricted');
+            const safeMsg = String(message || 'Please contact support.');
+            titleEl.textContent = safeTitle;
+            msgEl.textContent = safeMsg;
+            if (iconEl) {
+                iconEl.textContent = safeTitle.toLowerCase().includes('banned') ? '⛔' : '🔒';
+            }
+
+            overlay.style.display = 'flex';
+        }
+
         async function checkAuth() {
             const sessionToken = localStorage.getItem('session_token');
             const userName = localStorage.getItem('user_name');
@@ -1401,14 +1425,20 @@
                 });
                 
                 clearTimeout(timeoutId);
-                
+
+                if (response.status === 403) {
+                    const data = await response.json().catch(() => ({}));
+                    showAccountRestrictionOverlay(data.error, data.message);
+                    return false;
+                }
+
                 if (!response.ok) {
                     localStorage.removeItem('session_token');
                     localStorage.removeItem('user_name');
                     window.location.href = '/signin.html';
                     return false;
                 }
-                
+
                 const data = await response.json();
                 
                 // Display username and phone number in header
@@ -1502,6 +1532,13 @@
             loadConfig(); // Load config to populate phone number and other settings
             loadBundles(); // Load bundle settings
             loadTaskCount(); // Load task count badge
+
+            // Update tunnel status indicators early
+            try {
+                await checkNgrok();
+            } catch (e) {
+                console.warn('Tunnel status check failed:', e);
+            }
             
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
@@ -1695,6 +1732,11 @@
                 const salesDetectorEnabled = config.SALES_DETECTOR_ENABLED === true;
                 document.getElementById('salesDetectorBundleToggle').checked = salesDetectorEnabled;
                 updateToggleStyle('salesDetectorBundleToggle', salesDetectorEnabled);
+
+                // Load SMS notification state
+                const smsEnabled = config.SMS_NOTIFICATIONS_ENABLED === true;
+                document.getElementById('smsNotificationsToggle').checked = smsEnabled;
+                updateToggleStyle('smsNotificationsToggle', smsEnabled);
                 
                 // Load pricing from config (display only)
                 document.getElementById('calendarPriceDisplay').textContent = config.CALENDAR_BOOKING_CREDITS || 10;
@@ -1722,6 +1764,7 @@
                 const tasksEnabled = document.getElementById('tasksBundleToggle').checked;
                 const advancedVoiceEnabled = document.getElementById('advancedVoiceBundleToggle').checked;
                 const salesDetectorEnabled = document.getElementById('salesDetectorBundleToggle').checked;
+                const smsNotificationsEnabled = document.getElementById('smsNotificationsToggle').checked;
                 
                 // Save all settings in one request
                 const response = await fetch('/api/config', {
@@ -1734,7 +1777,8 @@
                         CALENDAR_BOOKING_ENABLED: calendarEnabled,
                         TASKS_ENABLED: tasksEnabled,
                         ADVANCED_VOICE_ENABLED: advancedVoiceEnabled,
-                        SALES_DETECTOR_ENABLED: salesDetectorEnabled
+                        SALES_DETECTOR_ENABLED: salesDetectorEnabled,
+                        SMS_NOTIFICATIONS_ENABLED: smsNotificationsEnabled
                     })
                 });
                 
@@ -1846,22 +1890,32 @@
                 
                 const indicator = document.getElementById('ngrokIndicator');
                 const status = document.getElementById('ngrokStatus');
+                const cfIndicator = document.getElementById('cloudflareIndicator');
+                const cfStatus = document.getElementById('cloudflareStatus');
                 
-                if (data.running) {
-                    indicator.className = 'status-indicator status-ok';
-                    status.textContent = data.url;
-                } else {
-                    indicator.className = 'status-indicator status-error';
-                    status.textContent = data.message || 'Not running';
-                }
+                const ngrokRunning = (typeof data.ngrok_running === 'boolean') ? data.ngrok_running : ((data.provider || '').toLowerCase() === 'ngrok' ? !!data.running : false);
+                const cloudflareRunning = (typeof data.cloudflare_running === 'boolean') ? data.cloudflare_running : ((data.provider || '').toLowerCase() === 'cloudflare' ? !!data.running : false);
+
+                // ngrok circle
+                indicator.className = ngrokRunning ? 'status-indicator status-ok' : 'status-indicator status-error';
+                status.textContent = ngrokRunning ? (data.ngrok_url || data.url || 'ngrok running') : 'Not running';
+
+                // Cloudflare circle
+                if (cfIndicator) cfIndicator.className = cloudflareRunning ? 'status-indicator status-ok' : 'status-indicator status-error';
+                if (cfStatus) cfStatus.textContent = cloudflareRunning ? (data.cloudflare_url || 'Cloudflare running') : 'Not running';
             } catch (error) {
                 const indicator = document.getElementById('ngrokIndicator');
                 const status = document.getElementById('ngrokStatus');
+                const cfIndicator = document.getElementById('cloudflareIndicator');
+                const cfStatus = document.getElementById('cloudflareStatus');
                 indicator.className = 'status-indicator status-error';
+                if (cfIndicator) cfIndicator.className = 'status-indicator status-error';
                 if (error.name === 'AbortError') {
                     status.textContent = 'Timeout checking status';
+                    if (cfStatus) cfStatus.textContent = 'Timeout checking status';
                 } else {
                     status.textContent = 'Error checking';
+                    if (cfStatus) cfStatus.textContent = 'Error checking';
                 }
             }
         }
@@ -1993,54 +2047,6 @@
             } catch (error) {
                 console.error('Error deleting call:', error);
                 alert('Error deleting call');
-            }
-        }
-
-        async function showPerformanceReport(callUuid) {
-            try {
-                const response = await fetch(`/api/performance-report/${callUuid}`);
-                const data = await response.json();
-                
-                if (!data.success) {
-                    alert('No performance report available for this call yet.');
-                    return;
-                }
-                
-                const scores = data.scores || {};
-                const improvements = data.improvements || 'No improvements suggested.';
-                
-                const modal = document.createElement('div');
-                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
-                modal.innerHTML = `
-                    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 50px rgba(0,0,0,0.5);">
-                        <h2 style="color: white; margin-bottom: 20px; font-size: 24px;">📊 Performance Report</h2>
-                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                            <div style="font-size: 32px; font-weight: 700; color: ${data.overall_score >= 9 ? '#66ea96' : data.overall_score >= 7 ? '#f1c40f' : '#ff6b6b'}; text-align: center; margin-bottom: 15px;">
-                                Overall: ${data.overall_score}/10
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; color: white; font-size: 14px;">
-                                <div><strong>Human-likeness:</strong> ${scores.human_likeness || 'N/A'}/10</div>
-                                <div><strong>Response timing:</strong> ${scores.response_timing || 'N/A'}/10</div>
-                                <div><strong>Turn-taking:</strong> ${scores.turn_taking || 'N/A'}/10</div>
-                                <div><strong>Relevance:</strong> ${scores.relevance || 'N/A'}/10</div>
-                                <div><strong>Short-utterance:</strong> ${scores.short_utterance_handling || 'N/A'}/10</div>
-                                <div><strong>Topic focus:</strong> ${scores.topic_focus || 'N/A'}/10</div>
-                                <div><strong>Verbosity control:</strong> ${scores.verbosity_control || 'N/A'}/10</div>
-                                <div><strong>Overall flow:</strong> ${scores.overall_flow || 'N/A'}/10</div>
-                            </div>
-                        </div>
-                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                            <h3 style="color: white; margin-bottom: 10px; font-size: 16px;">🎯 Next Call Improvements:</h3>
-                            <div style="color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${improvements}</div>
-                        </div>
-                        <button onclick="this.closest('div[style*=fixed]').remove()" style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px; border-radius: 10px; color: white; font-size: 16px; font-weight: 600; cursor: pointer;">Close</button>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-                modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            } catch (error) {
-                console.error('Error loading performance report:', error);
-                alert('Failed to load performance report');
             }
         }
 
@@ -2210,7 +2216,6 @@
                                                 ? '<button disabled style="background: rgba(100,255,100,0.2); border: 1px solid rgba(100,255,100,0.4); padding: 8px 16px; border-radius: 8px; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600; cursor: not-allowed;">✓ Complete</button>'
                                                 : `<button onclick="markCallComplete('${call.call_uuid}')" style="background: linear-gradient(135deg, #66ea96 0%, #66c8ea 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Mark Complete</button>`
                                             }
-                                            <button onclick="showPerformanceReport('${call.call_uuid}')" style="background: rgba(100,100,255,0.2); border: 1px solid rgba(100,100,255,0.4); padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">📊 Performance</button>
                                             <button onclick="deleteCall('${call.call_uuid}')" style="background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.4); padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">🗑️ Delete</button>
                                         </div>
                                     </div>
@@ -2365,12 +2370,9 @@
                 const transferNumberEl = document.getElementById('transferNumber');
                 if (transferNumberEl) transferNumberEl.value = config.TRANSFER_NUMBER || '';
 
-                // Transfer-by-name people list (up to 5)
-                const people = Array.isArray(config.TRANSFER_PEOPLE) ? config.TRANSFER_PEOPLE : [];
-                for (let i = 1; i <= 5; i++) {
-                    const el = document.getElementById('transferPerson' + i);
-                    if (el) el.value = (people[i - 1] || '');
-                }
+                // Transfer instructions
+                const transferInstructionsEl = document.getElementById('transferInstructions');
+                if (transferInstructionsEl) transferInstructionsEl.value = config.TRANSFER_INSTRUCTIONS || '';
                 
                 const headerTransferNumberEl = document.getElementById('headerTransferNumber');
                 if (headerTransferNumberEl) headerTransferNumberEl.value = config.TRANSFER_NUMBER || '';
@@ -3277,9 +3279,14 @@
             document.getElementById('googleVoiceSection').style.display = 'none';
             document.getElementById('elevenLabsVoiceSection').style.display = 'none';
             document.getElementById('playhtVoiceSection').style.display = 'none';
+            document.getElementById('speechmaticsVoiceSection').style.display = 'none';
             
-            // Always show Speechmatics section since it's the only option
-            document.getElementById('speechmaticsVoiceSection').style.display = 'block';
+            // Show the selected provider section
+            if (provider === 'openai') {
+                document.getElementById('openaiVoiceSection').style.display = 'block';
+            } else if (provider === 'speechmatics') {
+                document.getElementById('speechmaticsVoiceSection').style.display = 'block';
+            }
             
             // Force a repaint to ensure dropdown is visible
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -3814,13 +3821,7 @@
             const agentInstructions = document.getElementById('agentInstructions')?.value || '';
             const callGreeting = document.getElementById('callGreeting')?.value || '';
             const transferNumber = document.getElementById('transferNumber')?.value || '';
-
-            const transferPeople = [];
-            for (let i = 1; i <= 5; i++) {
-                const v = document.getElementById('transferPerson' + i)?.value || '';
-                const trimmed = v.trim();
-                if (trimmed) transferPeople.push(trimmed);
-            }
+            const transferInstructions = document.getElementById('transferInstructions')?.value || '';
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
@@ -3876,7 +3877,7 @@
                         AGENT_INSTRUCTIONS: agentInstructions,
                         CALL_GREETING: callGreeting,
                         TRANSFER_NUMBER: transferNumber,
-                        TRANSFER_PEOPLE: transferPeople
+                        TRANSFER_INSTRUCTIONS: transferInstructions
                     })
                 });
                 
@@ -5409,6 +5410,29 @@
                         </div>
                     </div>
 
+                    <!-- SMS Notifications -->
+                    <div style="background: linear-gradient(135deg, rgba(241,196,15,0.08) 0%, rgba(243,156,18,0.12) 100%); border: 2px solid rgba(241,196,15,0.35); border-radius: 14px; padding: 20px; transition: all 0.3s; position: relative; overflow: hidden;" onmouseover="this.style.borderColor='rgba(241,196,15,0.6)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(241,196,15,0.22)'" onmouseout="this.style.borderColor='rgba(241,196,15,0.35)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(241,196,15,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; position: relative; z-index: 1;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(241,196,15,0.25) 0%, rgba(243,156,18,0.25) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(241,196,15,0.3);">📩</div>
+                                    <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; letter-spacing: -0.3px;">Text Notifications</h3>
+                                </div>
+                                <p style="margin: 0 0 12px 0; color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; padding-left: 60px;">Send you an SMS summary after calls your AI agent handles</p>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 60px;">
+                                    <span style="background: linear-gradient(135deg, rgba(241,196,15,0.3) 0%, rgba(243,156,18,0.3) 100%); padding: 6px 14px; border-radius: 8px; font-weight: 700; color: #f1c40f; font-size: 13px; border: 1px solid rgba(241,196,15,0.4); box-shadow: 0 2px 8px rgba(241,196,15,0.18);">3 credits per SMS</span>
+                                    <span style="color: rgba(255,255,255,0.45); font-size: 12px;">• Billed per call notification</span>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-block; width: 64px; height: 34px; flex-shrink: 0; cursor: pointer;">
+                                <input type="checkbox" id="smsNotificationsToggle" onchange="toggleBundle('smsNotifications')" style="opacity: 0; width: 0; height: 0;">
+                                <span class="bundle-toggle-slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.15); transition: 0.4s; border-radius: 34px; border: 2px solid rgba(255,255,255,0.25); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                <span class="bundle-toggle-knob" style="position: absolute; content: ''; height: 26px; width: 26px; left: 3px; bottom: 2px; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); transition: 0.4s; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></span>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- Save Button -->
                     <div style="margin-top: 30px; text-align: center;">
                         <button onclick="saveBundleSettings()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 16px 48px; border-radius: 12px; color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102,126,234,0.4);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102,126,234,0.6)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102,126,234,0.4)'">
@@ -5506,6 +5530,17 @@
     </div>
 
     <!-- Welcome Modal (First Login) -->
+    <div id="accountRestrictionOverlay" class="welcome-overlay" style="display: none;">
+        <div class="welcome-modal" style="max-width: 680px;">
+            <div id="accountRestrictionIcon" class="welcome-icon">🔒</div>
+            <h1 id="accountRestrictionTitle" class="welcome-title">Account Suspended</h1>
+            <p id="accountRestrictionMessage" class="welcome-subtitle">Your account is currently restricted. Please contact support.</p>
+            <div style="display:flex; gap: 12px; justify-content:center; margin-top: 18px;">
+                <button class="btn-secondary" onclick="logout()" style="padding: 12px 26px; font-weight: 800;">Sign out</button>
+            </div>
+        </div>
+    </div>
+
     <div id="welcomeOverlay" class="welcome-overlay" style="display: none;">
         <div class="welcome-modal">
             <div class="welcome-icon">👋</div>

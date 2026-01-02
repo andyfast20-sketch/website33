@@ -16,19 +16,39 @@ import base64
 import json
 import logging
 import os
+import sys
 import subprocess
 import secrets
 import hashlib
 import time
 import hmac
 import base64 as _py_base64
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Any
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import sqlite3
 import io
+import re
 
 import numpy as np
+
+
+# NOTE (Windows / Python 3.13 stability):
+# On some Windows builds (notably Python 3.13), the default Proactor event loop
+# can occasionally throw internal assertions under high churn / invalid HTTP
+# probes (seen as ProactorBasePipeTransport/BaseProactorEventLoop assertions),
+# which can destabilize uvicorn. For production server runs on Windows, prefer
+# the Selector event loop for improved robustness.
+if (
+    sys.platform.startswith("win")
+    and os.environ.get("PRODUCTION", "").lower() in {"1", "true", "yes"}
+):
+    try:
+        policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+        if policy is not None:
+            asyncio.set_event_loop_policy(policy())
+    except Exception:
+        pass
 
 
 def _load_local_dotenv_if_present() -> None:
@@ -54,7 +74,12 @@ def _load_local_dotenv_if_present() -> None:
                 value = value.strip().strip('"').strip("'")
                 if not key:
                     continue
-                os.environ.setdefault(key, value)
+                # Only set if missing OR present-but-empty. This prevents a common
+                # Windows pitfall where an env var exists but is blank, which would
+                # otherwise block `.env` from supplying the real value.
+                existing = os.environ.get(key)
+                if existing is None or not str(existing).strip():
+                    os.environ[key] = value
     except Exception:
         # Never block startup due to .env parsing issues.
         return
@@ -248,6 +273,48 @@ CONFIG = {
     # DeepSeek API Keys (with fallback)
     "DEEPSEEK_API_KEY": os.getenv("DEEPSEEK_API_KEY", ""),
     "DEEPSEEK_API_KEY_FALLBACK": os.getenv("DEEPSEEK_API_KEY_FALLBACK", ""),
+
+    # DeepSeek performance tuning (used only when DeepSeek brain is active)
+    # Keep these conservative to avoid changing UX too much.
+    "DEEPSEEK_MAX_TOKENS": int(os.getenv("DEEPSEEK_MAX_TOKENS", "220")),
+    "DEEPSEEK_HISTORY_PARTS": int(os.getenv("DEEPSEEK_HISTORY_PARTS", "6")),
+    "DEEPSEEK_MAX_MESSAGE_CHARS": int(os.getenv("DEEPSEEK_MAX_MESSAGE_CHARS", "500")),
+    "DEEPSEEK_SYSTEM_MAX_CHARS": int(os.getenv("DEEPSEEK_SYSTEM_MAX_CHARS", "7000")),
+    "DEEPSEEK_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("DEEPSEEK_TOTAL_PROMPT_MAX_CHARS", "12000")),
+    "DEEPSEEK_REQUEST_TIMEOUT_SECONDS": float(os.getenv("DEEPSEEK_REQUEST_TIMEOUT_SECONDS", "12")),
+
+    # Groq (OpenAI-compatible) - low latency chat completions (used only when Groq brain is active)
+    "GROQ_API_KEY": os.getenv("GROQ_API_KEY", ""),
+    "GROQ_MODEL": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+    "GROQ_MAX_TOKENS": int(os.getenv("GROQ_MAX_TOKENS", "220")),
+    "GROQ_HISTORY_PARTS": int(os.getenv("GROQ_HISTORY_PARTS", "6")),
+    "GROQ_MAX_MESSAGE_CHARS": int(os.getenv("GROQ_MAX_MESSAGE_CHARS", "500")),
+    "GROQ_SYSTEM_MAX_CHARS": int(os.getenv("GROQ_SYSTEM_MAX_CHARS", "7000")),
+    "GROQ_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("GROQ_TOTAL_PROMPT_MAX_CHARS", "12000")),
+    "GROQ_REQUEST_TIMEOUT_SECONDS": float(os.getenv("GROQ_REQUEST_TIMEOUT_SECONDS", "12")),
+
+    # xAI Grok (OpenAI-compatible) - separate from Groq (used only when Grok brain is active)
+    "GROK_API_KEY": os.getenv("GROK_API_KEY", ""),
+    "GROK_MODEL": os.getenv("GROK_MODEL", "grok-4-latest"),
+    "GROK_MAX_TOKENS": int(os.getenv("GROK_MAX_TOKENS", "220")),
+    "GROK_HISTORY_PARTS": int(os.getenv("GROK_HISTORY_PARTS", "6")),
+    "GROK_MAX_MESSAGE_CHARS": int(os.getenv("GROK_MAX_MESSAGE_CHARS", "500")),
+    "GROK_SYSTEM_MAX_CHARS": int(os.getenv("GROK_SYSTEM_MAX_CHARS", "7000")),
+    "GROK_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("GROK_TOTAL_PROMPT_MAX_CHARS", "12000")),
+    "GROK_REQUEST_TIMEOUT_SECONDS": float(os.getenv("GROK_REQUEST_TIMEOUT_SECONDS", "12")),
+
+    # OpenRouter (OpenAI-compatible) - router/aggregator (used only when OpenRouter brain is active)
+    "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY", ""),
+    "OPENROUTER_MODEL": os.getenv("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant"),
+    "OPENROUTER_MAX_TOKENS": int(os.getenv("OPENROUTER_MAX_TOKENS", "100")),  # Shorter responses = faster
+    "OPENROUTER_HISTORY_PARTS": int(os.getenv("OPENROUTER_HISTORY_PARTS", "4")),  # Less context = faster
+    "OPENROUTER_MAX_MESSAGE_CHARS": int(os.getenv("OPENROUTER_MAX_MESSAGE_CHARS", "400")),  # Compact messages
+    "OPENROUTER_SYSTEM_MAX_CHARS": int(os.getenv("OPENROUTER_SYSTEM_MAX_CHARS", "5000")),  # Leaner system prompt
+    "OPENROUTER_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", "8000")),  # Smaller total
+    "OPENROUTER_REQUEST_TIMEOUT_SECONDS": float(os.getenv("OPENROUTER_REQUEST_TIMEOUT_SECONDS", "8")),  # Faster timeout
+    # Optional OpenRouter attribution headers
+    "OPENROUTER_HTTP_REFERER": os.getenv("OPENROUTER_HTTP_REFERER", ""),
+    "OPENROUTER_X_TITLE": os.getenv("OPENROUTER_X_TITLE", "website33"),
     
     # ElevenLabs API Key and Voice ID
     "ELEVENLABS_API_KEY": os.getenv("ELEVENLABS_API_KEY", ""),
@@ -298,6 +365,149 @@ CONFIG = {
     "WELCOME_MESSAGE": "Hello! This is Judie. How can I help you today?",
 }
 
+
+# --- DeepSeek async client reuse (keep-alive) -------------------------------
+_DEEPSEEK_HTTPX_CLIENT: Optional[httpx.AsyncClient] = None
+_DEEPSEEK_ASYNC_CLIENT: Optional[Any] = None
+_DEEPSEEK_ASYNC_CLIENT_KEY: str = ""
+
+
+def _get_deepseek_async_client(api_key: str):
+    """Return a process-wide AsyncOpenAI client for DeepSeek.
+
+    This is a latency optimization: avoid recreating clients and TLS sessions
+    on every DeepSeek turn.
+    """
+    global _DEEPSEEK_HTTPX_CLIENT, _DEEPSEEK_ASYNC_CLIENT, _DEEPSEEK_ASYNC_CLIENT_KEY
+
+    api_key = (api_key or "").strip()
+    if not api_key:
+        raise ValueError("Missing DeepSeek API key")
+
+    # Recreate the OpenAI wrapper if the key changes.
+    if _DEEPSEEK_ASYNC_CLIENT is not None and _DEEPSEEK_ASYNC_CLIENT_KEY == api_key:
+        return _DEEPSEEK_ASYNC_CLIENT
+
+    if _DEEPSEEK_HTTPX_CLIENT is None:
+        timeout_seconds = float(CONFIG.get("DEEPSEEK_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        # Keep a slightly higher connect timeout; most latency is generation/read.
+        timeout = httpx.Timeout(connect=min(10.0, timeout_seconds), read=timeout_seconds, write=timeout_seconds, pool=timeout_seconds)
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=30.0)
+        _DEEPSEEK_HTTPX_CLIENT = httpx.AsyncClient(timeout=timeout, limits=limits)
+
+    _DEEPSEEK_ASYNC_CLIENT = openai.AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://api.deepseek.com",
+        http_client=_DEEPSEEK_HTTPX_CLIENT,
+    )
+    _DEEPSEEK_ASYNC_CLIENT_KEY = api_key
+    return _DEEPSEEK_ASYNC_CLIENT
+
+
+# --- Groq async client reuse (keep-alive) ----------------------------------
+_GROQ_HTTPX_CLIENT: Optional[httpx.AsyncClient] = None
+_GROQ_ASYNC_CLIENT: Optional[Any] = None
+_GROQ_ASYNC_CLIENT_KEY: str = ""
+
+
+def _get_groq_async_client(api_key: str):
+    """Return a process-wide AsyncOpenAI client for Groq (OpenAI-compatible API)."""
+    global _GROQ_HTTPX_CLIENT, _GROQ_ASYNC_CLIENT, _GROQ_ASYNC_CLIENT_KEY
+
+    api_key = (api_key or "").strip()
+    if not api_key:
+        raise ValueError("Missing Groq API key")
+
+    if _GROQ_ASYNC_CLIENT is not None and _GROQ_ASYNC_CLIENT_KEY == api_key:
+        return _GROQ_ASYNC_CLIENT
+
+    if _GROQ_HTTPX_CLIENT is None:
+        timeout_seconds = float(CONFIG.get("GROQ_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        timeout = httpx.Timeout(connect=min(10.0, timeout_seconds), read=timeout_seconds, write=timeout_seconds, pool=timeout_seconds)
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=30.0)
+        _GROQ_HTTPX_CLIENT = httpx.AsyncClient(timeout=timeout, limits=limits)
+
+    _GROQ_ASYNC_CLIENT = openai.AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1",
+        http_client=_GROQ_HTTPX_CLIENT,
+    )
+    _GROQ_ASYNC_CLIENT_KEY = api_key
+    return _GROQ_ASYNC_CLIENT
+
+
+# --- xAI Grok async client reuse (keep-alive) --------------------------------
+_GROK_HTTPX_CLIENT: Optional[httpx.AsyncClient] = None
+_GROK_ASYNC_CLIENT: Optional[Any] = None
+_GROK_ASYNC_CLIENT_KEY: str = ""
+
+
+def _get_grok_async_client(api_key: str):
+    """Return a process-wide AsyncOpenAI client for xAI Grok (OpenAI-compatible)."""
+    global _GROK_HTTPX_CLIENT, _GROK_ASYNC_CLIENT, _GROK_ASYNC_CLIENT_KEY
+
+    api_key = (api_key or "").strip()
+    if not api_key:
+        raise ValueError("Missing Grok API key")
+
+    if _GROK_ASYNC_CLIENT is not None and _GROK_ASYNC_CLIENT_KEY == api_key:
+        return _GROK_ASYNC_CLIENT
+
+    if _GROK_HTTPX_CLIENT is None:
+        timeout_seconds = float(CONFIG.get("GROK_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        timeout = httpx.Timeout(connect=min(10.0, timeout_seconds), read=timeout_seconds, write=timeout_seconds, pool=timeout_seconds)
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=30.0)
+        _GROK_HTTPX_CLIENT = httpx.AsyncClient(timeout=timeout, limits=limits)
+
+    _GROK_ASYNC_CLIENT = openai.AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://api.x.ai/v1",
+        http_client=_GROK_HTTPX_CLIENT,
+    )
+    _GROK_ASYNC_CLIENT_KEY = api_key
+    return _GROK_ASYNC_CLIENT
+
+
+# --- OpenRouter async client reuse (keep-alive) ----------------------------
+_OPENROUTER_HTTPX_CLIENT: Optional[httpx.AsyncClient] = None
+_OPENROUTER_ASYNC_CLIENT: Optional[Any] = None
+_OPENROUTER_ASYNC_CLIENT_KEY: str = ""
+
+
+def _get_openrouter_async_client(api_key: str):
+    """Return a process-wide AsyncOpenAI client for OpenRouter (OpenAI-compatible)."""
+    global _OPENROUTER_HTTPX_CLIENT, _OPENROUTER_ASYNC_CLIENT, _OPENROUTER_ASYNC_CLIENT_KEY
+
+    api_key = (api_key or "").strip()
+    if not api_key:
+        raise ValueError("Missing OpenRouter API key")
+
+    if _OPENROUTER_ASYNC_CLIENT is not None and _OPENROUTER_ASYNC_CLIENT_KEY == api_key:
+        return _OPENROUTER_ASYNC_CLIENT
+
+    if _OPENROUTER_HTTPX_CLIENT is None:
+        timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        timeout = httpx.Timeout(connect=min(10.0, timeout_seconds), read=timeout_seconds, write=timeout_seconds, pool=timeout_seconds)
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=30.0)
+        _OPENROUTER_HTTPX_CLIENT = httpx.AsyncClient(timeout=timeout, limits=limits)
+
+    headers = {}
+    referer = str(CONFIG.get("OPENROUTER_HTTP_REFERER", "") or "").strip()
+    title = str(CONFIG.get("OPENROUTER_X_TITLE", "") or "").strip()
+    if referer:
+        headers["HTTP-Referer"] = referer
+    if title:
+        headers["X-Title"] = title
+
+    _OPENROUTER_ASYNC_CLIENT = openai.AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        http_client=_OPENROUTER_HTTPX_CLIENT,
+        default_headers=headers or None,
+    )
+    _OPENROUTER_ASYNC_CLIENT_KEY = api_key
+    return _OPENROUTER_ASYNC_CLIENT
+
 # Audio settings
 VONAGE_SAMPLE_RATE = 16000  # Vonage uses 16kHz Linear PCM
 OPENAI_SAMPLE_RATE = 24000  # OpenAI Realtime API uses 24kHz
@@ -311,6 +521,128 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("VonageAgent")
+
+
+def _latest_trycloudflare_url_from_log(log_path: str = "cloudflared_quick.log") -> str:
+    try:
+        if not os.path.exists(log_path):
+            return ""
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()[-400:]
+        for line in reversed(lines):
+            m = re.search(r"https://[a-zA-Z0-9\-]+\.trycloudflare\.com", line)
+            if m:
+                return m.group(0)
+    except Exception:
+        return ""
+    return ""
+
+# ============================================================================
+# LAST WEBHOOK DEBUG (helps diagnose "engaged" / misconfigured Vonage URLs)
+# ============================================================================
+
+_LAST_WEBHOOK: Dict[str, Dict[str, Any]] = {
+    "answer": {},
+    "events": {},
+}
+
+_LAST_NCCO: Dict[str, Any] = {}
+
+
+def _debug_state_init(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS debug_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+
+
+def _debug_state_set(key: str, value: Any) -> None:
+    try:
+        conn = get_db_connection()
+        _debug_state_init(conn)
+        payload = json.dumps(value, ensure_ascii=False)
+        conn.execute(
+            "INSERT OR REPLACE INTO debug_state (key, value, updated_at) VALUES (?, ?, ?)",
+            (key, payload, datetime.now().isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        return
+
+
+def _debug_state_get(key: str, default: Any) -> Any:
+    try:
+        conn = get_db_connection()
+        _debug_state_init(conn)
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM debug_state WHERE key = ?", (key,))
+        row = cur.fetchone()
+        conn.close()
+        if not row or not row[0]:
+            return default
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return default
+    except Exception:
+        return default
+
+
+def _record_last_webhook(kind: str, request, data: Any) -> None:
+    try:
+        client_host = None
+        if getattr(request, "client", None) is not None:
+            client_host = getattr(request.client, "host", None)
+
+        payload_keys: List[str] = []
+        uuid = None
+        status = None
+        to_value = None
+        if isinstance(data, dict):
+            payload_keys = sorted([str(k) for k in data.keys()])
+            uuid = data.get("uuid") or data.get("conversation_uuid")
+            status = data.get("status")
+            to_value = data.get("to")
+
+        payload = {
+            "received_at": datetime.now().isoformat(),
+            "kind": kind,
+            "method": getattr(request, "method", None),
+            "path": str(getattr(getattr(request, "url", None), "path", "")),
+            "query": str(getattr(request, "query_params", "")),
+            "host": (getattr(request, "headers", {}) or {}).get("host", ""),
+            "x_forwarded_host": (getattr(request, "headers", {}) or {}).get("x-forwarded-host", ""),
+            "x_forwarded_proto": (getattr(request, "headers", {}) or {}).get("x-forwarded-proto", ""),
+            "client_host": client_host,
+            "user_agent": (getattr(request, "headers", {}) or {}).get("user-agent", ""),
+            "content_type": (getattr(request, "headers", {}) or {}).get("content-type", ""),
+            "uuid": uuid,
+            "status": status,
+            "to": to_value,
+            "payload_keys": payload_keys,
+        }
+        _LAST_WEBHOOK[kind] = payload
+        _debug_state_set(f"last_webhook:{kind}", payload)
+    except Exception:
+        # Never break call handling due to debug tracking.
+        return
+
+
+def _record_last_ncco(request: Request, call_uuid: str, ncco: Any, ws_url: Optional[str] = None, note: str = "") -> None:
+    try:
+        payload = {
+            "generated_at": datetime.now().isoformat(),
+            "uuid": call_uuid,
+            "host": _public_host_from_request(request),
+            "ws_url": ws_url,
+            "note": note,
+            "ncco": ncco,
+        }
+        global _LAST_NCCO
+        _LAST_NCCO = payload
+        _debug_state_set("last_ncco", payload)
+    except Exception:
+        return
 
 # ============================================================================
 # ELEVENLABS CLIENT
@@ -491,6 +823,125 @@ def init_database():
         conn.close()
 
 
+def _normalize_public_url(url: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return ""
+    # Avoid trailing slashes to keep webhook URLs consistent.
+    return u.rstrip("/")
+
+
+def _get_global_tunnel_settings() -> Tuple[str, str]:
+    """Return (provider, public_url) from global_settings."""
+    provider = ""
+    public_url = ""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT tunnel_provider, public_url FROM global_settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            provider = (row[0] or "").strip().lower()
+            public_url = _normalize_public_url(row[1] or "")
+    except Exception:
+        pass
+    return provider, public_url
+
+
+def _set_global_tunnel_provider(provider: str) -> None:
+    p = (provider or "").strip().lower()
+    if p not in {"ngrok", "cloudflare"}:
+        return
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE global_settings SET tunnel_provider = ? WHERE id = 1", (p,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _persist_public_url(url: str) -> None:
+    u = _normalize_public_url(url)
+    if not u:
+        return
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE global_settings SET public_url = ? WHERE id = 1", (u,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _sync_public_url_from_db_best_effort() -> Tuple[str, str]:
+    """Best-effort sync of CONFIG[PUBLIC_URL] from DB and/or Cloudflare log.
+
+    Returns (provider, public_url).
+    """
+    provider, public_url = _get_global_tunnel_settings()
+    if public_url:
+        CONFIG["PUBLIC_URL"] = public_url
+        return provider, public_url
+
+    # If Cloudflare is selected but DB URL is empty, try to pull the latest
+    # trycloudflare URL from the logfile.
+    if provider == "cloudflare":
+        try:
+            url_from_log = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+            if url_from_log:
+                CONFIG["PUBLIC_URL"] = url_from_log
+                _persist_public_url(url_from_log)
+                return provider, url_from_log
+        except Exception:
+            pass
+    return provider, _normalize_public_url(CONFIG.get("PUBLIC_URL") or "")
+
+
+def _is_process_running(image_name: str) -> bool:
+    """Cross-platform-ish process check (optimized for Windows)."""
+    name = (image_name or "").strip()
+    if not name:
+        return False
+    try:
+        if os.name == "nt":
+            # tasklist output includes the image name if running.
+            result = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {name}"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            out = (result.stdout or "").lower()
+            return name.lower() in out
+        # Non-Windows: best-effort pgrep.
+        result = subprocess.run(["pgrep", "-f", name], capture_output=True, text=True, timeout=3)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _kill_process_images(images: List[str]) -> int:
+    """Force-kill process images by name. Returns number of kill attempts."""
+    killed = 0
+    for img in images:
+        img = (img or "").strip()
+        if not img:
+            continue
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/IM", img], capture_output=True, text=True, timeout=5)
+            else:
+                subprocess.run(["pkill", "-f", img], capture_output=True, text=True, timeout=5)
+            killed += 1
+        except Exception:
+            continue
+    return killed
+
+
 def _ensure_column(cursor: sqlite3.Cursor, table: str, column: str, ddl: str) -> None:
     try:
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
@@ -516,6 +967,10 @@ def ensure_auth_schema() -> None:
         # Existing code references these; ensure they exist.
         _ensure_column(cursor, "users", "status", "TEXT DEFAULT 'active'")
         _ensure_column(cursor, "users", "suspension_message", "TEXT")
+
+        # Used by super-admin suspend/ban endpoints.
+        _ensure_column(cursor, "users", "suspended_at", "TEXT")
+        _ensure_column(cursor, "users", "suspended_by", "TEXT")
 
         # Pending signup verification table
         cursor.execute(
@@ -571,12 +1026,29 @@ init_database()
 ensure_auth_schema()
 ensure_sms_notification_schema()
 
+
+def ensure_global_settings_schema() -> None:
+    """Best-effort schema migration for new global_settings columns."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        _ensure_column(cursor, "global_settings", "groq_api_key", "TEXT")
+        _ensure_column(cursor, "global_settings", "grok_api_key", "TEXT")
+        _ensure_column(cursor, "global_settings", "openrouter_api_key", "TEXT")
+        _ensure_column(cursor, "global_settings", "openrouter_model", "TEXT")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+ensure_global_settings_schema()
+
 def load_global_api_keys():
     """Load API keys from global_settings and update CONFIG"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider FROM global_settings WHERE id = 1')
+        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, groq_api_key, grok_api_key, openrouter_api_key, openrouter_model, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
 
         if result:
@@ -584,6 +1056,10 @@ def load_global_api_keys():
                 speechmatics_key_raw,
                 openai_key_raw,
                 deepseek_key_raw,
+                groq_key_raw,
+                grok_key_raw,
+                openrouter_key_raw,
+                openrouter_model_raw,
                 vonage_key_raw,
                 vonage_secret_raw,
                 vonage_app_id_raw,
@@ -594,10 +1070,40 @@ def load_global_api_keys():
             speechmatics_key = _decrypt_secret(speechmatics_key_raw)
             openai_key = _decrypt_secret(openai_key_raw)
             deepseek_key = _decrypt_secret(deepseek_key_raw)
+            groq_key = _decrypt_secret(groq_key_raw)
+            grok_key = _decrypt_secret(grok_key_raw)
+            openrouter_key = _decrypt_secret(openrouter_key_raw)
+            openrouter_model = str(openrouter_model_raw or "").strip()
             vonage_key = _decrypt_secret(vonage_key_raw)
             vonage_secret = _decrypt_secret(vonage_secret_raw)
             vonage_app_id = _decrypt_secret(vonage_app_id_raw)
             vonage_private_key_pem = _decrypt_secret(vonage_private_key_pem_raw)
+
+            # If values are encrypted in DB but we cannot decrypt them, the app will silently
+            # behave as if the keys are missing (because _decrypt_secret returns "").
+            # This most commonly happens when the process cannot access Windows Credential
+            # Manager (keyring) or when WEBSITE33_MASTER_KEY is not set in the environment.
+            def _warn_if_decrypt_missing(label: str, raw_val: Optional[str], decrypted_val: str) -> None:
+                try:
+                    raw_s = (raw_val or "").strip()
+                    if raw_s.startswith(_SECRET_PREFIX) and not (decrypted_val or "").strip():
+                        logger.warning(
+                            f"⚠️ Cannot decrypt {label} from DB (value is encrypted but decrypt returned empty). "
+                            f"Set env WEBSITE33_MASTER_KEY or ensure this process can access Windows Credential Manager."
+                        )
+                except Exception:
+                    return
+
+            _warn_if_decrypt_missing("speechmatics_api_key", speechmatics_key_raw, speechmatics_key)
+            _warn_if_decrypt_missing("openai_api_key", openai_key_raw, openai_key)
+            _warn_if_decrypt_missing("deepseek_api_key", deepseek_key_raw, deepseek_key)
+            _warn_if_decrypt_missing("groq_api_key", groq_key_raw, groq_key)
+            _warn_if_decrypt_missing("grok_api_key", grok_key_raw, grok_key)
+            _warn_if_decrypt_missing("openrouter_api_key", openrouter_key_raw, openrouter_key)
+            _warn_if_decrypt_missing("vonage_api_key", vonage_key_raw, vonage_key)
+            _warn_if_decrypt_missing("vonage_api_secret", vonage_secret_raw, vonage_secret)
+            _warn_if_decrypt_missing("vonage_application_id", vonage_app_id_raw, vonage_app_id)
+            _warn_if_decrypt_missing("vonage_private_key_pem", vonage_private_key_pem_raw, vonage_private_key_pem)
 
             # Opportunistic migration: if DB contains plaintext keys and we have
             # an encryption backend, replace them with encrypted values.
@@ -608,6 +1114,12 @@ def load_global_api_keys():
                 updates["openai_api_key"] = _encrypt_secret(str(openai_key_raw))
             if deepseek_key_raw and not str(deepseek_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
                 updates["deepseek_api_key"] = _encrypt_secret(str(deepseek_key_raw))
+            if groq_key_raw and not str(groq_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["groq_api_key"] = _encrypt_secret(str(groq_key_raw))
+            if grok_key_raw and not str(grok_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["grok_api_key"] = _encrypt_secret(str(grok_key_raw))
+            if openrouter_key_raw and not str(openrouter_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["openrouter_api_key"] = _encrypt_secret(str(openrouter_key_raw))
             if vonage_key_raw and not str(vonage_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
                 updates["vonage_api_key"] = _encrypt_secret(str(vonage_key_raw))
             if vonage_secret_raw and not str(vonage_secret_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
@@ -650,6 +1162,22 @@ def load_global_api_keys():
                 CONFIG["DEEPSEEK_API_KEY"] = deepseek_key
                 logger.info("✅ Loaded DeepSeek API key from database")
 
+            if groq_key:
+                CONFIG["GROQ_API_KEY"] = groq_key
+                logger.info("✅ Loaded Groq API key from database")
+
+            if grok_key:
+                CONFIG["GROK_API_KEY"] = grok_key
+                logger.info("✅ Loaded Grok (xAI) API key from database")
+
+            if openrouter_key:
+                CONFIG["OPENROUTER_API_KEY"] = openrouter_key
+                logger.info("✅ Loaded OpenRouter API key from database")
+
+            if openrouter_model:
+                CONFIG["OPENROUTER_MODEL"] = openrouter_model
+                logger.info(f"✅ Loaded OpenRouter model from database: {openrouter_model}")
+
             if vonage_key:
                 CONFIG["VONAGE_API_KEY"] = vonage_key
                 logger.info("✅ Loaded Vonage API key from database")
@@ -684,6 +1212,107 @@ def _get_vonage_credentials() -> Tuple[Optional[str], Optional[str]]:
     if not api_key or not api_secret:
         return None, None
     return api_key, api_secret
+
+
+def _update_vonage_application_webhooks(new_url: str) -> bool:
+    """
+    Update Vonage application webhooks to use the new tunnel URL.
+    This is critical when the tunnel URL changes (Cloudflare generates new URLs each time).
+    Returns True if successful, False otherwise.
+    """
+    try:
+        api_key, api_secret = _get_vonage_credentials()
+        if not api_key or not api_secret:
+            logger.warning("Cannot update Vonage webhooks: credentials not configured")
+            return False
+        
+        # Get application ID from database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT vonage_application_id FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row or not row[0]:
+            logger.warning("Cannot update Vonage webhooks: application ID not configured")
+            return False
+        
+        app_id = _decrypt_secret(row[0]) if row[0] else ""
+        if not app_id:
+            logger.warning("Cannot update Vonage webhooks: could not decrypt application ID")
+            return False
+        
+        # Update the application via Vonage API
+        import requests
+        import base64
+        
+        answer_url = f"{new_url.rstrip('/')}/webhooks/answer"
+        event_url = f"{new_url.rstrip('/')}/webhooks/events"
+        
+        auth_string = f"{api_key}:{api_secret}"
+        auth_bytes = auth_string.encode('ascii')
+        base64_auth = base64.b64encode(auth_bytes).decode('ascii')
+        
+        headers = {
+            "Authorization": f"Basic {base64_auth}",
+            "Content-Type": "application/json"
+        }
+        
+        # First get the current application to preserve name and other settings
+        get_response = requests.get(
+            f"https://api.nexmo.com/v2/applications/{app_id}",
+            headers=headers,
+            timeout=10
+        )
+        
+        if get_response.status_code != 200:
+            logger.error(f"Could not fetch current application: {get_response.status_code}")
+            return False
+        
+        current_app = get_response.json()
+        
+        # Update only the webhook URLs, preserve everything else
+        payload = {
+            "name": current_app.get("name", "Voice Agent"),
+            "capabilities": {
+                "voice": {
+                    "webhooks": {
+                        "answer_url": {
+                            "address": answer_url,
+                            "http_method": "POST"
+                        },
+                        "event_url": {
+                            "address": event_url,
+                            "http_method": "POST"
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Preserve other capabilities if they exist
+        if "capabilities" in current_app:
+            for cap_name, cap_value in current_app["capabilities"].items():
+                if cap_name != "voice" and cap_value:
+                    payload["capabilities"][cap_name] = cap_value
+        
+        response = requests.put(
+            f"https://api.nexmo.com/v2/applications/{app_id}",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"✅ Vonage application webhooks updated to: {new_url}")
+            return True
+        else:
+            logger.error(f"Failed to update Vonage webhooks: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error updating Vonage application webhooks: {e}")
+        return False
 
 
 def load_global_filler_words() -> List[str]:
@@ -808,10 +1437,10 @@ def load_backchannel_settings() -> None:
     defaults = {
         "IGNORE_BACKCHANNELS_ALWAYS": True,
         "BACKCHANNEL_MAX_WORDS": 3,
-        "MIN_USER_TURN_SECONDS": 0.30,
+        "MIN_USER_TURN_SECONDS": 0.50,
         # Require sustained caller speech before cancelling the agent.
         # This prevents tiny noises / brief "ok" acknowledgements from interrupting.
-        "BARGE_IN_MIN_SPEECH_SECONDS": 0.35,
+        "BARGE_IN_MIN_SPEECH_SECONDS": 0.60,
     }
     try:
         conn = get_db_connection()
@@ -873,8 +1502,13 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT s.user_id, s.expires_at, COALESCE(a.is_suspended, 0) as is_suspended
+        SELECT
+            s.user_id,
+            s.expires_at,
+            COALESCE(a.is_suspended, 0) as is_suspended,
+            COALESCE(u.status, 'active') as user_status
         FROM sessions s
+        JOIN users u ON s.user_id = u.id
         LEFT JOIN account_settings a ON s.user_id = a.user_id
         WHERE s.session_token = ?
     ''', (session_token,))
@@ -885,11 +1519,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Optio
     if not result:
         return None
     
-    user_id, expires_at, is_suspended = result
+    user_id, expires_at, is_suspended, user_status = result
     
-    # Check if account is suspended
-    if is_suspended:
-        logger.warning(f"Blocked login attempt for suspended user {user_id}")
+    # Check if account is suspended/banned
+    if is_suspended or (user_status in ('suspended', 'banned')):
+        logger.warning(f"Blocked auth for restricted user {user_id} (is_suspended={is_suspended}, status={user_status})")
         return None
     
     # Check if session is expired
@@ -1026,9 +1660,27 @@ def _get_vonage_sms_credentials() -> Tuple[str, str]:
 def _send_vonage_sms(to_e164: str, text: str) -> Tuple[bool, str]:
     api_key, api_secret = _get_vonage_sms_credentials()
     if not api_key or not api_secret:
+        logger.error("❌ SMS send failed: Vonage credentials not configured")
         return False, "Vonage SMS credentials not configured"
 
-    sms_from = (os.getenv("SIGNUP_SMS_FROM") or "07441474491").strip()
+    sms_from_raw = (CONFIG.get("SIGNUP_SMS_FROM") or os.getenv("SIGNUP_SMS_FROM") or "VoiceAI").strip()
+    # Vonage supports either an alphanumeric Sender ID (often <=11 chars) or an MSISDN.
+    # If a numeric sender is provided, normalize it to digits-only international form.
+    sms_from = sms_from_raw
+    sms_from_digits = "".join(ch for ch in sms_from_raw if ch.isdigit() or ch == "+")
+    if sms_from_digits:
+        if sms_from_digits.startswith("00"):
+            sms_from_digits = "+" + sms_from_digits[2:]
+        if sms_from_digits.startswith("+"):
+            sms_from_digits = sms_from_digits[1:]
+        # If it's a UK-style local mobile (07...), normalize to 44...
+        if sms_from_digits.startswith("0") and len(sms_from_digits) >= 10:
+            sms_from_digits = "44" + sms_from_digits[1:]
+        sms_from = sms_from_digits
+
+    # Keep sender ID within common carrier limits if using alphanumeric.
+    if not sms_from.isdigit() and len(sms_from) > 11:
+        sms_from = sms_from[:11]
     payload = {
         "api_key": api_key,
         "api_secret": api_secret,
@@ -1037,27 +1689,39 @@ def _send_vonage_sms(to_e164: str, text: str) -> Tuple[bool, str]:
         "text": text,
     }
 
+    logger.info(f"📲 Sending SMS to {to_e164} from {sms_from}")
+    
     try:
         resp = requests.post("https://rest.nexmo.com/sms/json", data=payload, timeout=15)
     except requests.exceptions.RequestException as e:
+        logger.error(f"❌ SMS send failed (network error): {e}")
         return False, f"SMS send failed: {e}"
 
     if resp.status_code != 200:
+        logger.error(f"❌ SMS send failed: HTTP {resp.status_code} - {resp.text[:200]}")
         return False, f"SMS send failed (HTTP {resp.status_code})"
 
     try:
         data = resp.json()
-    except Exception:
+    except Exception as e:
+        logger.error(f"❌ SMS send failed: Invalid JSON response - {e}")
         return False, "SMS send failed (invalid response)"
 
     messages = data.get("messages") or []
     if not messages:
+        logger.error(f"❌ SMS send failed: Empty messages array - {data}")
         return False, "SMS send failed (empty response)"
 
-    status = str(messages[0].get("status") or "")
+    first_msg = messages[0] if messages else {}
+    status = str(first_msg.get("status") or "")
     if status != "0":
-        err_text = messages[0].get("error-text") or "Unknown error"
+        err_text = first_msg.get("error-text") or "Unknown error"
+        logger.error(f"❌ SMS send failed: Vonage status {status} - {err_text}")
         return False, f"SMS send failed: {err_text}"
+
+    msg_id = first_msg.get("message-id")
+    remaining = first_msg.get("remaining-balance")
+    logger.info(f"✅ SMS accepted by Vonage for {to_e164} (message-id={msg_id}, remaining-balance={remaining})")
     return True, "ok"
 
 
@@ -1298,6 +1962,35 @@ def _is_secure_request(request: Request) -> bool:
         return (request.url.scheme or "").lower() == "https"
     except Exception:
         return False
+
+
+def _public_host_from_request(request: Request) -> str:
+    try:
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+        return host
+    except Exception:
+        return ""
+
+
+def _public_base_url_from_request(request: Request) -> str:
+    host = _public_host_from_request(request)
+    if not host:
+        return (CONFIG.get("PUBLIC_URL") or "").rstrip("/")
+
+    host_lower = host.lower()
+    scheme = "http" if host_lower.startswith("localhost") or host_lower.startswith("127.0.0.1") else "https"
+    return f"{scheme}://{host}".rstrip("/")
+
+
+def _public_ws_url_from_request(request: Request, path: str) -> str:
+    host = _public_host_from_request(request)
+    if not host:
+        ws_host = (CONFIG.get("PUBLIC_URL") or "").replace("https://", "").replace("http://", "").rstrip("/")
+        return f"wss://{ws_host}{path}"
+
+    host_lower = host.lower()
+    ws_scheme = "ws" if host_lower.startswith("localhost") or host_lower.startswith("127.0.0.1") else "wss"
+    return f"{ws_scheme}://{host}{path}"
 
 
 _super_admin_login_attempts: Dict[str, List[float]] = {}
@@ -1640,6 +2333,96 @@ class MinutesTracker:
 
 class CallLogger:
     """Handles call logging and summarization"""
+
+    @staticmethod
+    def persist_call_brain_info(
+        call_uuid: str,
+        user_id: Optional[int] = None,
+        call_mode: Optional[str] = None,
+        selected_provider: str = "openai",
+        effective_provider: str = "openai",
+        reasons: Optional[List[str]] = None,
+    ) -> None:
+        """Persist selected/effective brain provider for a call.
+
+        Best-effort: never break calls if schema is missing.
+        """
+        try:
+            import json
+
+            selected = str(selected_provider or "openai").strip().lower()
+            effective = str(effective_provider or "openai").strip().lower()
+            rs = [str(r) for r in (reasons or []) if str(r)]
+            reasons_json = json.dumps(rs)
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # Backward-compatible: add columns if they don't exist yet.
+            _ensure_column(cursor, "calls", "selected_brain_provider", "TEXT")
+            _ensure_column(cursor, "calls", "effective_brain_provider", "TEXT")
+            _ensure_column(cursor, "calls", "brain_gating_reasons", "TEXT")
+
+            # Ensure the call_mode column exists (older DBs may not have it).
+            _ensure_column(cursor, "calls", "call_mode", "TEXT")
+
+            cursor.execute(
+                """
+                UPDATE calls
+                SET
+                    user_id = COALESCE(user_id, ?),
+                    call_mode = COALESCE(?, call_mode),
+                    selected_brain_provider = ?,
+                    effective_brain_provider = ?,
+                    brain_gating_reasons = ?
+                WHERE call_uuid = ?
+                """,
+                (user_id, call_mode, selected, effective, reasons_json, call_uuid),
+            )
+            conn.commit()
+            conn.close()
+
+            if rs:
+                logger.info(
+                    f"[{call_uuid}] 🧠 Brain routing selected={selected} effective={effective} call_mode={call_mode or ''} reasons={','.join(rs)}"
+                )
+            else:
+                logger.info(f"[{call_uuid}] 🧠 Brain routing selected={selected} effective={effective} call_mode={call_mode or ''}")
+        except Exception:
+            return
+
+    @staticmethod
+    def persist_call_fallback_info(
+        call_uuid: str,
+        openai_fallback_turns: int = 0,
+        openai_fallback_reasons: Optional[List[str]] = None,
+    ) -> None:
+        """Persist best-effort fallback diagnostics for a call."""
+        try:
+            import json
+
+            turns = int(openai_fallback_turns or 0)
+            rs = [str(r) for r in (openai_fallback_reasons or []) if str(r)]
+            rs_json = json.dumps(rs)
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            _ensure_column(cursor, "calls", "openai_fallback_turns", "INTEGER DEFAULT 0")
+            _ensure_column(cursor, "calls", "openai_fallback_reasons", "TEXT")
+
+            cursor.execute(
+                """
+                UPDATE calls
+                SET openai_fallback_turns = ?, openai_fallback_reasons = ?
+                WHERE call_uuid = ?
+                """,
+                (turns, rs_json, call_uuid),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            return
     
     @staticmethod
     def log_call_start(call_uuid: str, caller: str, called: str, user_id: Optional[int] = None):
@@ -1917,6 +2700,8 @@ class CallSession:
     
     def __init__(self, call_uuid: str, caller: str = "", called: str = ""):
         self.call_uuid = call_uuid
+        # Used for ordering live sessions (Super Admin live usage panel)
+        self._session_started_at: float = time.time()
         self.caller = caller
         self.caller_number = caller  # Store for appointment booking
         self.called = called
@@ -1933,12 +2718,12 @@ class CallSession:
         self._caller_speaking: bool = False
         self._pending_barge_in_task: Optional[asyncio.Task] = None
         self._pending_barge_in_started_at: Optional[float] = None
-        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.55))
+        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.35))  # Faster detection
 
         # Turn gating: avoid treating tiny utterances (e.g., "ok") as full turns.
         self._last_speech_started_at: Optional[float] = None
         self._last_speech_duration_seconds: float = 0.0
-        self._min_user_turn_seconds: float = float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.45))
+        self._min_user_turn_seconds: float = float(CONFIG.get("MIN_USER_TURN_SECONDS", 0.30))  # Faster response
         
         # Response time tracking
         self._speech_stopped_time = None  # Timestamp when user stops speaking (initialized to None)
@@ -1981,6 +2766,20 @@ class CallSession:
         self._turn_transcript_ready: asyncio.Event = asyncio.Event()
         # Per-turn guard: prevents double-triggering and enables a safe fallback when transcript arrives late.
         self._response_triggered_for_turn: bool = False
+
+        # Recent caller utterances (helps intent detection when the request spans multiple short chunks,
+        # e.g. "I'm the doctors" + "can you transfer me" across two transcripts).
+        try:
+            from collections import deque
+            self._recent_caller_utterances = deque(maxlen=8)  # items: (ts, text)
+        except Exception:
+            self._recent_caller_utterances = []
+        self._last_transfer_intent_check_at: float = 0.0
+        self._last_transfer_intent_trigger_at: float = 0.0
+        self._transfer_intent_cooldown_seconds: float = 2.0
+
+        # Cache transfer alias tokens for the current call (built lazily)
+        self._transfer_alias_cache: dict = {}
         
         # Speechmatics optimization: persistent HTTP client (avoids TLS handshake delay)
         import httpx
@@ -2018,6 +2817,12 @@ class CallSession:
         self._speechmatics_audio_bytes_received_for_turn: bool = False
         self._speechmatics_audio_bytes_received_event: asyncio.Event = asyncio.Event()
 
+        # Pending transfer confirmation (when transfer rules are met but we ask the caller first).
+        self._pending_transfer_number: Optional[str] = None
+        self._pending_transfer_reason: Optional[str] = None
+        self._pending_transfer_prompted: bool = False
+        self._pending_transfer_set_at: float = 0.0
+
         # Generic TTS output generation counter (ElevenLabs/Cartesia/Google/PlayHT/OpenAI audio).
         # Incrementing this invalidates any in-flight TTS stream loops so we stop sending audio
         # immediately on barge-in.
@@ -2027,6 +2832,1720 @@ class CallSession:
         # If we detect JSON base64 audio inbound, we mirror it outbound.
         self._vonage_audio_mode: str = "bytes"  # "bytes" | "json"
         self._vonage_audio_mode_logged: bool = False
+
+        # AI brain provider (OpenAI vs DeepSeek) - effective provider is computed per-turn.
+        self.brain_provider: str = str(CONFIG.get("AI_BRAIN_PROVIDER", "openai") or "openai").strip().lower()
+        # Lock the brain provider for the lifetime of the call so a mid-call setting change
+        # does not cause inconsistent behavior.
+        self._brain_provider_selected: str = self.brain_provider
+        self._brain_provider_locked: Optional[str] = None
+        self._brain_provider_lock_reasons: List[str] = []
+        self._deepseek_task: Optional[asyncio.Task] = None
+        self._groq_task: Optional[asyncio.Task] = None
+        self._grok_task: Optional[asyncio.Task] = None
+        self._openrouter_task: Optional[asyncio.Task] = None
+
+        # Cache of the current system instructions/context used for the call.
+        # (OpenAI receives these via session.update + injected system items; DeepSeek needs an explicit prompt.)
+        self._brain_instructions_text: str = ""
+        self._brain_global_instructions_text: str = ""
+        self._brain_business_context_text: str = ""
+
+        # Brain usage tracking ("how much" each brain was used). We measure by assistant turns,
+        # plus a simple char-count as a secondary metric.
+        self._brain_openai_turns: int = 0
+        self._brain_deepseek_turns: int = 0
+        self._brain_groq_turns: int = 0
+        self._brain_grok_turns: int = 0
+        self._brain_openrouter_turns: int = 0
+        self._brain_openai_chars: int = 0
+        self._brain_deepseek_chars: int = 0
+        self._brain_groq_chars: int = 0
+        self._brain_grok_chars: int = 0
+        self._brain_openrouter_chars: int = 0
+
+        # Diagnostics: when a non-OpenAI brain is selected, we may still fall back to OpenAI
+        # on a per-turn basis (timeouts/empty responses/errors). Track why, so we can explain
+        # "why OpenRouter was 0" after a call.
+        self._openai_fallback_turns: int = 0
+        self._openai_fallback_reasons: List[str] = []
+
+    def _brain_usage_snapshot(self) -> dict:
+        openai_turns = int(getattr(self, "_brain_openai_turns", 0) or 0)
+        deepseek_turns = int(getattr(self, "_brain_deepseek_turns", 0) or 0)
+        groq_turns = int(getattr(self, "_brain_groq_turns", 0) or 0)
+        grok_turns = int(getattr(self, "_brain_grok_turns", 0) or 0)
+        openrouter_turns = int(getattr(self, "_brain_openrouter_turns", 0) or 0)
+        total_turns = openai_turns + deepseek_turns + groq_turns + grok_turns + openrouter_turns
+        if total_turns <= 0:
+            openai_pct = 0
+            deepseek_pct = 0
+            groq_pct = 0
+            grok_pct = 0
+            openrouter_pct = 0
+        else:
+            openai_pct = int(round((openai_turns / total_turns) * 100))
+            deepseek_pct = int(round((deepseek_turns / total_turns) * 100))
+            groq_pct = int(round((groq_turns / total_turns) * 100))
+            grok_pct = int(round((grok_turns / total_turns) * 100))
+            openrouter_pct = int(round((openrouter_turns / total_turns) * 100))
+            # Normalize rounding drift.
+            drift = 100 - (openai_pct + deepseek_pct + groq_pct + grok_pct + openrouter_pct)
+            if drift != 0:
+                # Give drift to the largest bucket (or OpenAI by default).
+                buckets = [
+                    ("openai", openai_turns),
+                    ("deepseek", deepseek_turns),
+                    ("groq", groq_turns),
+                    ("grok", grok_turns),
+                    ("openrouter", openrouter_turns),
+                ]
+                buckets.sort(key=lambda x: x[1], reverse=True)
+                winner = buckets[0][0] if buckets else "openai"
+                if winner == "deepseek":
+                    deepseek_pct += drift
+                elif winner == "groq":
+                    groq_pct += drift
+                elif winner == "grok":
+                    grok_pct += drift
+                elif winner == "openrouter":
+                    openrouter_pct += drift
+                else:
+                    openai_pct += drift
+
+        return {
+            "call_uuid": self.call_uuid,
+            "openai_turns": openai_turns,
+            "deepseek_turns": deepseek_turns,
+            "groq_turns": groq_turns,
+            "grok_turns": grok_turns,
+            "openrouter_turns": openrouter_turns,
+            "openai_chars": int(getattr(self, "_brain_openai_chars", 0) or 0),
+            "deepseek_chars": int(getattr(self, "_brain_deepseek_chars", 0) or 0),
+            "groq_chars": int(getattr(self, "_brain_groq_chars", 0) or 0),
+            "grok_chars": int(getattr(self, "_brain_grok_chars", 0) or 0),
+            "openrouter_chars": int(getattr(self, "_brain_openrouter_chars", 0) or 0),
+            "openai_percent": openai_pct,
+            "deepseek_percent": deepseek_pct,
+            "groq_percent": groq_pct,
+            "grok_percent": grok_pct,
+            "openrouter_percent": openrouter_pct,
+        }
+
+    def _brain_usage_db_upsert(self) -> None:
+        """Persist current brain usage snapshot to SQLite for post-call display."""
+        try:
+            snap = self._brain_usage_snapshot()
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS call_brain_usage (
+                    call_uuid TEXT PRIMARY KEY,
+                    openai_turns INTEGER DEFAULT 0,
+                    deepseek_turns INTEGER DEFAULT 0,
+                    groq_turns INTEGER DEFAULT 0,
+                    grok_turns INTEGER DEFAULT 0,
+                    openrouter_turns INTEGER DEFAULT 0,
+                    openai_chars INTEGER DEFAULT 0,
+                    deepseek_chars INTEGER DEFAULT 0,
+                    groq_chars INTEGER DEFAULT 0,
+                    grok_chars INTEGER DEFAULT 0,
+                    openrouter_chars INTEGER DEFAULT 0,
+                    updated_at TEXT
+                )
+                """
+            )
+
+            # Backward-compatible migration if table existed before groq columns.
+            _ensure_column(cur, "call_brain_usage", "groq_turns", "INTEGER DEFAULT 0")
+            _ensure_column(cur, "call_brain_usage", "groq_chars", "INTEGER DEFAULT 0")
+            _ensure_column(cur, "call_brain_usage", "grok_turns", "INTEGER DEFAULT 0")
+            _ensure_column(cur, "call_brain_usage", "grok_chars", "INTEGER DEFAULT 0")
+            _ensure_column(cur, "call_brain_usage", "openrouter_turns", "INTEGER DEFAULT 0")
+            _ensure_column(cur, "call_brain_usage", "openrouter_chars", "INTEGER DEFAULT 0")
+            cur.execute(
+                """
+                INSERT INTO call_brain_usage (
+                    call_uuid, openai_turns, deepseek_turns, groq_turns, grok_turns, openrouter_turns, openai_chars, deepseek_chars, groq_chars, grok_chars, openrouter_chars, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(call_uuid) DO UPDATE SET
+                    openai_turns=excluded.openai_turns,
+                    deepseek_turns=excluded.deepseek_turns,
+                    groq_turns=excluded.groq_turns,
+                    grok_turns=excluded.grok_turns,
+                    openrouter_turns=excluded.openrouter_turns,
+                    openai_chars=excluded.openai_chars,
+                    deepseek_chars=excluded.deepseek_chars,
+                    groq_chars=excluded.groq_chars,
+                    grok_chars=excluded.grok_chars,
+                    openrouter_chars=excluded.openrouter_chars,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    snap["call_uuid"],
+                    snap["openai_turns"],
+                    snap["deepseek_turns"],
+                    snap["groq_turns"],
+                    snap["grok_turns"],
+                    snap["openrouter_turns"],
+                    snap["openai_chars"],
+                    snap["deepseek_chars"],
+                    snap["groq_chars"],
+                    snap["grok_chars"],
+                    snap["openrouter_chars"],
+                ),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            # Non-critical; never break calls due to metrics.
+            pass
+
+    def _record_brain_turn(self, provider: str, assistant_text: str) -> None:
+        """Record a completed assistant turn for the specified provider."""
+        p = str(provider or "").strip().lower()
+        text_len = len(str(assistant_text or ""))
+        if p == "deepseek":
+            self._brain_deepseek_turns += 1
+            self._brain_deepseek_chars += text_len
+        elif p == "groq":
+            self._brain_groq_turns += 1
+            self._brain_groq_chars += text_len
+        elif p == "grok":
+            self._brain_grok_turns += 1
+            self._brain_grok_chars += text_len
+        elif p == "openrouter":
+            self._brain_openrouter_turns += 1
+            self._brain_openrouter_chars += text_len
+        else:
+            self._brain_openai_turns += 1
+            self._brain_openai_chars += text_len
+
+        # Persist best-effort for Super Admin display.
+        self._brain_usage_db_upsert()
+
+    def lock_brain_provider_for_call(self) -> None:
+        """Freeze the configured brain provider for this call.
+
+        Goal: if the super-admin selected OpenRouter (etc), that is what we use for the call.
+        We avoid silent mid-call switching by:
+        - resolving the selection once per call
+        - disabling incompatible bundles (calendar tool-calling) rather than changing brains
+        - ensuring a valid TTS path exists for non-OpenAI brains
+        """
+        if getattr(self, "_brain_provider_locked", None):
+            return
+
+        selected = str(CONFIG.get("AI_BRAIN_PROVIDER", self.brain_provider) or "openai").strip().lower()
+        if selected not in ["openai", "deepseek", "groq", "grok", "openrouter"]:
+            selected = "openai"
+
+        effective = selected
+        reasons: List[str] = []
+
+        # If OpenRouter is selected, we want the same low-latency conversational behavior
+        # as the OpenAI realtime pipeline, but with OpenRouter producing the assistant text.
+        # Force realtime mode so we keep OpenAI Realtime for VAD + transcription (ASR), while
+        # disabling OpenAI auto-response and triggering OpenRouter manually.
+        call_mode = str(getattr(self, "call_mode", "") or "").strip().lower()
+        if effective == "openrouter" and call_mode != "realtime":
+            try:
+                self.call_mode = "realtime"
+            except Exception:
+                pass
+            call_mode = "realtime"
+            reasons.append("forced_realtime_for_openai_asr")
+
+        # Realtime mode uses an OpenAI Realtime WebSocket for VAD + transcription.
+        # We can still run a non-OpenAI "brain" for responses by disabling OpenAI
+        # auto-response (turn_detection.create_response=False) and triggering the
+        # selected brain manually.
+        if call_mode == "realtime" and effective != "openai":
+            reasons.append("realtime_mode_uses_openai_asr_only")
+
+        # Non-OpenAI brains require a separate TTS path (OpenAI realtime audio won't apply).
+        if effective in ["deepseek", "groq", "grok", "openrouter"]:
+            # If calendar booking is enabled, tool calling relies on the OpenAI realtime brain.
+            # Prefer honoring the selected brain and disabling booking for this call.
+            if bool(getattr(self, "calendar_booking_enabled", True)):
+                try:
+                    self.calendar_booking_enabled = False
+                except Exception:
+                    pass
+                reasons.append("disabled_calendar_booking_for_non_openai_brain")
+
+            voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
+
+            # For non-OpenAI brains, ensure we have a TTS provider we can use.
+            # If the account is set to OpenAI audio, switch to Speechmatics (if configured)
+            # so the call still speaks naturally.
+            has_speechmatics = bool(str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip())
+            if voice_provider == "openai":
+                if has_speechmatics:
+                    try:
+                        self.voice_provider = "speechmatics"
+                        if not getattr(self, "speechmatics_voice_id", None):
+                            self.speechmatics_voice_id = "sarah"
+                    except Exception:
+                        pass
+                    reasons.append("forced_speechmatics_tts_for_non_openai_brain")
+                else:
+                    # Without a non-OpenAI TTS path, we would produce text-only (dead air).
+                    # Fall back explicitly to OpenAI so the caller still hears a response.
+                    reasons.append("no_tts_path_for_non_openai_brain")
+                    effective = "openai"
+
+            # Validate the selected provider has a configured API key.
+            if effective == "deepseek":
+                has_deepseek = bool(
+                    str(CONFIG.get("DEEPSEEK_API_KEY", "") or "").strip()
+                    or str(CONFIG.get("DEEPSEEK_API_KEY_FALLBACK", "") or "").strip()
+                )
+                if not has_deepseek:
+                    reasons.append("missing_deepseek_key")
+                    effective = "openai"
+            elif effective == "groq":
+                if not str(CONFIG.get("GROQ_API_KEY", "") or "").strip():
+                    reasons.append("missing_groq_key")
+                    effective = "openai"
+            elif effective == "grok":
+                if not str(CONFIG.get("GROK_API_KEY", "") or "").strip():
+                    reasons.append("missing_grok_key")
+                    effective = "openai"
+            elif effective == "openrouter":
+                if not str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip():
+                    reasons.append("missing_openrouter_key")
+                    effective = "openai"
+
+        self._brain_provider_selected = selected
+        self._brain_provider_locked = effective
+        self._brain_provider_lock_reasons = reasons
+
+        if reasons:
+            logger.warning(
+                f"[{self.call_uuid}] 🧠 Brain locked selected={selected} effective={effective} reasons={','.join(reasons)}"
+            )
+        else:
+            logger.info(f"[{self.call_uuid}] 🧠 Brain locked provider={effective}")
+
+    async def _speak_text_via_voice_provider(self, text: str) -> None:
+        """Send assistant text to the configured TTS provider.
+
+        For non-OpenAI brains, we must generate audio ourselves (Speechmatics/Cartesia/ElevenLabs/Google/PlayHT).
+        """
+        cleaned = (text or "").strip()
+        if not cleaned or not self.is_active:
+            return
+
+        voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
+
+        # Prefer Speechmatics streaming when selected.
+        if voice_provider == "speechmatics" and str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+            await self._enqueue_speechmatics_tts(cleaned)
+            return
+
+        # Non-streaming / external TTS options.
+        # Increment generation so a new utterance invalidates older in-flight TTS streams.
+        try:
+            self._tts_output_generation = int(getattr(self, "_tts_output_generation", 0) or 0) + 1
+        except Exception:
+            self._tts_output_generation = 1
+
+        if voice_provider == "cartesia" and cartesia_client:
+            await self._send_cartesia_audio(cleaned)
+            return
+        if voice_provider == "elevenlabs" and eleven_client:
+            await self._send_elevenlabs_audio(cleaned)
+            return
+        if voice_provider == "google" and google_tts_client:
+            await self._send_google_tts_audio(cleaned)
+            return
+        if voice_provider == "playht" and (playht_api_key and playht_user_id):
+            await self._send_playht_audio(cleaned)
+            return
+
+        # Last-resort: if Speechmatics is configured, use it even if not selected.
+        if str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+            await self._enqueue_speechmatics_tts(cleaned)
+            return
+
+        logger.error(f"[{self.call_uuid}] No usable TTS provider configured for voice_provider={voice_provider}; audio skipped")
+
+    def _effective_brain_provider(self) -> str:
+        """Return the locked brain provider for this call."""
+        if getattr(self, "_brain_provider_locked", None):
+            return str(self._brain_provider_locked or "openai")
+        # If not locked yet, lock now (best-effort).
+        try:
+            self.lock_brain_provider_for_call()
+        except Exception:
+            return "openai"
+        return str(getattr(self, "_brain_provider_locked", None) or "openai")
+
+    def _cancel_pending_deepseek(self) -> None:
+        task = getattr(self, "_deepseek_task", None)
+        if task is not None and not task.done():
+            try:
+                task.cancel()
+            except Exception:
+                pass
+
+    def _cancel_pending_groq(self) -> None:
+        task = getattr(self, "_groq_task", None)
+        if task is not None and not task.done():
+            try:
+                task.cancel()
+            except Exception:
+                pass
+
+    def _cancel_pending_grok(self) -> None:
+        task = getattr(self, "_grok_task", None)
+        if task is not None and not task.done():
+            try:
+                task.cancel()
+            except Exception:
+                pass
+
+    def _cancel_pending_openrouter(self) -> None:
+        task = getattr(self, "_openrouter_task", None)
+        if task is not None and not task.done():
+            try:
+                task.cancel()
+            except Exception:
+                pass
+
+    def _messages_from_transcript_parts(self, max_parts: Optional[int] = None) -> list:
+        messages = []
+        agent_name = str(CONFIG.get("AGENT_NAME", "Agent") or "Agent")
+        try:
+            limit = int(max_parts) if max_parts is not None else int(CONFIG.get("DEEPSEEK_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            limit = 6
+
+        for part in (self.transcript_parts or [])[-max(0, limit):]:
+            if not part:
+                continue
+            text = str(part).strip()
+            if text.lower().startswith("caller:"):
+                messages.append({"role": "user", "content": text.split(":", 1)[1].strip()})
+                continue
+            if text.startswith(f"{agent_name}:"):
+                messages.append({"role": "assistant", "content": text.split(":", 1)[1].strip()})
+                continue
+            messages.append({"role": "user", "content": text})
+        return messages
+
+    def _truncate_tail(self, text: str, max_chars: int) -> str:
+        s = (text or "").strip()
+        if max_chars <= 0:
+            return ""
+        if len(s) <= max_chars:
+            return s
+        return s[-max_chars:]
+
+    def _cap_messages_total_chars(self, messages: list, total_max_chars: int) -> list:
+        """Drop oldest non-system messages until under the cap."""
+        if total_max_chars <= 0:
+            return messages
+        try:
+            def _msg_len(m: dict) -> int:
+                return len(str(m.get("content", "") or ""))
+            total = sum(_msg_len(m) for m in messages)
+            if total <= total_max_chars:
+                return messages
+
+            # Keep the first system message (if present) and drop from the start after it.
+            keep_system = []
+            rest = messages
+            if messages and str(messages[0].get("role")) == "system":
+                keep_system = [messages[0]]
+                rest = messages[1:]
+
+            while rest and (sum(_msg_len(m) for m in (keep_system + rest)) > total_max_chars):
+                rest = rest[1:]
+            return keep_system + rest
+        except Exception:
+            return messages
+
+    async def _deepseek_generate_text(self, user_text: str, extra_system_instruction: Optional[str] = None) -> str:
+        """Generate a single-turn response using DeepSeek (OpenAI-compatible API)."""
+        api_key = (str(CONFIG.get("DEEPSEEK_API_KEY", "") or "").strip() or str(CONFIG.get("DEEPSEEK_API_KEY_FALLBACK", "") or "").strip())
+        client = _get_deepseek_async_client(api_key)
+
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        # Trim system prompt to reduce latency (business context can get very large).
+        try:
+            system_max = int(CONFIG.get("DEEPSEEK_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        # Build a small recent history for speed.
+        history = self._messages_from_transcript_parts()
+        try:
+            msg_max = int(CONFIG.get("DEEPSEEK_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        # Avoid duplicating the current user utterance if transcript already includes it.
+        if final_user:
+            if not (messages and str(messages[-1].get("role")) == "user" and str(messages[-1].get("content", "")).strip() == final_user):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        # Cap total prompt size (drop oldest) to keep generation snappy.
+        try:
+            total_cap = int(CONFIG.get("DEEPSEEK_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        # Configurable response length.
+        try:
+            max_tokens = int(CONFIG.get("DEEPSEEK_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        t0 = time.time()
+        timeout_seconds = float(CONFIG.get("DEEPSEEK_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+
+        try:
+            resp = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=max_tokens,
+                ),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] DeepSeek timed out after {timeout_seconds:.1f}s")
+            return ""
+        finally:
+            dt = time.time() - t0
+            # Lightweight perf log (no content leak).
+            logger.info(f"[{self.call_uuid}] DeepSeek latency={dt:.2f}s msgs={len(messages)} max_tokens={max_tokens}")
+        try:
+            content = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            content = ""
+        return content
+
+    async def _run_deepseek_turn(self, user_text: str, extra_system_instruction: Optional[str] = None) -> None:
+        """Run DeepSeek generation and speak the result via Speechmatics."""
+        try:
+            if not self.is_active:
+                return
+
+            # Mark that text generation has started (helps filler logic decide whether to wait slightly).
+            if not getattr(self, "_assistant_text_started_for_turn", False):
+                self._assistant_text_started_for_turn = True
+                try:
+                    self._assistant_text_started_event.set()
+                except Exception:
+                    pass
+
+            text = await self._deepseek_generate_text(user_text, extra_system_instruction=extra_system_instruction)
+            if not self.is_active:
+                return
+
+            if not text:
+                # Fail-safe: don't leave dead air.
+                logger.warning(f"[{self.call_uuid}] DeepSeek returned empty/timeout; falling back to OpenAI for this turn")
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="deepseek_empty")
+                return
+
+            logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']} (DeepSeek): {text}")
+            self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {text}")
+
+            # 🔥 AI-INITIATED TRANSFER: Check if the agent is saying it will transfer
+            transfer_number = getattr(self, 'transfer_number', '')
+            if transfer_number and text:
+                ai_transfer_phrases = [
+                    "i'll transfer you now", "i will transfer you now", "i'm transferring you",
+                    "transferring you now", "i'll put you through now", "putting you through now",
+                    "connecting you now", "i'll transfer you right", "i will transfer you right",
+                    "let me transfer you now", "i'm putting you through", "i'll connect you now"
+                ]
+                text_lower = text.lower()
+                if any(phrase in text_lower for phrase in ai_transfer_phrases):
+                    logger.info(f"[{self.call_uuid}] 🔥 AI INITIATED TRANSFER detected in brain response: '{text}'")
+                    logger.info(f"[{self.call_uuid}] 🔥 Executing transfer to {transfer_number}")
+                    
+                    # Stop any ongoing TTS
+                    self._barge_in_stop_speechmatics()
+                    self._speechmatics_pending_text = ""
+                    
+                    # Execute transfer
+                    asyncio.create_task(self._execute_auto_transfer(transfer_number, f"AI initiated: {text}"))
+                    return  # Don't continue speaking, we're transferring
+
+            self._record_brain_turn("deepseek", text)
+
+            await self._speak_text_via_voice_provider(text)
+
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] DeepSeek brain error: {e}")
+            try:
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="deepseek_error")
+            except Exception:
+                pass
+
+    async def _groq_generate_text(self, user_text: str, extra_system_instruction: Optional[str] = None) -> str:
+        """Generate a single-turn response using Groq (OpenAI-compatible API)."""
+        api_key = str(CONFIG.get("GROQ_API_KEY", "") or "").strip()
+        client = _get_groq_async_client(api_key)
+
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("GROQ_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("GROQ_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("GROQ_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (messages and str(messages[-1].get("role")) == "user" and str(messages[-1].get("content", "")).strip() == final_user):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("GROQ_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        try:
+            max_tokens = int(CONFIG.get("GROQ_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        model = str(CONFIG.get("GROQ_MODEL", "llama-3.1-8b-instant") or "llama-3.1-8b-instant").strip()
+
+        t0 = time.time()
+        timeout_seconds = float(CONFIG.get("GROQ_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        try:
+            resp = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=max_tokens,
+                ),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] Groq timed out after {timeout_seconds:.1f}s")
+            return ""
+        finally:
+            dt = time.time() - t0
+            logger.info(f"[{self.call_uuid}] Groq latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
+
+        try:
+            content = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            content = ""
+        return content
+
+    async def _run_groq_turn(self, user_text: str, extra_system_instruction: Optional[str] = None) -> None:
+        """Run Groq generation and speak the result via Speechmatics."""
+        try:
+            if not self.is_active:
+                return
+
+            if not getattr(self, "_assistant_text_started_for_turn", False):
+                self._assistant_text_started_for_turn = True
+                try:
+                    self._assistant_text_started_event.set()
+                except Exception:
+                    pass
+
+            text = await self._groq_generate_text(user_text, extra_system_instruction=extra_system_instruction)
+            if not self.is_active:
+                return
+
+            if not text:
+                logger.warning(f"[{self.call_uuid}] Groq returned empty/timeout; falling back to OpenAI for this turn")
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="groq_empty")
+                return
+
+            logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']} (Groq): {text}")
+            self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {text}")
+
+            # 🔥 AI-INITIATED TRANSFER: Check if the agent is saying it will transfer
+            transfer_number = getattr(self, 'transfer_number', '')
+            if transfer_number and text:
+                ai_transfer_phrases = [
+                    "i'll transfer you now", "i will transfer you now", "i'm transferring you",
+                    "transferring you now", "i'll put you through now", "putting you through now",
+                    "connecting you now", "i'll transfer you right", "i will transfer you right",
+                    "let me transfer you now", "i'm putting you through", "i'll connect you now"
+                ]
+                text_lower = text.lower()
+                if any(phrase in text_lower for phrase in ai_transfer_phrases):
+                    logger.info(f"[{self.call_uuid}] 🔥 AI INITIATED TRANSFER detected in brain response: '{text}'")
+                    logger.info(f"[{self.call_uuid}] 🔥 Executing transfer to {transfer_number}")
+                    
+                    # Stop any ongoing TTS
+                    self._barge_in_stop_speechmatics()
+                    self._speechmatics_pending_text = ""
+                    
+                    # Execute transfer
+                    asyncio.create_task(self._execute_auto_transfer(transfer_number, f"AI initiated: {text}"))
+                    return  # Don't continue speaking, we're transferring
+
+            self._record_brain_turn("groq", text)
+
+            await self._speak_text_via_voice_provider(text)
+
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Groq brain error: {e}")
+            try:
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="groq_error")
+            except Exception:
+                pass
+
+    async def _grok_generate_text(self, user_text: str, extra_system_instruction: Optional[str] = None) -> str:
+        """Generate a single-turn response using xAI Grok (OpenAI-compatible API)."""
+        api_key = str(CONFIG.get("GROK_API_KEY", "") or "").strip()
+        client = _get_grok_async_client(api_key)
+
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("GROK_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("GROK_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("GROK_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (messages and str(messages[-1].get("role")) == "user" and str(messages[-1].get("content", "")).strip() == final_user):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("GROK_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        try:
+            max_tokens = int(CONFIG.get("GROK_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        model = str(CONFIG.get("GROK_MODEL", "grok-4-latest") or "grok-4-latest").strip()
+
+        t0 = time.time()
+        timeout_seconds = float(CONFIG.get("GROK_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        try:
+            resp = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=max_tokens,
+                ),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] Grok timed out after {timeout_seconds:.1f}s")
+            return ""
+        finally:
+            dt = time.time() - t0
+            logger.info(f"[{self.call_uuid}] Grok latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
+
+        try:
+            content = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            content = ""
+        return content
+
+    async def _run_grok_turn(self, user_text: str, extra_system_instruction: Optional[str] = None) -> None:
+        """Run Grok generation and speak the result via Speechmatics."""
+        try:
+            if not self.is_active:
+                return
+
+            if not getattr(self, "_assistant_text_started_for_turn", False):
+                self._assistant_text_started_for_turn = True
+                try:
+                    self._assistant_text_started_event.set()
+                except Exception:
+                    pass
+
+            text = await self._grok_generate_text(user_text, extra_system_instruction=extra_system_instruction)
+            if not self.is_active:
+                return
+
+            if not text:
+                logger.warning(f"[{self.call_uuid}] Grok returned empty/timeout; falling back to OpenAI for this turn")
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="grok_empty")
+                return
+
+            logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']} (Grok): {text}")
+            self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {text}")
+
+            # 🔥 AI-INITIATED TRANSFER: Check if the agent is saying it will transfer
+            transfer_number = getattr(self, 'transfer_number', '')
+            if transfer_number and text:
+                ai_transfer_phrases = [
+                    "i'll transfer you now", "i will transfer you now", "i'm transferring you",
+                    "transferring you now", "i'll put you through now", "putting you through now",
+                    "connecting you now", "i'll transfer you right", "i will transfer you right",
+                    "let me transfer you now", "i'm putting you through", "i'll connect you now"
+                ]
+                text_lower = text.lower()
+                if any(phrase in text_lower for phrase in ai_transfer_phrases):
+                    logger.info(f"[{self.call_uuid}] 🔥 AI INITIATED TRANSFER detected in brain response: '{text}'")
+                    logger.info(f"[{self.call_uuid}] 🔥 Executing transfer to {transfer_number}")
+                    
+                    # Stop any ongoing TTS
+                    self._barge_in_stop_speechmatics()
+                    self._speechmatics_pending_text = ""
+                    
+                    # Execute transfer
+                    asyncio.create_task(self._execute_auto_transfer(transfer_number, f"AI initiated: {text}"))
+                    return  # Don't continue speaking, we're transferring
+
+            self._record_brain_turn("grok", text)
+
+            await self._speak_text_via_voice_provider(text)
+
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Grok brain error: {e}")
+            try:
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="grok_error")
+            except Exception:
+                pass
+
+    async def _openrouter_generate_text(self, user_text: str, extra_system_instruction: Optional[str] = None) -> str:
+        """Generate a single-turn response using OpenRouter (OpenAI-compatible API)."""
+        api_key = str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip()
+        client = _get_openrouter_async_client(api_key)
+
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (messages and str(messages[-1].get("role")) == "user" and str(messages[-1].get("content", "")).strip() == final_user):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        try:
+            max_tokens = int(CONFIG.get("OPENROUTER_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+
+        # Define transfer function if transfer is configured and custom rules exist
+        tools = None
+        transfer_number = getattr(self, 'transfer_number', '')
+        has_custom_transfer_rules = self._has_custom_transfer_rules()
+        
+        if transfer_number and has_custom_transfer_rules:
+            tools = [{
+                "type": "function",
+                "function": {
+                    "name": "transfer_call",
+                    "description": "Transfer the call to the business owner or designated person when transfer conditions are met according to the transfer instructions",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "reason": {
+                                "type": "string",
+                                "description": "Brief reason for the transfer (e.g., 'Caller Mr Roberts requesting Eric Jones')"
+                            }
+                        },
+                        "required": ["reason"]
+                    }
+                }
+            }]
+
+        t0 = time.time()
+        timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        try:
+            call_params = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": max_tokens,
+            }
+            if tools:
+                call_params["tools"] = tools
+                call_params["tool_choice"] = "auto"
+            
+            resp = await asyncio.wait_for(
+                client.chat.completions.create(**call_params),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] OpenRouter timed out after {timeout_seconds:.1f}s")
+            return ""
+        finally:
+            dt = time.time() - t0
+            logger.info(f"[{self.call_uuid}] OpenRouter latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
+
+        # Check if AI wants to call the transfer function
+        try:
+            message = resp.choices[0].message
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                for tool_call in message.tool_calls:
+                    if tool_call.function.name == "transfer_call":
+                        import json
+                        try:
+                            args = json.loads(tool_call.function.arguments)
+                            reason = args.get("reason", "AI initiated transfer")
+                        except Exception:
+                            reason = "AI initiated transfer"
+                        
+                        logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION CALLED by AI: {reason}")
+                        logger.info(f"[{self.call_uuid}] 🔥 Transfer requested; asking caller for confirmation")
+
+                        # Ask the caller for explicit confirmation before transferring.
+                        # This avoids surprise transfers and reduces any last-second hallucinated phrasing.
+                        self._set_pending_transfer(transfer_number, reason)
+                        return "I can transfer you now. Would you like me to transfer you?"
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Error processing tool calls: {e}")
+
+        try:
+            content = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            content = ""
+        return content
+
+    async def _openrouter_stream_deltas(self, user_text: str, extra_system_instruction: Optional[str] = None):
+        """Yield text deltas from OpenRouter streaming chat completion.
+
+        This is used to start Speechmatics TTS earlier (sentence-by-sentence) instead
+        of waiting for the full completion.
+        """
+        api_key = str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip()
+        client = _get_openrouter_async_client(api_key)
+
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (
+                messages
+                and str(messages[-1].get("role")) == "user"
+                and str(messages[-1].get("content", "")).strip() == final_user
+            ):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        try:
+            max_tokens = int(CONFIG.get("OPENROUTER_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+        timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+
+        t0 = time.time()
+        stream = None
+        try:
+            # `create(stream=True)` returns quickly; the stream itself may run longer.
+            call_params = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": max_tokens,
+                "stream": True,
+            }
+
+            # If transfer is configured and custom transfer rules exist, enable tool calling
+            # even in streaming mode (so we can keep Speechmatics streaming for low latency).
+            try:
+                transfer_number = getattr(self, "transfer_number", "")
+            except Exception:
+                transfer_number = ""
+            try:
+                has_custom_transfer_rules = bool(self._has_custom_transfer_rules())
+            except Exception:
+                has_custom_transfer_rules = False
+
+            if transfer_number and has_custom_transfer_rules:
+                call_params["tools"] = [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_call",
+                            "description": "Request a call transfer when transfer conditions are met according to the transfer instructions",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "Brief reason for the transfer",
+                                    }
+                                },
+                                "required": ["reason"],
+                            },
+                        },
+                    }
+                ]
+                call_params["tool_choice"] = "auto"
+
+            stream = await asyncio.wait_for(
+                client.chat.completions.create(**call_params),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] OpenRouter stream start timed out after {timeout_seconds:.1f}s")
+            return
+        finally:
+            dt = time.time() - t0
+            logger.info(f"[{self.call_uuid}] OpenRouter stream start latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
+
+        # Stream deltas (and detect tool calls).
+        try:
+            tool_args_by_index = {}
+            async for chunk in stream:
+                if not self.is_active:
+                    break
+                if getattr(self, "_caller_speaking", False):
+                    break
+
+                # Tool calls may arrive in streaming mode.
+                try:
+                    delta_obj = chunk.choices[0].delta
+                    tool_calls = getattr(delta_obj, "tool_calls", None)
+                except Exception:
+                    tool_calls = None
+
+                if tool_calls:
+                    for tc in tool_calls:
+                        try:
+                            fn = getattr(tc, "function", None)
+                            name = getattr(fn, "name", "") if fn else ""
+                            idx = getattr(tc, "index", 0)
+                            args_part = getattr(fn, "arguments", "") if fn else ""
+                        except Exception:
+                            name = ""
+                            idx = 0
+                            args_part = ""
+
+                        if name == "transfer_call":
+                            prev = tool_args_by_index.get(idx, "")
+                            tool_args_by_index[idx] = prev + (args_part or "")
+
+                            reason = "AI requested transfer"
+                            try:
+                                import json
+                                if tool_args_by_index[idx]:
+                                    parsed = json.loads(tool_args_by_index[idx])
+                                    reason = str(parsed.get("reason") or reason)
+                            except Exception:
+                                pass
+
+                            try:
+                                transfer_number_local = getattr(self, "transfer_number", "")
+                            except Exception:
+                                transfer_number_local = ""
+
+                            if transfer_number_local:
+                                logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION CALLED (streaming) by AI: {reason}")
+                                self._set_pending_transfer(transfer_number_local, reason)
+                                return
+
+                try:
+                    delta = chunk.choices[0].delta.content
+                except Exception:
+                    delta = None
+                if delta:
+                    yield str(delta)
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] OpenRouter streaming error: {e}")
+            return
+
+    async def _run_openrouter_turn(self, user_text: str, extra_system_instruction: Optional[str] = None) -> None:
+        """Run OpenRouter generation and speak the result via Speechmatics."""
+        try:
+            if not self.is_active:
+                return
+
+            # Count a "turn" when OpenRouter actually begins responding. In realtime calls,
+            # barge-in / VAD can cancel streaming mid-response; if we only count on completion,
+            # Active Call can misleadingly show 0 OpenRouter turns even though OpenRouter spoke.
+            turn_counted = False
+
+            if not getattr(self, "_assistant_text_started_for_turn", False):
+                self._assistant_text_started_for_turn = True
+                try:
+                    self._assistant_text_started_event.set()
+                except Exception:
+                    pass
+
+            voice_provider = getattr(self, "voice_provider", "openai")
+            enqueued_any_speechmatics = False
+
+            transfer_number = getattr(self, "transfer_number", "")
+            has_custom_transfer_rules = False
+            try:
+                has_custom_transfer_rules = bool(self._has_custom_transfer_rules())
+            except Exception:
+                has_custom_transfer_rules = False
+
+            # OpenRouter tool calling is implemented in the non-streaming path.
+            # When custom transfer rules exist, force non-streaming so the model can
+            # actually call `transfer_call` instead of narrating it.
+            force_non_streaming_for_transfer_tools = False
+
+            # If we are in Speechmatics mode, stream deltas and enqueue sentence-by-sentence
+            # so the caller hears speech sooner.
+            if (
+                voice_provider == "speechmatics"
+                and CONFIG.get("SPEECHMATICS_API_KEY")
+                and not force_non_streaming_for_transfer_tools
+            ):
+                import re
+
+                full_text = ""
+                pending = ""
+                started_any_audio = False
+                min_sentence_chars = 20  # Balance: not too small (gaps) not too large (latency)
+                force_start_chars = 60  # Start speaking quickly
+                force_cut_chars = 50  # Cut at natural points
+
+                async for delta in self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction):
+                    if not self.is_active:
+                        return
+                    if not delta:
+                        continue
+
+                    if not turn_counted:
+                        turn_counted = True
+                        try:
+                            self._brain_openrouter_turns += 1
+                            self._brain_usage_db_upsert()
+                        except Exception:
+                            pass
+
+                    # Mark that text generation has started (helps filler logic decide whether to wait slightly).
+                    if not getattr(self, "_assistant_text_started_for_turn", False):
+                        self._assistant_text_started_for_turn = True
+                        try:
+                            self._assistant_text_started_event.set()
+                        except Exception:
+                            pass
+
+                    full_text += delta
+                    pending += delta
+
+                    # Extract complete sentences.
+                    while True:
+                        match = re.search(r"(.+?[.!?])(\s+|$)", pending)
+                        if not match:
+                            break
+                        sentence = match.group(1).strip()
+                        pending = pending[match.end():]
+                        if len(sentence) < min_sentence_chars:
+                            continue
+
+                        # Never speak internal tool/narration tokens.
+                        try:
+                            s_lower = sentence.lower()
+                            if "transfer_call" in s_lower or "uses transfer" in s_lower or "tool call" in s_lower:
+                                continue
+                        except Exception:
+                            pass
+                        started_any_audio = True
+                        enqueued_any_speechmatics = True
+                        await self._enqueue_speechmatics_tts(sentence)
+
+                    # Force-start if no punctuation appears for a while.
+                    if (not started_any_audio) and len(pending.strip()) >= force_start_chars:
+                        raw = pending
+                        raw2 = raw.lstrip()
+                        chunk = raw2[:force_cut_chars]
+                        # Prefer to cut on a natural boundary.
+                        cut_at = max(chunk.rfind(","), chunk.rfind(";"), chunk.rfind(" "))
+                        if cut_at >= 40:
+                            chunk = chunk[:cut_at].strip()
+                        if len(chunk) >= min_sentence_chars:
+
+                            # Never speak internal tool/narration tokens.
+                            try:
+                                c_lower = chunk.lower()
+                                if "transfer_call" in c_lower or "uses transfer" in c_lower or "tool call" in c_lower:
+                                    raw2 = raw2[len(chunk):]
+                                    pending = raw2
+                                    continue
+                            except Exception:
+                                pass
+                            started_any_audio = True
+                            enqueued_any_speechmatics = True
+                            await self._enqueue_speechmatics_tts(chunk)
+                            raw2 = raw2[len(chunk):]
+                            pending = raw2
+
+                text = full_text.strip()
+
+                # If a streaming tool-call requested transfer, switch to a confirmation prompt.
+                if getattr(self, "_pending_transfer_number", None):
+                    try:
+                        self._barge_in_stop_speechmatics()
+                        self._speechmatics_pending_text = ""
+                    except Exception:
+                        pass
+                    text = "I can transfer you now. Would you like me to transfer you?"
+                    enqueued_any_speechmatics = True
+                    await self._enqueue_speechmatics_tts(text)
+                # Flush remaining tail.
+                tail = pending.strip()
+                if tail and self.is_active and not getattr(self, "_caller_speaking", False):
+                    try:
+                        t_lower = tail.lower()
+                        if "transfer_call" not in t_lower and "uses transfer" not in t_lower and "tool call" not in t_lower:
+                            enqueued_any_speechmatics = True
+                            await self._enqueue_speechmatics_tts(tail)
+                    except Exception:
+                        enqueued_any_speechmatics = True
+                        await self._enqueue_speechmatics_tts(tail)
+
+            else:
+                text = await self._openrouter_generate_text(user_text, extra_system_instruction=extra_system_instruction)
+
+            if not self.is_active:
+                return
+
+            if not text:
+                logger.warning(f"[{self.call_uuid}] OpenRouter returned empty/timeout; falling back to OpenAI for this turn")
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="openrouter_empty")
+                return
+
+            logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']} (OpenRouter): {text}")
+            self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {text}")
+
+            # FALLBACK: Some models don't support function calling well and may include function name in text
+            # Detect if AI mentioned transfer_call() in the response text (DeepSeek does this)
+            # Also detect narrative descriptions like "*uses transfer_call()*" (Claude does this)
+            transfer_number = getattr(self, 'transfer_number', '')
+            if transfer_number and text:
+                # Check for various ways AI might mention the function
+                text_lower = text.lower()
+                if ('*transfer_call()' in text_lower or 
+                    'transfer_call()' in text_lower or
+                    '*uses transfer_call()' in text_lower or
+                    'uses transfer_call()' in text_lower):
+                    logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION mentioned in text (model doesn't support tool calling): '{text}'")
+                    logger.info(f"[{self.call_uuid}] 🔥 Transfer requested; asking caller for confirmation")
+                    
+                    # Remove the function mention from the text before speaking
+                    import re
+                    clean_text = re.sub(r'\*[^*]*transfer_call\(\)[^*]*\*', '', text, flags=re.IGNORECASE)
+                    clean_text = re.sub(r'transfer_call\(\)', '', clean_text, flags=re.IGNORECASE)
+                    clean_text = re.sub(r'\*quietly processes.*?\*', '', clean_text, flags=re.IGNORECASE)
+                    clean_text = re.sub(r'\*uses.*?\*', '', clean_text, flags=re.IGNORECASE)
+                    clean_text = ' '.join(clean_text.split())  # Normalize whitespace
+                    clean_text = clean_text.strip()
+
+                    # Ask for confirmation instead of transferring immediately.
+                    self._set_pending_transfer(transfer_number, "AI requested transfer")
+                    confirm_text = "I can transfer you now. Would you like me to transfer you?"
+
+                    # If we already started streaming Speechmatics audio for this turn, stop it and
+                    # speak the confirmation prompt immediately (otherwise the caller may never hear it).
+                    try:
+                        if voice_provider == "speechmatics" and CONFIG.get("SPEECHMATICS_API_KEY"):
+                            self._barge_in_stop_speechmatics()
+                            self._speechmatics_pending_text = ""
+                            enqueued_any_speechmatics = True
+                            await self._enqueue_speechmatics_tts(confirm_text)
+                    except Exception:
+                        pass
+
+                    # Update transcript with what we will actually say (not the narrated tool usage).
+                    if self.transcript_parts and self.transcript_parts[-1].startswith(f"{CONFIG['AGENT_NAME']}: "):
+                        self.transcript_parts[-1] = f"{CONFIG['AGENT_NAME']}: {confirm_text}"
+                    text = confirm_text
+
+            if turn_counted:
+                # We already counted the turn at the start of streaming; only add chars now.
+                try:
+                    self._brain_openrouter_chars += len(str(text or ""))
+                    self._brain_usage_db_upsert()
+                except Exception:
+                    pass
+            else:
+                self._record_brain_turn("openrouter", text)
+
+            # If not using Speechmatics streaming mode above, speak via the configured TTS provider.
+            if voice_provider == "speechmatics" and CONFIG.get("SPEECHMATICS_API_KEY"):
+                # In streaming mode we've already enqueued segments; avoid duplicating.
+                # Only enqueue here if we didn't enqueue anything (e.g., streaming disabled or failed).
+                if not enqueued_any_speechmatics:
+                    await self._enqueue_speechmatics_tts(text)
+            else:
+                await self._speak_text_via_voice_provider(text)
+
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            # Include a compact error summary in the fallback reason so Super Admin diagnostics
+            # can show *why* OpenRouter wasn't used (401/429/model_not_found/etc).
+            try:
+                detail = self._safe_exception_summary(e)
+            except Exception:
+                detail = ""
+            logger.error(f"[{self.call_uuid}] OpenRouter brain error: {detail or e}")
+            try:
+                reason = "openrouter_error"
+                if detail:
+                    reason = f"openrouter_error::{detail}"
+                await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason=reason)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _safe_exception_summary(exc: Exception, max_len: int = 180) -> str:
+        """Return a short, non-sensitive summary for logs/diagnostics."""
+        try:
+            name = exc.__class__.__name__
+        except Exception:
+            name = "Exception"
+
+        status = ""
+        try:
+            sc = getattr(exc, "status_code", None)
+            if sc is not None:
+                status = f" {int(sc)}"
+        except Exception:
+            status = ""
+
+        msg = ""
+        try:
+            msg = str(exc)
+        except Exception:
+            msg = ""
+        msg = (msg or "").strip().replace("\r", " ").replace("\n", " ")
+        # Avoid accidentally echoing bearer tokens (best-effort).
+        if "bearer" in msg.lower():
+            msg = "<redacted>"
+
+        summary = f"{name}{status}: {msg}" if msg else f"{name}{status}"
+        if max_len > 0 and len(summary) > max_len:
+            summary = summary[: max(0, max_len - 3)] + "..."
+        return summary
+
+    async def _fallback_to_openai_for_turn(self, user_text: str, extra_system_instruction: Optional[str] = None, reason: str = "") -> None:
+        """Best-effort fallback to OpenAI for a turn.
+
+        Important: when using Speechmatics STT, OpenAI may not have received the user's
+        text. Inject it as a conversation item before triggering `response.create`.
+        """
+        if not getattr(self, "openai_ws", None):
+            return
+
+        cleaned = (user_text or "").strip()
+        if not cleaned:
+            return
+
+        # Track why we fell back (best-effort; bounded to avoid unbounded growth).
+        try:
+            self._openai_fallback_turns = int(getattr(self, "_openai_fallback_turns", 0) or 0) + 1
+            rs = list(getattr(self, "_openai_fallback_reasons", []) or [])
+            r = str(reason or "").strip()
+            if r:
+                if (not rs) or (rs[-1] != r):
+                    rs.append(r)
+                # Keep last 10 reasons.
+                if len(rs) > 10:
+                    rs = rs[-10:]
+            self._openai_fallback_reasons = rs
+        except Exception:
+            pass
+
+        try:
+            await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+        except Exception:
+            pass
+
+        # Optional per-turn extra system instruction (used in a few flows like transfer declined).
+        if extra_system_instruction:
+            try:
+                await self.openai_ws.send(json.dumps({
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "system",
+                        "content": [{"type": "input_text", "text": str(extra_system_instruction).strip()}],
+                    },
+                }))
+            except Exception:
+                pass
+
+        try:
+            await self.openai_ws.send(json.dumps({
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": cleaned}],
+                },
+            }))
+        except Exception:
+            # If we can't inject, still try to trigger a response.
+            pass
+
+        try:
+            await self.openai_ws.send(json.dumps({"type": "response.create"}))
+            # Ensure metrics reflect that this turn is now being handled by OpenAI.
+            try:
+                self._brain_provider_for_turn = "openai"
+            except Exception:
+                pass
+            logger.info(f"[{self.call_uuid}] ✅ OpenAI fallback triggered ({reason or 'fallback'})")
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] OpenAI fallback failed: {e}")
+
+    async def _trigger_brain_response(self, reason: str, extra_system_instruction: Optional[str] = None) -> bool:
+        """Trigger a model response for the current turn.
+
+        Returns True if a response was triggered.
+        """
+        if getattr(self, "_response_triggered_for_turn", False):
+            return False
+
+        provider = self._effective_brain_provider()
+        if provider == "deepseek":
+            # Best-effort cancel any in-flight OpenAI output.
+            try:
+                if self.openai_ws:
+                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+
+            user_text = (getattr(self, "_last_caller_transcript", "") or "").strip()
+            if not user_text:
+                return False
+
+            # Cancel any previous deepseek task and start a new one.
+            self._cancel_pending_deepseek()
+
+            self._response_triggered_for_turn = True
+            self._brain_provider_for_turn = "deepseek"
+            self._last_speech_time = asyncio.get_event_loop().time()
+            self._deepseek_task = asyncio.create_task(self._run_deepseek_turn(user_text, extra_system_instruction=extra_system_instruction))
+            logger.info(f"[{self.call_uuid}] ✅ DeepSeek brain triggered ({reason})")
+            return True
+
+        if provider == "groq":
+            # Best-effort cancel any in-flight OpenAI output.
+            try:
+                if self.openai_ws:
+                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+
+            user_text = (getattr(self, "_last_caller_transcript", "") or "").strip()
+            if not user_text:
+                return False
+
+            self._cancel_pending_groq()
+
+            self._response_triggered_for_turn = True
+            self._brain_provider_for_turn = "groq"
+            self._last_speech_time = asyncio.get_event_loop().time()
+            self._groq_task = asyncio.create_task(self._run_groq_turn(user_text, extra_system_instruction=extra_system_instruction))
+            logger.info(f"[{self.call_uuid}] ✅ Groq brain triggered ({reason})")
+            return True
+
+        if provider == "grok":
+            try:
+                if self.openai_ws:
+                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+
+            user_text = (getattr(self, "_last_caller_transcript", "") or "").strip()
+            if not user_text:
+                return False
+
+            self._cancel_pending_grok()
+
+            self._response_triggered_for_turn = True
+            self._brain_provider_for_turn = "grok"
+            self._last_speech_time = asyncio.get_event_loop().time()
+            self._grok_task = asyncio.create_task(self._run_grok_turn(user_text, extra_system_instruction=extra_system_instruction))
+            logger.info(f"[{self.call_uuid}] ✅ Grok brain triggered ({reason})")
+            return True
+
+        if provider == "openrouter":
+            try:
+                if self.openai_ws:
+                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+
+            user_text = (getattr(self, "_last_caller_transcript", "") or "").strip()
+            if not user_text:
+                return False
+
+            self._cancel_pending_openrouter()
+
+            self._response_triggered_for_turn = True
+            self._brain_provider_for_turn = "openrouter"
+            self._last_speech_time = asyncio.get_event_loop().time()
+            self._openrouter_task = asyncio.create_task(self._run_openrouter_turn(user_text, extra_system_instruction=extra_system_instruction))
+            logger.info(f"[{self.call_uuid}] ✅ OpenRouter brain triggered ({reason})")
+            return True
+
+        # Default: OpenAI realtime brain.
+        try:
+            await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+        except Exception:
+            pass
+        try:
+            await self.openai_ws.send(json.dumps({"type": "response.create"}))
+            self._response_triggered_for_turn = True
+            self._brain_provider_for_turn = "openai"
+            self._last_speech_time = asyncio.get_event_loop().time()
+            logger.info(f"[{self.call_uuid}] ✅ OpenAI brain triggered ({reason})")
+            return True
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Failed to create response: {e}")
+            return False
+
+    async def _trigger_brain_response_after_caller_stops(
+        self,
+        reason: str,
+        transcript: str,
+        extra_system_instruction: Optional[str] = None,
+        timeout_seconds: float = 1.2,
+    ) -> None:
+        """Wait briefly for VAD speech_stopped, then trigger a response.
+
+        This prevents a dead-air failure mode where the Whisper transcript arrives
+        before `input_audio_buffer.speech_stopped`, leaving `_caller_speaking=True`
+        and causing OpenRouter streaming to immediately abort.
+        """
+        try:
+            if getattr(self, "_response_triggered_for_turn", False):
+                return
+
+            cleaned = (transcript or "").strip()
+            if cleaned:
+                self._last_caller_transcript = cleaned
+
+            loop = asyncio.get_event_loop()
+            start = loop.time()
+            while getattr(self, "_caller_speaking", False) and (loop.time() - start) < timeout_seconds:
+                await asyncio.sleep(0.05)
+
+            # If we're still "speaking" after the timeout, trigger anyway — barge-in handling
+            # can cancel/interrupt if needed, but we avoid going silent.
+            triggered = await self._trigger_brain_response(reason, extra_system_instruction=extra_system_instruction)
+            if triggered:
+                logger.info(f"[{self.call_uuid}] ✅ AI response triggered ({reason}) after waiting for caller stop")
+        except Exception:
+            # Best-effort only.
+            return
+
+    async def _schedule_latency_filler_for_trigger(self, min_turn: float, delay_seconds: float) -> None:
+        """Schedule Speechmatics filler after triggering a response, if needed."""
+        voice_provider = getattr(self, 'voice_provider', 'openai')
+        if voice_provider != 'speechmatics':
+            return
+        if self._pending_filler_task is not None and not self._pending_filler_task.done():
+            try:
+                self._pending_filler_task.cancel()
+            except Exception:
+                pass
+        self._pending_filler_generation += 1
+        gen = self._pending_filler_generation
+        self._pending_filler_task = asyncio.create_task(
+            self._maybe_play_speechmatics_filler(gen, min_turn, delay_seconds=delay_seconds)
+        )
 
     @staticmethod
     def _normalize_backchannel_text(text: str) -> str:
@@ -2145,10 +4664,19 @@ class CallSession:
             # Adaptive wait: if the model has started generating text, the response is likely imminent.
             # Give it a bit more time before injecting filler. If nothing at all has started, we use the
             # initial `delay_seconds` threshold.
-            try:
-                max_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MAX_MS", "1100"))
-            except Exception:
-                max_ms = 1100.0
+            # Provider-specific max wait: if OpenRouter has started emitting text but Speechmatics
+            # bytes still haven't arrived, don't wait as long before injecting filler.
+            provider_for_turn = str(getattr(self, "_brain_provider_for_turn", "openai") or "openai").strip().lower()
+            if provider_for_turn == "openrouter":
+                try:
+                    max_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MAX_MS", "750"))
+                except Exception:
+                    max_ms = 750.0
+            else:
+                try:
+                    max_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MAX_MS", "1100"))
+                except Exception:
+                    max_ms = 1100.0
             max_wait_seconds = max(0.0, max_ms / 1000.0)
 
             try:
@@ -2235,6 +4763,19 @@ class CallSession:
                 delay = float(delay)
             except Exception:
                 delay = self._barge_in_min_speech_seconds
+
+            # Speechmatics TTS can otherwise feel like the agent is talking over the caller.
+            # Keep barge-in highly responsive in that mode.
+            try:
+                voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
+                if voice_provider == "speechmatics" and str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+                    try:
+                        cap = float(CONFIG.get("SPEECHMATICS_BARGE_IN_MAX_DELAY_SECONDS", 0.25) or 0.25)
+                    except Exception:
+                        cap = 0.25
+                    delay = min(delay, max(0.0, cap))
+            except Exception:
+                pass
             await asyncio.sleep(delay)
             if not self.is_active or not self.openai_ws:
                 return
@@ -2287,6 +4828,25 @@ class CallSession:
                 await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
         except Exception as e:
             logger.warning(f"[{self.call_uuid}] Failed to cancel OpenAI response ({reason}): {e}")
+
+        # Also stop any in-flight external brain generation tasks so they can't enqueue
+        # additional Speechmatics segments after barge-in.
+        try:
+            self._cancel_pending_deepseek()
+        except Exception:
+            pass
+        try:
+            self._cancel_pending_groq()
+        except Exception:
+            pass
+        try:
+            self._cancel_pending_grok()
+        except Exception:
+            pass
+        try:
+            self._cancel_pending_openrouter()
+        except Exception:
+            pass
 
     async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
         if not self.vonage_ws:
@@ -2588,6 +5148,79 @@ Provide your analysis."""
             logger.error(f"[{self.call_uuid}] Sales detection error: {e}")
         
         return False
+
+    def _set_pending_transfer(self, transfer_number: str, reason: str) -> None:
+        self._pending_transfer_number = str(transfer_number or "").strip() or None
+        self._pending_transfer_reason = str(reason or "").strip() or "Caller requested transfer"
+        self._pending_transfer_prompted = True
+        try:
+            self._pending_transfer_set_at = asyncio.get_event_loop().time()
+        except Exception:
+            self._pending_transfer_set_at = 0.0
+
+    def _clear_pending_transfer(self) -> None:
+        self._pending_transfer_number = None
+        self._pending_transfer_reason = None
+        self._pending_transfer_prompted = False
+        self._pending_transfer_set_at = 0.0
+
+    async def _maybe_handle_pending_transfer_confirmation(self, transcript: str) -> bool:
+        """Handle a yes/no reply if a transfer confirmation is pending.
+
+        Returns True if this transcript was consumed for transfer confirmation.
+        """
+        transfer_number = str(getattr(self, "_pending_transfer_number", "") or "").strip()
+        if not transfer_number:
+            return False
+
+        t = (transcript or "").strip().lower()
+        if not t:
+            return False
+
+        # Normalize punctuation/whitespace.
+        t_norm = " ".join("".join(ch if ch.isalnum() or ch.isspace() else " " for ch in t).split())
+
+        yes_phrases = {
+            "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please", "go ahead", "do it",
+            "transfer", "transfer me", "connect me", "put me through",
+        }
+        no_phrases = {
+            "no", "nope", "nah", "not now", "dont", "don't", "do not", "stop", "cancel",
+        }
+
+        def _matches(s: str, phrases: set[str]) -> bool:
+            if s in phrases:
+                return True
+            for p in phrases:
+                if p and p in s:
+                    return True
+            return False
+
+        reason = str(getattr(self, "_pending_transfer_reason", "") or "Transfer confirmed")
+
+        if _matches(t_norm, yes_phrases):
+            self._clear_pending_transfer()
+            try:
+                await self._speak_text_via_voice_provider("Okay — transferring you now.")
+            except Exception:
+                pass
+            asyncio.create_task(self._execute_auto_transfer(transfer_number, reason))
+            return True
+
+        if _matches(t_norm, no_phrases):
+            self._clear_pending_transfer()
+            try:
+                await self._speak_text_via_voice_provider("Okay — I won’t transfer you.")
+            except Exception:
+                pass
+            return True
+
+        # Unclear response: ask for an explicit yes/no and keep pending.
+        try:
+            await self._speak_text_via_voice_provider("Do you want me to transfer you now? Please say yes or no.")
+        except Exception:
+            pass
+        return True
     
     async def _execute_auto_transfer(self, transfer_number: str, detected_sentence: str):
         """Execute automatic transfer with fixed message - bypasses AI function calling"""
@@ -2612,9 +5245,15 @@ Provide your analysis."""
                     if credits_remaining <= 0:
                         logger.warning(f"[{self.call_uuid}] 🚫 TRANSFER BLOCKED - Insufficient credits (balance: {credits_remaining})")
                         
-                        # Inform caller about insufficient credits
+                        # Inform caller about insufficient credits.
+                        # IMPORTANT: in non-OpenAI brain mode, do not trigger OpenAI responses.
                         try:
-                            if self.openai_ws:
+                            effective = str(self._effective_brain_provider() or "openai").strip().lower()
+                        except Exception:
+                            effective = "openai"
+
+                        if effective == "openai" and self.openai_ws:
+                            try:
                                 await self.openai_ws.send(json.dumps({
                                     "type": "conversation.item.create",
                                     "item": {
@@ -2622,10 +5261,23 @@ Provide your analysis."""
                                         "role": "user",
                                         "content": [{
                                             "type": "input_text",
-                                            "text": "[SYSTEM: Cannot transfer call - account has insufficient credits. Politely apologize and inform the caller that they need to add more credits to their account to use the transfer feature.]"}]}}))
+                                            "text": "[SYSTEM: Cannot transfer call - account has insufficient credits. Politely apologize and inform the caller that they need to add more credits to their account to use the transfer feature.]"
+                                        }]
+                                    }
+                                }))
                                 await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                        except Exception as e:
-                            logger.error(f"[{self.call_uuid}] Error sending insufficient credits message: {e}")
+                            except Exception as e:
+                                logger.error(f"[{self.call_uuid}] Error sending insufficient credits message via OpenAI: {e}")
+                        else:
+                            try:
+                                msg = (
+                                    "Sorry — I can't transfer this call right now because this account doesn't have enough credits. "
+                                    "You can contact the business to top up, or I can take a message."
+                                )
+                                await self._speak_text_via_voice_provider(msg)
+                                self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {msg}")
+                            except Exception:
+                                pass
                         
                         return  # Cancel transfer
                     
@@ -2650,12 +5302,48 @@ Provide your analysis."""
                     person_name = match.group(1).capitalize()
                     break
             
-            # Normalize phone number for Vonage (E.164 format)
-            # If it starts with '0', replace with '44' (assuming UK for now as per context)
+            # Normalize phone number for Vonage (digits-only E.164 style)
+            # We see common admin inputs like:
+            # - 07958... (UK local)
+            # - +447958...
+            # - 00447958...
+            # - 007958... (accidental double-zero before a UK local number)
+            import re
             original_number = transfer_number
-            if transfer_number.startswith('0'):
-                transfer_number = '44' + transfer_number[1:]
-                logger.info(f"[{self.call_uuid}] 📞 Normalized UK number: {original_number} → {transfer_number}")
+            raw = re.sub(r"\D+", "", (transfer_number or "").strip())
+
+            # Handle international dialing prefix 00...
+            if raw.startswith("00") and len(raw) > 2:
+                # If someone accidentally typed 0079... treat it as 079...
+                if len(raw) > 3 and raw[2] == "0":
+                    raw = raw[1:]  # 0079... -> 079...
+                else:
+                    raw = raw[2:]  # 0044... -> 44...
+
+            # If UK local format and inbound number looks UK, convert to country code.
+            called_digits = re.sub(r"\D+", "", (getattr(self, "called", "") or "").strip())
+            if raw.startswith("0") and len(raw) >= 10 and called_digits.startswith("44"):
+                raw = "44" + raw[1:]
+
+            # Common UK mistake: users enter country code + local leading 0 (e.g. 44 0 7958... => 4407958...)
+            # E.164 MUST NOT include the leading trunk '0'.
+            if raw.startswith("440") and len(raw) >= 11:
+                raw = "44" + raw[3:]
+
+            transfer_number = raw
+            if original_number != transfer_number:
+                logger.info(f"[{self.call_uuid}] 📞 Normalized transfer number: {original_number} → {transfer_number}")
+
+            # Basic sanity check: if we still don't have a plausible E.164-like number, abort gracefully.
+            if not transfer_number or len(transfer_number) < 10:
+                logger.error(f"[{self.call_uuid}] 🚫 Transfer aborted - invalid destination after normalization: {transfer_number!r} (from {original_number!r})")
+                try:
+                    msg = "Sorry — I can't transfer right now because the transfer number looks invalid. Please check the transfer number in settings."
+                    await self._speak_text_via_voice_provider(msg)
+                    self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {msg}")
+                except Exception:
+                    pass
+                return
             
             # Generate fixed transfer message
             transfer_message = f"OK, I'll try and transfer you to {person_name}. Please hold a moment."
@@ -2710,6 +5398,12 @@ Provide your analysis."""
             jwt_token = self._generate_vonage_jwt()
             if not jwt_token:
                 logger.error(f"[{self.call_uuid}] Cannot execute transfer - failed to generate JWT")
+
+                # Do not leave the caller in silence.
+                try:
+                    asyncio.create_task(self._handle_failed_transfer(reason_text="(transfer auth error)", person_name=person_name))
+                except Exception:
+                    pass
                 return
             
             import urllib.parse
@@ -2751,6 +5445,20 @@ Provide your analysis."""
                 async with session.put(transfer_url, json=transfer_data, headers=headers) as resp:
                     if resp.status in (200, 204):
                         logger.info(f"[{self.call_uuid}] ✅ Transfer initiated - keeping session alive for potential reconnect")
+                        # Mark transfer as initiated in DB immediately (best-effort).
+                        try:
+                            import sqlite3
+
+                            conn = sqlite3.connect('call_logs.db')
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "UPDATE calls SET transfer_initiated = 1 WHERE call_uuid = ?",
+                                (self.call_uuid,),
+                            )
+                            conn.commit()
+                            conn.close()
+                        except Exception:
+                            pass
                         # DO NOT close the session - keep it alive so the call can reconnect via websocket if transfer fails
                         # The transfer NCCO has fallback actions that will reconnect to this websocket
                     else:
@@ -2758,9 +5466,258 @@ Provide your analysis."""
                         logger.error(f"[{self.call_uuid}] Transfer failed with status {resp.status}: {error_text}")
                         if resp.status == 401:
                             logger.error(f"[{self.call_uuid}] ⚠️ Authentication failed. Check if private.key exists and is valid.")
+
+                        # If transfer fails, tell the caller instead of going silent.
+                        try:
+                            asyncio.create_task(self._handle_failed_transfer(reason_text=f"({resp.status})", person_name=person_name))
+                        except Exception:
+                            pass
         
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Auto-transfer error: {e}", exc_info=True)
+
+    def _transfer_aliases_for_label(self, label: str) -> List[str]:
+        """Generate matching aliases/tokens for a configured transfer label (person/profession)."""
+        try:
+            key = str(label or "").strip().lower()
+        except Exception:
+            key = ""
+        if not key:
+            return []
+
+        try:
+            cached = getattr(self, "_transfer_alias_cache", {}).get(key)
+            if cached:
+                return list(cached)
+        except Exception:
+            cached = None
+
+        aliases = {key}
+
+        # Tokenize multi-word labels so callers can say just "doctors".
+        try:
+            import re
+            for token in re.split(r"[^a-z0-9']+", key):
+                token = (token or "").strip("' ")
+                if not token:
+                    continue
+                if token in {"the", "a", "an", "or", "and", "of", "to", "from", "for"}:
+                    continue
+                if len(token) < 3:
+                    continue
+                aliases.add(token)
+        except Exception:
+            for token in key.split():
+                token = token.strip()
+                if token and len(token) >= 3:
+                    aliases.add(token)
+
+        # Basic plural normalization
+        if key.endswith("s") and len(key) > 3:
+            aliases.add(key[:-1])
+
+        # Common shorthand for professions
+        if key in {"doctor", "doctors", "dr", "drs"}:
+            aliases.update({"doctor", "doctors", "dr", "drs"})
+        if key in {"vet", "vets", "veterinary", "veterinarian", "veterinarians"}:
+            aliases.update({"vet", "vets", "veterinary", "veterinarian", "veterinarians"})
+
+        out = sorted(aliases, key=lambda s: (-len(s), s))
+        try:
+            if not hasattr(self, "_transfer_alias_cache") or not isinstance(self._transfer_alias_cache, dict):
+                self._transfer_alias_cache = {}
+            self._transfer_alias_cache[key] = out
+        except Exception:
+            pass
+        return out
+
+    def _infer_transfer_target_name(self) -> str:
+        """Best-effort: infer a human-friendly transfer recipient name from business/agent instructions.
+
+        This lets prompts say "transfer you to Bob" even when we only store a transfer number.
+        """
+        # Explicit override (future-proof)
+        try:
+            explicit = str(getattr(self, "transfer_target_name", "") or "").strip()
+        except Exception:
+            explicit = ""
+        if explicit:
+            return explicit
+
+        try:
+            haystack = f"{getattr(self, 'agent_instructions', '') or ''} {getattr(self, 'business_info', '') or ''} {getattr(self, 'transfer_instructions', '') or ''}".strip()
+        except Exception:
+            haystack = ""
+        if not haystack:
+            return ""
+
+        try:
+            import re
+            patterns = [
+                r"\btransfer\s+(?:calls?|the\s+call|them|the\s+caller)?\s*(?:over\s+to|to)\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\b",
+                r"\bput\s+(?:them|the\s+caller)\s+through\s+to\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\b",
+                r"\bconnect\s+(?:them|the\s+caller)\s+to\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\b",
+                r"\bforward\s+(?:calls?|the\s+call)?\s*(?:to)\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\b",
+            ]
+            for pat in patterns:
+                m = re.search(pat, haystack, flags=re.IGNORECASE)
+                if not m:
+                    continue
+                candidate = (m.group(1) or "").strip().strip(" .,:;\"'")
+                if not candidate:
+                    continue
+                low = candidate.lower()
+                if any(ch.isdigit() for ch in candidate):
+                    continue
+                if low in {"the doctors", "doctors", "doctor", "the vet", "vet", "vets", "reception", "receptionist", "office", "team"}:
+                    continue
+                if len(candidate) > 40:
+                    continue
+                return candidate
+        except Exception:
+            return ""
+
+        return ""
+
+    def _recent_caller_text_window(self, seconds: float = 4.0) -> str:
+        """Return concatenated recent caller utterances within the last `seconds`."""
+        try:
+            now_ts = asyncio.get_event_loop().time()
+        except Exception:
+            now_ts = time.time()
+        items = []
+        try:
+            for ts, txt in list(getattr(self, "_recent_caller_utterances", [])):
+                if not txt:
+                    continue
+                if float(ts) >= (float(now_ts) - float(seconds)):
+                    items.append(str(txt).strip())
+        except Exception:
+            return ""
+        return " ".join([t for t in items if t]).strip()
+
+    async def _brain_classify_transfer_intent(self, caller_text: str, transfer_people: List[str]) -> dict:
+        """Ask the currently selected brain provider if the caller intends a transfer.
+
+        Returns dict:
+          - wants_transfer: bool
+          - matched_label: str|None (must be one of transfer_people)
+          - confidence: float (0..1)
+          - reason: str
+        """
+        caller_text = str(caller_text or "").strip()
+        labels = [str(p).strip() for p in (transfer_people or []) if str(p).strip()]
+        if not caller_text or not labels:
+            return {"wants_transfer": False, "matched_label": None, "confidence": 0.0, "reason": "empty"}
+
+        provider = "openai"
+        try:
+            provider = str(self._effective_brain_provider() or "openai").strip().lower()
+        except Exception:
+            provider = "openai"
+
+        system = (
+            "You are a strict intent classifier for a phone receptionist transfer system. "
+            "Your job is to determine two things from the caller's words: "
+            "(1) whether they are explicitly asking to be transferred right now (wants_transfer=true only when the caller directly requests a transfer/connection/being put through), "
+            "and (2) whether the caller is identifying as or calling from one of the allowed labels (matched_label). "
+            "Examples: "
+            "- 'Can you transfer me to Barry?' => wants_transfer=true. "
+            "- 'It's the doctors calling' (no request yet) => wants_transfer=false but matched_label='Doctors' if that exact label is in the allowed list. "
+            "- 'I'm the vet, can you put me through' => wants_transfer=true and matched_label='Vet' if allowed. "
+            "IMPORTANT: matched_label MUST be exactly one of the allowed labels, or null. "
+            "Output ONLY valid JSON with keys: wants_transfer (boolean), matched_label (string or null), confidence (number 0..1), reason (string)."
+        )
+        user = (
+            "Caller said (verbatim):\n"
+            f"{caller_text}\n\n"
+            "Allowed labels (must match exactly if you choose one):\n"
+            + "\n".join([f"- {x}" for x in labels])
+        )
+
+        # Provider-specific routing (OpenAI-compatible APIs).
+        try:
+            import json as _json
+            import re as _re
+
+            timeout_seconds = 2.5
+            max_tokens = 80
+
+            if provider == "openrouter":
+                api_key = str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip()
+                model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+                client = _get_openrouter_async_client(api_key)
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                    temperature=0.0,
+                    max_tokens=max_tokens,
+                )
+                text_out = (resp.choices[0].message.content or "").strip()
+            elif provider == "groq":
+                api_key = str(CONFIG.get("GROQ_API_KEY", "") or "").strip()
+                model = str(CONFIG.get("GROQ_MODEL", "llama-3.1-8b-instant") or "llama-3.1-8b-instant").strip()
+                client = _get_groq_async_client(api_key)
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                    temperature=0.0,
+                    max_tokens=max_tokens,
+                )
+                text_out = (resp.choices[0].message.content or "").strip()
+            elif provider == "deepseek":
+                api_key = (str(CONFIG.get("DEEPSEEK_API_KEY", "") or "").strip() or str(CONFIG.get("DEEPSEEK_API_KEY_FALLBACK", "") or "").strip())
+                client = _get_deepseek_async_client(api_key)
+                resp = await asyncio.wait_for(
+                    client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                        temperature=0.0,
+                        max_tokens=max_tokens,
+                    ),
+                    timeout=timeout_seconds,
+                )
+                text_out = (resp.choices[0].message.content or "").strip()
+            else:
+                # Default: OpenAI
+                api_key = str(CONFIG.get("OPENAI_API_KEY", "") or "").strip()
+                if not api_key:
+                    return {"wants_transfer": False, "matched_label": None, "confidence": 0.0, "reason": "no_openai_key"}
+
+                # Use a small, fast model for intent classification.
+                model = str(CONFIG.get("OPENAI_INTENT_MODEL", "gpt-4o-mini") or "gpt-4o-mini").strip()
+                client = openai.AsyncOpenAI(api_key=api_key)
+                resp = await asyncio.wait_for(
+                    client.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                        temperature=0.0,
+                        max_tokens=max_tokens,
+                    ),
+                    timeout=timeout_seconds,
+                )
+                text_out = (resp.choices[0].message.content or "").strip()
+
+            # Parse JSON robustly.
+            m = _re.search(r"\{[\s\S]*\}", text_out)
+            payload = _json.loads(m.group(0) if m else text_out)
+
+            wants = bool(payload.get("wants_transfer", False))
+            matched = payload.get("matched_label", None)
+            if matched is not None:
+                matched = str(matched).strip()
+                if matched not in labels:
+                    matched = None
+            try:
+                conf = float(payload.get("confidence", 0.0) or 0.0)
+            except Exception:
+                conf = 0.0
+            conf = max(0.0, min(1.0, conf))
+            reason = str(payload.get("reason", "") or "").strip()
+            return {"wants_transfer": wants, "matched_label": matched, "confidence": conf, "reason": reason}
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Transfer intent classification failed ({provider}): {e}")
+            return {"wants_transfer": False, "matched_label": None, "confidence": 0.0, "reason": "error"}
     
     def _generate_vonage_jwt(self):
         """Generate Vonage JWT for API authentication"""
@@ -2876,37 +5833,53 @@ Provide your analysis."""
             except Exception as tts_error:
                 logger.error(f"[{self.call_uuid}] TTS error during failed transfer: {tts_error}", exc_info=True)
             
-            # Now check if OpenAI WebSocket is still connected and inject message
-            if not self.openai_ws or self.openai_ws.closed:
-                logger.warning(f"[{self.call_uuid}] ⚠️ OpenAI WebSocket closed, cannot continue conversation")
-                return
-            
-            # Inject a system message telling AI to continue the conversation
-            system_message = "The caller just heard that the person they wanted to reach is not answering. Continue the conversation naturally and offer to help them or arrange a callback."
-            
-            logger.info(f"[{self.call_uuid}] 💬 Injecting system message: {system_message}")
-            
-            # Inject the message into OpenAI conversation
-            await self.openai_ws.send(json.dumps({
-                "type": "conversation.item.create",
-                "item": {
-                    "type": "message",
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": system_message
-                        }
-                    ]
-                }
-            }))
-            
-            # Trigger a response from the AI
-            await self.openai_ws.send(json.dumps({
-                "type": "response.create"
-            }))
-            
-            logger.info(f"[{self.call_uuid}] ✅ Failed transfer context injected, AI will respond")
+            # Continue the conversation.
+            # IMPORTANT: if the call is locked to a non-OpenAI brain, do not trigger an OpenAI response.
+            try:
+                effective = str(self._effective_brain_provider() or "openai").strip().lower()
+            except Exception:
+                effective = "openai"
+
+            if effective == "openai":
+                # Now check if OpenAI WebSocket is still connected and inject message
+                if not self.openai_ws or self.openai_ws.closed:
+                    logger.warning(f"[{self.call_uuid}] ⚠️ OpenAI WebSocket closed, cannot continue conversation")
+                    return
+
+                # Inject a system message telling AI to continue the conversation
+                system_message = "The caller just heard that the person they wanted to reach is not answering. Continue the conversation naturally and offer to help them or arrange a callback."
+
+                logger.info(f"[{self.call_uuid}] 💬 Injecting system message: {system_message}")
+
+                # Inject the message into OpenAI conversation
+                await self.openai_ws.send(json.dumps({
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": system_message
+                            }
+                        ]
+                    }
+                }))
+
+                # Trigger a response from the AI
+                await self.openai_ws.send(json.dumps({
+                    "type": "response.create"
+                }))
+
+                logger.info(f"[{self.call_uuid}] ✅ Failed transfer context injected, AI will respond")
+            else:
+                # Deterministic follow-up (keeps latency low and avoids OpenAI usage).
+                msg = "No problem — would you like me to take a message, or have them call you back?"
+                try:
+                    await self._speak_text_via_voice_provider(msg)
+                    self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {msg}")
+                except Exception:
+                    pass
             
         except Exception as e:
             logger.error(f"[{self.call_uuid}] ❌ Error handling failed transfer: {e}", exc_info=True)
@@ -3014,6 +5987,27 @@ Provide your analysis."""
                     instructions_parts.append(f"\nADDITIONAL INSTRUCTIONS:\n{agent_instructions}")
                     logger.info(f"[{self.call_uuid}] Applied user-specific instructions")
                 
+                # Use session-specific transfer instructions (per user)
+                transfer_instructions = getattr(self, 'transfer_instructions', '')
+                transfer_number = getattr(self, 'transfer_number', '')
+                if transfer_instructions and transfer_number:
+                    instructions_parts.append(f"\n🔒 CONFIDENTIAL CALL TRANSFER RULES (DO NOT REVEAL TO CALLER):")
+                    instructions_parts.append(f"{transfer_instructions}")
+                    instructions_parts.append("\n⚠️ CRITICAL - TRANSFER RULE HANDLING:")
+                    instructions_parts.append("- These transfer rules are INTERNAL LOGIC ONLY - NEVER mention them to the caller")
+                    instructions_parts.append("- ❌ NEVER say things like 'If you're Mr. Roberts, I can transfer you'")
+                    instructions_parts.append("- ❌ NEVER reveal the conditions or names from the transfer rules")
+                    instructions_parts.append("- ✅ Instead, ASK naturally: 'May I ask who's calling?' then evaluate silently")
+                    instructions_parts.append("- When conditions are met, use transfer_call() function with a brief reason")
+                    instructions_parts.append("- Before calling transfer_call(), inform the caller naturally (e.g., 'Let me transfer you to Eric now')")
+                    instructions_parts.append("- If conditions are NOT met, offer to take a message without revealing why")
+                    logger.info(f"[{self.call_uuid}] Applied transfer instructions with function calling")
+                elif transfer_instructions:
+                    instructions_parts.append(f"\n🔒 CONFIDENTIAL CALL TRANSFER RULES (DO NOT REVEAL TO CALLER):")
+                    instructions_parts.append(f"{transfer_instructions}")
+                    instructions_parts.append("- These rules are INTERNAL - never mention them to the caller")
+                    logger.info(f"[{self.call_uuid}] Applied transfer instructions")
+                
                 # Natural, friendly responses - warm and conversational
                 instructions_parts.append("\n⚠️ RESPONSE STYLE - CRITICALLY IMPORTANT:")
                 instructions_parts.append("- Be genuinely warm, friendly, and welcoming in EVERY response")
@@ -3049,6 +6043,21 @@ Provide your analysis."""
                 instructions_parts.append("- For sales calls, be brief: 'Thank you, but we're not interested. Have a great day!'")
                 instructions_parts.append("- Do NOT offer to pass on details or have someone call back sales callers")
                 
+                # Add transfer capability instructions if transfer number is configured
+                transfer_number_configured = getattr(self, 'transfer_number', '')
+                transfer_people_configured = getattr(self, 'transfer_people', []) or []
+                if transfer_number_configured:
+                    instructions_parts.append("\n📞 CALL TRANSFER CAPABILITY:")
+                    instructions_parts.append("- You have the ability to transfer calls when appropriate")
+                    if transfer_people_configured:
+                        people_list = ", ".join(transfer_people_configured[:5])
+                        instructions_parts.append(f"- You can transfer calls for: {people_list}")
+                    instructions_parts.append("- IMPORTANT: Check the BUSINESS INFORMATION section above for specific transfer rules and guidelines")
+                    instructions_parts.append("- Follow any transfer instructions in the business context exactly as written")
+                    instructions_parts.append("- If the business context says to transfer for certain situations (e.g., 'if caller is the doctor', 'if they are the vet'), follow those rules")
+                    instructions_parts.append("- When you need to transfer, say something like: 'Let me transfer you now' or 'I'll put you through'")
+                    instructions_parts.append("- The system will detect your transfer intent and execute it automatically")
+                
                 # Only mention booking if calendar bundle is enabled
                 if getattr(self, 'calendar_booking_enabled', True):
                     instructions_parts.append("\nYou can book appointments using the book_appointment function when a caller requests one.")
@@ -3056,6 +6065,11 @@ Provide your analysis."""
                     instructions_parts.append("\nIf the booking function returns an 'insufficient_credits' error, politely tell the caller: 'I don't have access to the diary right now, but I can take your details and ask [person's name] to call you back.'")
                 
                 current_instructions = "\n".join(instructions_parts)
+                # Cache for DeepSeek brain prompt construction.
+                try:
+                    self._brain_instructions_text = current_instructions
+                except Exception:
+                    pass
                 logger.info(f"[{self.call_uuid}] Using instructions: {current_instructions[:100]}...")
                 
                 # Get user's voice preference and response latency from account_settings
@@ -3131,9 +6145,17 @@ Provide your analysis."""
                     padding_ms = 200
                     threshold = 0.5
 
-                # In Speechmatics mode we manually control when to call `response.create`.
-                # Letting OpenAI auto-create responses causes duplicate/early turns and tangents.
-                auto_create_response = (voice_provider != 'speechmatics')
+                # IMPORTANT: OpenAI auto-response should only be enabled when OpenAI is the
+                # selected brain for this call. When a non-OpenAI brain (OpenRouter/DeepSeek/etc)
+                # is locked for the call, we keep the OpenAI Realtime connection for transcription
+                # but we must NOT let OpenAI create responses automatically (or it will effectively
+                # become the brain and the selected brain will never be used).
+                try:
+                    brain_provider_for_call = self._effective_brain_provider()
+                except Exception:
+                    brain_provider_for_call = "openai"
+
+                auto_create_response = (str(brain_provider_for_call).strip().lower() == "openai")
 
                 turn_detection_config = {
                     "type": "server_vad",
@@ -3142,7 +6164,10 @@ Provide your analysis."""
                     "silence_duration_ms": silence_ms,
                     "create_response": auto_create_response
                 }
-                logger.info(f"[{self.call_uuid}] VAD: provider={voice_provider}, auto_create={auto_create_response}, threshold={threshold}, silence={silence_ms}ms, padding={padding_ms}ms")
+                logger.info(
+                    f"[{self.call_uuid}] VAD: voice_provider={voice_provider}, brain_provider={brain_provider_for_call}, auto_create={auto_create_response}, "
+                    f"threshold={threshold}, silence={silence_ms}ms, padding={padding_ms}ms"
+                )
                 
                 # Store modalities for greeting to use
                 self.modalities = modalities
@@ -3216,6 +6241,10 @@ Provide your analysis."""
                     conn.close()
                     if result and result[0]:
                         global_instructions = result[0]
+                        try:
+                            self._brain_global_instructions_text = str(global_instructions or "")
+                        except Exception:
+                            pass
                         global_context = f"""MANDATORY GLOBAL INSTRUCTIONS (for all agents):
 {global_instructions}
 
@@ -3250,6 +6279,10 @@ You must use ONLY this information when answering questions about services, area
                         }
                     }))
                     logger.info(f"[{self.call_uuid}] ✓ Injected business context into conversation")
+                    try:
+                        self._brain_business_context_text = business_context
+                    except Exception:
+                        pass
                 
                 logger.info(f"[{self.call_uuid}] Connected to OpenAI successfully")
                 return True
@@ -3336,6 +6369,18 @@ You must use ONLY this information when answering questions about services, area
                         pass
                     self._response_triggered_for_turn = False
 
+                    # Track which brain we intend to use for this user turn.
+                    # Used for provider-specific filler tuning (e.g., OpenRouter can be slower)
+                    # and to avoid mis-attributing late/canceled OpenAI output events as "OpenAI turns"
+                    # when OpenAI is only being used for ASR.
+                    try:
+                        self._brain_provider_for_turn = str(self._effective_brain_provider() or "openai").strip().lower()
+                    except Exception:
+                        self._brain_provider_for_turn = "openai"
+
+                    # Cancel any pending DeepSeek generation for a prior turn.
+                    self._cancel_pending_deepseek()
+
                     # Reset per-turn assistant audio tracking
                     self._assistant_audio_started_for_turn = False
                     try:
@@ -3398,9 +6443,13 @@ You must use ONLY this information when answering questions about services, area
                         logger.info(f"[{self.call_uuid}] 📝 Trimming conversation history: {len(self.transcript_parts)} → 10 messages (token optimization)")
                         self.transcript_parts = self.transcript_parts[-10:]
 
-                    # For Speechmatics we must overlap LLM generation with the filler,
-                    # otherwise you effectively wait: filler + LLM + Speechmatics.
+                    # If the locked brain is non-OpenAI, we must manually trigger brain responses
+                    # based on VAD + transcript events (OpenAI Realtime stays connected for ASR).
                     voice_provider = getattr(self, 'voice_provider', 'openai')
+                    try:
+                        manual_brain_mode = (str(self._effective_brain_provider() or 'openai').strip().lower() != 'openai')
+                    except Exception:
+                        manual_brain_mode = False
 
                     min_turn = CONFIG.get("MIN_USER_TURN_SECONDS", self._min_user_turn_seconds)
                     try:
@@ -3408,14 +6457,14 @@ You must use ONLY this information when answering questions about services, area
                     except Exception:
                         min_turn = self._min_user_turn_seconds
 
-                    # Speechmatics: cap min_turn to keep things snappy even if global settings are high.
-                    if voice_provider == 'speechmatics':
+                    # Speechmatics/manual-brain: cap min_turn to keep things snappy even if global settings are high.
+                    if voice_provider == 'speechmatics' or manual_brain_mode:
                         min_turn = min(min_turn, 0.30)
 
                     # Wait briefly for transcription to arrive so we can ignore backchannels like "ok".
-                    # In Speechmatics mode we rely on the transcript to avoid VAD noise causing responses.
+                    # In Speechmatics/manual-brain mode we rely on the transcript to avoid VAD noise causing responses.
                     last_transcript = ""
-                    if voice_provider == 'speechmatics':
+                    if voice_provider == 'speechmatics' or manual_brain_mode:
                         try:
                             await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.25)
                         except Exception:
@@ -3437,9 +6486,10 @@ You must use ONLY this information when answering questions about services, area
                     # IMPORTANT: if the agent is currently speaking, a short backchannel ("ok/yeah") can produce
                     # speech_stopped events; do not trigger a new response in that case.
                     if (
-                        voice_provider == 'speechmatics'
+                        (voice_provider == 'speechmatics' or manual_brain_mode)
                         and self.openai_ws
                         and not self._agent_speaking
+                        and not bool(getattr(self, "_pending_transfer_number", None))
                         and bool(last_transcript)
                         and not is_backchannel
                         and not is_trivially_short_token
@@ -3448,43 +6498,31 @@ You must use ONLY this information when answering questions about services, area
                             or word_count >= 1
                             or is_number_like
                         )
+                        and not getattr(self, "_pending_transfer_number", None)
                         and not self._response_triggered_for_turn
                     ):
-                        # Start the LLM response immediately (best-effort cancel prior).
-                        try:
-                            await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-                        except Exception:
-                            pass
-                        try:
-                            await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                            self._response_triggered_for_turn = True
-                            # Treat this as activity so the timeout monitor doesn't hang up mid-response.
-                            self._last_speech_time = asyncio.get_event_loop().time()
+                        # Trigger the configured brain and overlap with latency-based filler.
+                        effective_provider = self._effective_brain_provider()
+                        triggered = await self._trigger_brain_response("speech_stopped")
+                        if triggered:
                             logger.info(f"[{self.call_uuid}] ✅ AI response triggered immediately (overlapping with filler)")
-
-                            # Latency-based filler: only play filler if the assistant hasn't started
-                            # sending response audio after a short threshold.
-                            if self._pending_filler_task is not None and not self._pending_filler_task.done():
+                            # Provider-specific filler timing: OpenRouter often needs earlier filler.
+                            if str(effective_provider or "").strip().lower() == "openrouter":
                                 try:
-                                    self._pending_filler_task.cancel()
+                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "500"))
                                 except Exception:
-                                    pass
-                            self._pending_filler_generation += 1
-                            gen = self._pending_filler_generation
-                            try:
-                                latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
-                            except Exception:
-                                latency_ms = 650.0
+                                    latency_ms = 500.0
+                            else:
+                                try:
+                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                except Exception:
+                                    latency_ms = 650.0
                             try:
                                 delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                             except Exception:
                                 delay_seconds = 0.65
-                            self._pending_filler_task = asyncio.create_task(
-                                self._maybe_play_speechmatics_filler(gen, min_turn, delay_seconds=delay_seconds)
-                            )
-                        except Exception as e:
-                            logger.warning(f"[{self.call_uuid}] Failed to create response: {e}")
-                    elif voice_provider == 'speechmatics' and not self._agent_speaking and (is_backchannel or self._last_speech_duration_seconds < min_turn):
+                            await self._schedule_latency_filler_for_trigger(min_turn=min_turn, delay_seconds=delay_seconds)
+                    elif (voice_provider == 'speechmatics' or manual_brain_mode) and not self._agent_speaking and (is_backchannel or self._last_speech_duration_seconds < min_turn):
                         logger.info(
                             f"[{self.call_uuid}] 💤 Ignoring very short utterance ({self._last_speech_duration_seconds:.2f}s) - no filler/response"
                         )
@@ -3493,7 +6531,7 @@ You must use ONLY this information when answering questions about services, area
                     # If Whisper transcript arrives slightly late, a closing like "thank you" can
                     # otherwise receive filler. Wait a bit longer *only* for filler suppression.
                     if (
-                        voice_provider == 'speechmatics'
+                        (voice_provider == 'speechmatics' or manual_brain_mode)
                         and not self._agent_speaking
                         and self._last_speech_duration_seconds >= min_turn
                         and not last_transcript
@@ -3509,7 +6547,7 @@ You must use ONLY this information when answering questions about services, area
                         is_closing_phrase = t_norm in {"thanks", "thank you", "thankyou", "goodbye", "good bye", "bye"}
 
                     # If transcript is still empty, treat as VAD noise and do nothing.
-                    if voice_provider == 'speechmatics' and not self._agent_speaking and not last_transcript:
+                    if (voice_provider == 'speechmatics' or manual_brain_mode) and not self._agent_speaking and not last_transcript:
                         continue
 
                     # Filler is now latency-based and is only scheduled when we actually trigger a response.
@@ -3525,6 +6563,14 @@ You must use ONLY this information when answering questions about services, area
                     except Exception:
                         pass
 
+                    # If we're awaiting a transfer confirmation, handle it here and
+                    # do not trigger any additional brain response for this utterance.
+                    try:
+                        if await self._maybe_handle_pending_transfer_confirmation(transcript):
+                            continue
+                    except Exception:
+                        pass
+
                     # Fallback: if Whisper transcript arrives AFTER `speech_stopped` gating and we didn't
                     # trigger a response yet, do it here for substantive utterances.
                     # This prevents "agent went silent" when VAD duration was short but transcript is real.
@@ -3532,10 +6578,15 @@ You must use ONLY this information when answering questions about services, area
                         voice_provider = getattr(self, 'voice_provider', 'openai')
                     except Exception:
                         voice_provider = 'openai'
+                    try:
+                        manual_brain_mode = (str(self._effective_brain_provider() or 'openai').strip().lower() != 'openai')
+                    except Exception:
+                        manual_brain_mode = False
                     if (
-                        voice_provider == 'speechmatics'
+                        (voice_provider == 'speechmatics' or manual_brain_mode)
                         and self.openai_ws
                         and not self._agent_speaking
+                        and not bool(getattr(self, "_pending_transfer_number", None))
                         and not self._response_triggered_for_turn
                     ):
                         t_norm = (transcript or "").strip()
@@ -3555,48 +6606,48 @@ You must use ONLY this information when answering questions about services, area
                             trivially_short = (wc == 1 and len(t_norm_clean) <= 1)
 
                             if (self._last_speech_duration_seconds >= min_turn_fallback or wc >= 1 or is_number_like) and not trivially_short:
-                                try:
-                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-                                except Exception:
-                                    pass
-                                try:
-                                    await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                                    self._response_triggered_for_turn = True
-                                    self._last_speech_time = asyncio.get_event_loop().time()
-                                    logger.info(f"[{self.call_uuid}] ✅ AI response triggered (late transcript fallback)")
+                                # If VAD hasn't emitted speech_stopped yet, OpenRouter streaming can abort
+                                # immediately because `_caller_speaking` is still True. Wait briefly.
+                                if getattr(self, "_caller_speaking", False):
+                                    asyncio.create_task(
+                                        self._trigger_brain_response_after_caller_stops(
+                                            "late_transcript_fallback",
+                                            transcript=t_norm,
+                                            extra_system_instruction=None,
+                                        )
+                                    )
+                                    triggered = True
+                                else:
+                                    triggered = await self._trigger_brain_response("late_transcript_fallback")
 
-                                    # Latency-based filler for fallback-triggered responses.
-                                    if self._pending_filler_task is not None and not self._pending_filler_task.done():
+                                if triggered:
+                                    logger.info(f"[{self.call_uuid}] ✅ AI response trigger scheduled (late transcript fallback)")
+                                    effective_provider = self._effective_brain_provider()
+                                    if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            self._pending_filler_task.cancel()
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "420"))
                                         except Exception:
-                                            pass
-                                    self._pending_filler_generation += 1
-                                    gen = self._pending_filler_generation
-                                    try:
-                                        latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
-                                    except Exception:
-                                        latency_ms = 650.0
+                                            latency_ms = 420.0
+                                    else:
+                                        try:
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                        except Exception:
+                                            latency_ms = 650.0
                                     try:
                                         delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                                     except Exception:
                                         delay_seconds = 0.65
-                                    self._pending_filler_task = asyncio.create_task(
-                                        self._maybe_play_speechmatics_filler(gen, min_turn=0.0, delay_seconds=delay_seconds)
-                                    )
-                                except Exception as e:
-                                    logger.warning(f"[{self.call_uuid}] Failed to create response (fallback): {e}")
+                                    await self._schedule_latency_filler_for_trigger(min_turn=0.0, delay_seconds=delay_seconds)
 
                     # If the caller is saying something substantive while the agent is speaking,
-                    # stop the agent output immediately (true barge-in). We only skip this for
-                    # short backchannels like "ok" / "yeah".
+                    # stop the agent output immediately. We only skip this for short backchannels like "ok" / "yeah".
                     interrupted_agent = False
                     if (
                         transcript
                         and self._agent_speaking
                         and not self._is_backchannel_utterance(transcript)
                     ):
-                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (non-backchannel) - interrupting agent output: {transcript!r}")
+                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (caller interrupting) - stopping agent: {transcript!r}")
                         await self._interrupt_agent_output("barge_in_transcript")
                         interrupted_agent = True
 
@@ -3608,7 +6659,10 @@ You must use ONLY this information when answering questions about services, area
                         interrupted_agent
                         and not self._response_triggered_for_turn
                         and self.openai_ws
-                        and getattr(self, 'voice_provider', 'openai') == 'speechmatics'
+                        and (
+                            getattr(self, 'voice_provider', 'openai') == 'speechmatics'
+                            or (str(self._effective_brain_provider() or 'openai').strip().lower() != 'openai')
+                        )
                     ):
                         t_raw = (transcript or '').strip()
                         if t_raw and (not self._is_backchannel_utterance(t_raw)):
@@ -3627,36 +6681,25 @@ You must use ONLY this information when answering questions about services, area
                             if (self._last_speech_duration_seconds >= min_turn_fallback or wc >= 1 or is_number_like) and not trivially_short:
                                 # Allow latency filler for the new user turn even though we just barged-in.
                                 self._suppress_filler_for_turn = False
-                                try:
-                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-                                except Exception:
-                                    pass
-                                try:
-                                    await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                                    self._response_triggered_for_turn = True
-                                    self._last_speech_time = asyncio.get_event_loop().time()
+                                triggered = await self._trigger_brain_response("post_barge_in_transcript")
+                                if triggered:
                                     logger.info(f"[{self.call_uuid}] ✅ AI response triggered (post-barge-in transcript)")
-
-                                    if self._pending_filler_task is not None and not self._pending_filler_task.done():
+                                    effective_provider = self._effective_brain_provider()
+                                    if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            self._pending_filler_task.cancel()
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "420"))
                                         except Exception:
-                                            pass
-                                    self._pending_filler_generation += 1
-                                    gen = self._pending_filler_generation
-                                    try:
-                                        latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
-                                    except Exception:
-                                        latency_ms = 650.0
+                                            latency_ms = 420.0
+                                    else:
+                                        try:
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                        except Exception:
+                                            latency_ms = 650.0
                                     try:
                                         delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                                     except Exception:
                                         delay_seconds = 0.65
-                                    self._pending_filler_task = asyncio.create_task(
-                                        self._maybe_play_speechmatics_filler(gen, min_turn=0.0, delay_seconds=delay_seconds)
-                                    )
-                                except Exception as e:
-                                    logger.warning(f"[{self.call_uuid}] Failed to create response (post-barge-in): {e}")
+                                    await self._schedule_latency_filler_for_trigger(min_turn=0.0, delay_seconds=delay_seconds)
 
                     # If the caller is just backchanneling while the agent is talking, ignore it:
                     # don't stop TTS, and cancel any auto-response triggered by that utterance.
@@ -3665,6 +6708,9 @@ You must use ONLY this information when answering questions about services, area
                     ignore_always = bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True))
                     if self._is_backchannel_utterance(transcript) and (ignore_always or self._agent_speaking or self._caller_speaking):
                         logger.info(f"[{self.call_uuid}] 💤 Ignoring backchannel: {transcript!r}")
+
+                        # Cancel any pending DeepSeek generation that might have been queued.
+                        self._cancel_pending_deepseek()
 
                         # Best-effort: delete the underlying conversation item so it doesn't linger in context
                         # and get "responded to" later.
@@ -3697,6 +6743,17 @@ You must use ONLY this information when answering questions about services, area
                     self.transcript_parts.append(f"Caller: {transcript}")
                     self._last_speech_time = asyncio.get_event_loop().time()
 
+                    # Record recent caller utterances for intent detection (span multi-chunk requests).
+                    try:
+                        now_ts = asyncio.get_event_loop().time()
+                    except Exception:
+                        now_ts = time.time()
+                    try:
+                        if hasattr(self, "_recent_caller_utterances"):
+                            self._recent_caller_utterances.append((float(now_ts), str(transcript or "").strip()))
+                    except Exception:
+                        pass
+
                     # ------------------------------------------------------------------
                     # Transfer-by-name offering (up to 5 configured names)
                     # If caller asks for a configured person, offer transfer; transfer only on confirmation.
@@ -3706,13 +6763,16 @@ You must use ONLY this information when answering questions about services, area
 
                     now_ts = asyncio.get_event_loop().time()
                     pending_name = getattr(self, '_pending_transfer_person_name', '') or ''
+                    pending_target = getattr(self, '_pending_transfer_target_name', '') or ''
                     pending_expires = float(getattr(self, '_pending_transfer_expires_at', 0) or 0)
 
                     # Expire pending confirmation window
                     if pending_name and pending_expires and now_ts > pending_expires:
                         self._pending_transfer_person_name = ""
+                        self._pending_transfer_target_name = ""
                         self._pending_transfer_expires_at = 0
                         pending_name = ""
+                        pending_target = ""
 
                     if pending_name and transfer_number:
                         low = (transcript or "").strip().lower()
@@ -3723,8 +6783,10 @@ You must use ONLY this information when answering questions about services, area
                         no_markers = ["no", "nope", "nah", "no thanks", "not now", "don't", "do not"]
 
                         if any(m in low for m in yes_markers):
-                            logger.info(f"[{self.call_uuid}] ✅ Transfer confirmed to {pending_name}")
+                            to_name = (pending_target or pending_name).strip() or "them"
+                            logger.info(f"[{self.call_uuid}] ✅ Transfer confirmed (label={pending_name!r} -> to={to_name!r})")
                             self._pending_transfer_person_name = ""
+                            self._pending_transfer_target_name = ""
                             self._pending_transfer_expires_at = 0
 
                             # Cancel any active OpenAI response and stop Speechmatics output
@@ -3736,41 +6798,74 @@ You must use ONLY this information when answering questions about services, area
                             self._barge_in_stop_speechmatics()
                             self._speechmatics_pending_text = ""
 
-                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"transfer to {pending_name}"))
+                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"transfer to {to_name}"))
                             continue
 
                         if any(m in low for m in no_markers):
-                            logger.info(f"[{self.call_uuid}] 🚫 Transfer declined (asked for {pending_name})")
+                            to_name = (pending_target or pending_name).strip() or "them"
+                            logger.info(f"[{self.call_uuid}] 🚫 Transfer declined (label={pending_name!r} -> to={to_name!r})")
                             self._pending_transfer_person_name = ""
+                            self._pending_transfer_target_name = ""
                             self._pending_transfer_expires_at = 0
                             try:
                                 self._transfer_declined_people.add((pending_name or "").strip().lower())
                             except Exception:
                                 pass
                             try:
-                                if self.openai_ws:
-                                    await self.openai_ws.send(json.dumps({
-                                        "type": "conversation.item.create",
-                                        "item": {
-                                            "type": "message",
-                                            "role": "user",
-                                            "content": [{
-                                                "type": "input_text",
-                                                "text": (
-                                                    f"[SYSTEM: The caller declined a transfer to {pending_name}. "
-                                                    f"Acknowledge briefly and take a message for {pending_name}. "
-                                                    f"Ask for their name, best callback number, and what it's about. Keep it concise.]"
-                                                )
-                                            }]
-                                        }
-                                    }))
-                                    await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                effective = "openai"
+                                try:
+                                    effective = str(self._effective_brain_provider() or "openai").strip().lower()
+                                except Exception:
+                                    effective = "openai"
+
+                                extra = (
+                                    f"The caller declined a transfer to {to_name}. "
+                                    f"Acknowledge briefly and take a message for {to_name}. "
+                                    f"Ask for their name, best callback number, and what it's about. Keep it concise."
+                                )
+
+                                if effective != "openai":
+                                    await self._trigger_brain_response("transfer_declined", extra_system_instruction=extra)
+                                else:
+                                    if self.openai_ws:
+                                        await self.openai_ws.send(json.dumps({
+                                            "type": "conversation.item.create",
+                                            "item": {
+                                                "type": "message",
+                                                "role": "user",
+                                                "content": [{
+                                                    "type": "input_text",
+                                                    "text": f"[SYSTEM: {extra}]"
+                                                }]
+                                            }
+                                        }))
+                                        await self.openai_ws.send(json.dumps({"type": "response.create"}))
                             except Exception:
                                 pass
                             continue
 
                     # Detect name request (only if we are not already awaiting confirmation)
-                    if transfer_number and transcript and transfer_people and not pending_name:
+                    # BUT: Skip auto-detection if custom transfer rules exist in business context
+                    has_custom_transfer_rules = False
+                    try:
+                        business_context = getattr(self, 'business_info', '') or ''
+                        agent_instructions_text = getattr(self, 'agent_instructions', '') or ''
+                        transfer_instructions_text = getattr(self, 'transfer_instructions', '') or ''
+                        combined = (business_context + " " + agent_instructions_text + " " + transfer_instructions_text).lower()
+                        # Check for custom transfer rules (common patterns in call handling guidelines)
+                        transfer_rule_indicators = [
+                            "if the user says", "if caller says", "if they say", "if the caller",
+                            "when the user says", "when caller says", "when they say",
+                            "if it is the", "if they are the", "if caller is",
+                            "transfer them", "then transfer", "transfer to", "transfer the call"
+                        ]
+                        if any(indicator in combined for indicator in transfer_rule_indicators):
+                            has_custom_transfer_rules = True
+                            logger.info(f"[{self.call_uuid}] 🎯 Custom transfer rules detected in business context - AI will handle transfer logic naturally")
+                    except Exception:
+                        pass
+                    
+                    if transfer_number and transcript and transfer_people and not pending_name and not has_custom_transfer_rules:
                         low = transcript.lower()
                         matched_person = None
 
@@ -3904,6 +6999,13 @@ You must use ONLY this information when answering questions about services, area
                                 self._pending_transfer_person_name = matched_person
                                 self._pending_transfer_expires_at = now_ts + 30.0
 
+                                # Best-effort: infer who we are transferring TO (e.g., "Bob").
+                                try:
+                                    inferred_to = (self._infer_transfer_target_name() or "").strip()
+                                except Exception:
+                                    inferred_to = ""
+                                self._pending_transfer_target_name = inferred_to or "the person you're trying to reach"
+
                                 # Best-effort cancel any active OpenAI response and force an offer
                                 try:
                                     if self.openai_ws:
@@ -3911,25 +7013,36 @@ You must use ONLY this information when answering questions about services, area
                                 except Exception:
                                     pass
 
+                                extra = (
+                                    f"The caller indicated the call was from {matched_person} (or they are {matched_person}). "
+                                    f"Ask: 'Would you like me to transfer you to {self._pending_transfer_target_name}?' "
+                                    f"Wait for a clear yes/no. If yes, proceed with transfer. If no, take a message for {self._pending_transfer_target_name}. "
+                                    f"Keep it concise and natural."
+                                )
+
                                 try:
-                                    if self.openai_ws:
-                                        await self.openai_ws.send(json.dumps({
-                                            "type": "conversation.item.create",
-                                            "item": {
-                                                "type": "message",
-                                                "role": "user",
-                                                "content": [{
-                                                    "type": "input_text",
-                                                    "text": (
-                                                        f"[SYSTEM: The caller indicated the call was from {matched_person} (or they are {matched_person}). "
-                                                        f"Say: 'I can try and transfer you to them if you would you like me to?' "
-                                                        f"Wait for a clear yes/no. If yes, proceed with transfer. If no, take a message for {matched_person}. "
-                                                        f"Keep it concise and natural.]"
-                                                    )
-                                                }]
-                                            }
-                                        }))
-                                        await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                    effective = "openai"
+                                    try:
+                                        effective = str(self._effective_brain_provider() or "openai").strip().lower()
+                                    except Exception:
+                                        effective = "openai"
+
+                                    if effective != "openai":
+                                        await self._trigger_brain_response("transfer_offer", extra_system_instruction=extra)
+                                    else:
+                                        if self.openai_ws:
+                                            await self.openai_ws.send(json.dumps({
+                                                "type": "conversation.item.create",
+                                                "item": {
+                                                    "type": "message",
+                                                    "role": "user",
+                                                    "content": [{
+                                                        "type": "input_text",
+                                                        "text": f"[SYSTEM: {extra}]"
+                                                    }]
+                                                }
+                                            }))
+                                            await self.openai_ws.send(json.dumps({"type": "response.create"}))
                                 except Exception:
                                     pass
                                 continue
@@ -3938,9 +7051,67 @@ You must use ONLY this information when answering questions about services, area
                     logger.info(f"[{self.call_uuid}] 🔍 Transfer check: transfer_number='{transfer_number}', transcript='{transcript}'")
                     
                     if transfer_number and transcript:
-                        caller_keywords = ["transfer me", "transfer", "speak to someone", "talk to someone", 
-                                          "connect me", "put me through", "real person", "human", "manager"]
-                        if any(keyword in transcript.lower() for keyword in caller_keywords):
+                        t_low = str(transcript or "").lower()
+
+                        # Fast-path keyword detection (cheap)
+                        caller_keywords = [
+                            "transfer me", "can you transfer", "please transfer", "transfer",
+                            "put me through", "connect me", "connect us", "patch me through",
+                            "can i speak to", "could i speak to", "can i talk to", "could i talk to",
+                            "speak to someone", "talk to someone", "real person", "human", "manager",
+                        ]
+                        direct_keyword = any(k in t_low for k in caller_keywords)
+
+                        # Brain-based intent detection (handles flexible phrasing + multi-utterance requests)
+                        # Run only when transfer_people is configured and we haven't just triggered.
+                        # SKIP brain classifier when custom transfer rules exist - let the AI handle it naturally.
+                        should_try_intent = bool(transfer_people) and not has_custom_transfer_rules
+                        try:
+                            now_ts2 = asyncio.get_event_loop().time()
+                        except Exception:
+                            now_ts2 = time.time()
+                        try:
+                            cooldown = float(getattr(self, "_transfer_intent_cooldown_seconds", 2.0) or 2.0)
+                        except Exception:
+                            cooldown = 2.0
+
+                        recently_triggered = False
+                        try:
+                            last_trig = float(getattr(self, "_last_transfer_intent_trigger_at", 0.0) or 0.0)
+                            if last_trig and (now_ts2 - last_trig) < cooldown:
+                                recently_triggered = True
+                        except Exception:
+                            recently_triggered = False
+
+                        # Only bother calling intent model when the utterance looks relevant.
+                        looks_like_transfer = direct_keyword
+                        if not looks_like_transfer and transfer_people:
+                            try:
+                                # If caller mentions any label token/alias, treat as relevant.
+                                import re
+                                for lbl in transfer_people[:5]:
+                                    for alias in self._transfer_aliases_for_label(str(lbl)):
+                                        if not alias:
+                                            continue
+                                        if alias in {"dr", "drs"}:
+                                            pat = r"\b" + re.escape(alias) + r"\.?\b"
+                                        else:
+                                            pat = r"\b" + re.escape(alias) + r"\b"
+                                        if re.search(pat, t_low):
+                                            looks_like_transfer = True
+                                            break
+                                    if looks_like_transfer:
+                                        break
+                            except Exception:
+                                pass
+                        if not looks_like_transfer:
+                            # Other common structures: asking for someone / identifying as a known label.
+                            if any(x in t_low for x in ["i am", "i'm", "this is", "calling from", "from the", "from "]):
+                                looks_like_transfer = True
+
+                        # If custom transfer rules exist, skip ALL automatic transfer detection
+                        # and let the AI handle it naturally based on the transfer instructions
+                        if direct_keyword and not has_custom_transfer_rules:
                             logger.info(f"[{self.call_uuid}] 🔥🔥🔥 CALLER REQUESTED TRANSFER: '{transcript}'")
                             logger.info(f"[{self.call_uuid}] 🔥 USING TRANSFER NUMBER: {transfer_number}")
                             logger.info(f"[{self.call_uuid}] 🔥 STOPPING OPENAI and executing transfer to {transfer_number}")
@@ -3958,6 +7129,118 @@ You must use ONLY this information when answering questions about services, area
                             
                             # Execute transfer immediately
                             asyncio.create_task(self._execute_auto_transfer(transfer_number, f"Caller requested: {transcript}"))
+
+                            try:
+                                self._last_transfer_intent_trigger_at = float(now_ts2)
+                            except Exception:
+                                pass
+                            continue
+
+                        # If no direct keyword matched, let the selected brain decide intent.
+                        # If the caller is from a configured label but hasn't explicitly requested transfer,
+                        # we will OFFER a transfer (yes/no) and take a message if declined.
+                        if should_try_intent and looks_like_transfer and (not recently_triggered) and (not pending_name):
+                            try:
+                                # Combine a short recent window so split requests trigger on first ask.
+                                combined = self._recent_caller_text_window(seconds=4.0) or str(transcript or "").strip()
+                                last_check = float(getattr(self, "_last_transfer_intent_check_at", 0.0) or 0.0)
+                                # Debounce repeated checks within a short interval.
+                                if (now_ts2 - last_check) >= 0.6:
+                                    self._last_transfer_intent_check_at = float(now_ts2)
+                                    intent = await self._brain_classify_transfer_intent(combined, transfer_people[:5])
+                                    matched_label = str(intent.get("matched_label") or "").strip() if intent.get("matched_label") else ""
+                                    wants_transfer = bool(intent.get("wants_transfer"))
+
+                                    if matched_label:
+                                        if wants_transfer:
+                                            logger.info(
+                                                f"[{self.call_uuid}] 🎯 Brain transfer intent: wants_transfer=True matched_label={matched_label!r} conf={intent.get('confidence')} reason={intent.get('reason')!r}"
+                                            )
+
+                                            # Caller explicitly requested transfer -> transfer immediately.
+                                            try:
+                                                if self.openai_ws:
+                                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                                            except Exception:
+                                                pass
+                                            self._barge_in_stop_speechmatics()
+                                            self._speechmatics_pending_text = ""
+
+                                            asyncio.create_task(
+                                                self._execute_auto_transfer(
+                                                    transfer_number,
+                                                    f"Brain explicit transfer request matched '{matched_label}': {combined}",
+                                                )
+                                            )
+                                            try:
+                                                self._last_transfer_intent_trigger_at = float(now_ts2)
+                                            except Exception:
+                                                pass
+                                            continue
+                                        else:
+                                            # Caller identified as a configured label but did NOT ask to transfer.
+                                            # Offer transfer and wait for a clear yes/no.
+                                            logger.info(
+                                                f"[{self.call_uuid}] 🎯 Brain identity match (offer transfer): matched_label={matched_label!r} conf={intent.get('confidence')} reason={intent.get('reason')!r}"
+                                            )
+                                            self._pending_transfer_person_name = matched_label
+                                            self._pending_transfer_expires_at = now_ts2 + 30.0
+
+                                            # Best-effort: infer who we are transferring TO (e.g., "Bob").
+                                            try:
+                                                inferred_to = (self._infer_transfer_target_name() or "").strip()
+                                            except Exception:
+                                                inferred_to = ""
+                                            self._pending_transfer_target_name = inferred_to or "the person you're trying to reach"
+
+                                            # Best-effort cancel any active response so we can ask the question cleanly.
+                                            try:
+                                                if self.openai_ws:
+                                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                                            except Exception:
+                                                pass
+
+                                            extra = (
+                                                f"The caller appears to be from {matched_label}. "
+                                                f"Ask: 'Would you like me to transfer you to {self._pending_transfer_target_name}?' "
+                                                f"Wait for a clear yes/no. "
+                                                f"If yes, proceed with transfer. If no, take a message for {self._pending_transfer_target_name} and ask for their name, best callback number, and what it's about. "
+                                                f"Keep it concise and natural."
+                                            )
+
+                                            try:
+                                                effective = "openai"
+                                                try:
+                                                    effective = str(self._effective_brain_provider() or "openai").strip().lower()
+                                                except Exception:
+                                                    effective = "openai"
+
+                                                if effective != "openai":
+                                                    await self._trigger_brain_response("transfer_offer", extra_system_instruction=extra)
+                                                else:
+                                                    if self.openai_ws:
+                                                        await self.openai_ws.send(json.dumps({
+                                                            "type": "conversation.item.create",
+                                                            "item": {
+                                                                "type": "message",
+                                                                "role": "user",
+                                                                "content": [{
+                                                                    "type": "input_text",
+                                                                    "text": f"[SYSTEM: {extra}]"
+                                                                }]
+                                                            }
+                                                        }))
+                                                        await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                                            except Exception:
+                                                pass
+
+                                            try:
+                                                self._last_transfer_intent_trigger_at = float(now_ts2)
+                                            except Exception:
+                                                pass
+                                            continue
+                            except Exception as e:
+                                logger.warning(f"[{self.call_uuid}] Transfer intent handling error: {e}")
 
                     # Check for sales call in background (non-blocking) - don't wait for result
                     if self.sales_detector_enabled:
@@ -4104,6 +7387,38 @@ You must use ONLY this information when answering questions about services, area
                     logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']}: {transcript}")
                     self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {transcript}")
                     
+                    # 🔥 AI-INITIATED TRANSFER: Check if the agent is saying it will transfer
+                    transfer_number = getattr(self, 'transfer_number', '')
+                    if transfer_number and transcript:
+                        ai_transfer_phrases = [
+                            "i'll transfer you now", "i will transfer you now", "i'm transferring you",
+                            "transferring you now", "i'll put you through now", "putting you through now",
+                            "connecting you now", "i'll transfer you right", "i will transfer you right",
+                            "let me transfer you now", "i'm putting you through", "i'll connect you now"
+                        ]
+                        transcript_lower = transcript.lower()
+                        if any(phrase in transcript_lower for phrase in ai_transfer_phrases):
+                            logger.info(f"[{self.call_uuid}] 🔥 AI INITIATED TRANSFER detected in response: '{transcript}'")
+                            logger.info(f"[{self.call_uuid}] 🔥 Executing transfer to {transfer_number}")
+                            
+                            # Stop any ongoing TTS
+                            self._barge_in_stop_speechmatics()
+                            self._speechmatics_pending_text = ""
+                            
+                            # Execute transfer
+                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"AI initiated: {transcript}"))
+                            continue
+                    
+                    # Only count an OpenAI turn if OpenAI is actually the brain for this turn.
+                    # When using a non-OpenAI brain (OpenRouter/Groq/etc) we cancel OpenAI output,
+                    # but late/canceled events can still arrive; avoid mis-attributing usage.
+                    try:
+                        turn_brain = str(getattr(self, "_brain_provider_for_turn", "openai") or "openai").strip().lower()
+                    except Exception:
+                        turn_brain = "openai"
+                    if turn_brain == "openai":
+                        self._record_brain_turn("openai", transcript)
+                    
                     # Get user's voice provider preference
                     voice_provider = getattr(self, 'voice_provider', 'openai')
 
@@ -4159,6 +7474,36 @@ You must use ONLY this information when answering questions about services, area
                     transcript = event.get("transcript", "")
                     logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']}: {transcript}")
                     self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {transcript}")
+                    
+                    # 🔥 AI-INITIATED TRANSFER: Check if the agent is saying it will transfer
+                    transfer_number = getattr(self, 'transfer_number', '')
+                    if transfer_number and transcript:
+                        ai_transfer_phrases = [
+                            "i'll transfer you now", "i will transfer you now", "i'm transferring you",
+                            "transferring you now", "i'll put you through now", "putting you through now",
+                            "connecting you now", "i'll transfer you right", "i will transfer you right",
+                            "let me transfer you now", "i'm putting you through", "i'll connect you now"
+                        ]
+                        transcript_lower = transcript.lower()
+                        if any(phrase in transcript_lower for phrase in ai_transfer_phrases):
+                            logger.info(f"[{self.call_uuid}] 🔥 AI INITIATED TRANSFER detected in audio response: '{transcript}'")
+                            logger.info(f"[{self.call_uuid}] 🔥 Executing transfer to {transfer_number}")
+                            
+                            # Stop any ongoing TTS
+                            self._barge_in_stop_speechmatics()
+                            self._speechmatics_pending_text = ""
+                            
+                            # Execute transfer
+                            asyncio.create_task(self._execute_auto_transfer(transfer_number, f"AI initiated: {transcript}"))
+                            continue
+                    
+                    # Only count an OpenAI turn if OpenAI is actually the brain for this turn.
+                    try:
+                        turn_brain = str(getattr(self, "_brain_provider_for_turn", "openai") or "openai").strip().lower()
+                    except Exception:
+                        turn_brain = "openai"
+                    if turn_brain == "openai":
+                        self._record_brain_turn("openai", transcript)
                     self._agent_speaking = False  # Agent finished speaking
                     
                     # Get user's voice provider preference
@@ -4302,7 +7647,7 @@ You must use ONLY this information when answering questions about services, area
                 stream=True
             ):
                 if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
-                    logger.info(f"[{self.call_uuid}] 🛑 Cartesia interrupted (barge-in)")
+                    logger.info(f"[{self.call_uuid}] 🛑 Cartesia interrupted")
                     break
 
                 if chunk.audio and self.vonage_ws and self.is_active:
@@ -4402,7 +7747,7 @@ You must use ONLY this information when answering questions about services, area
             
             for chunk in audio_generator:
                 if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
-                    logger.info(f"[{self.call_uuid}] 🛑 ElevenLabs interrupted (barge-in)")
+                    logger.info(f"[{self.call_uuid}] 🛑 ElevenLabs interrupted")
                     break
 
                 if chunk and self.is_active and self.vonage_ws:
@@ -4491,7 +7836,7 @@ You must use ONLY this information when answering questions about services, area
             buffered = b""
             chunk_size = 6400  # ~200ms at 16kHz, 16-bit mono
             prebuffer = bytearray()
-            max_prebuffer = 128000  # ~4s of 16kHz PCM16 audio; filler should end long before this
+            max_prebuffer = 64000  # ~2s of 16kHz PCM16 audio - reduced to minimize delay after filler
 
             # Stream bytes as they arrive. If Speechmatics buffers server-side,
             # this still avoids an extra full-download wait on our side.
@@ -4564,10 +7909,10 @@ You must use ONLY this information when answering questions about services, area
                 # If the stream ends while filler is still playing, wait briefly to flush the buffered
                 # audio immediately after filler finishes.
                 if self._filler_injecting and (prebuffer or buffered):
-                    for _ in range(40):
+                    for _ in range(20):
                         if not self._filler_injecting:
                             break
-                        await asyncio.sleep(0.05)
+                        await asyncio.sleep(0.02)
 
                 if prebuffer and not self._filler_injecting:
                     buffered += bytes(prebuffer)
@@ -5131,9 +8476,16 @@ You must use ONLY this information when answering questions about services, area
                     if credits_remaining <= 0:
                         logger.warning(f"[{self.call_uuid}] 🚫 CREDITS DEPLETED (balance: {credits_remaining}) - Disconnecting call for user {self.user_id}")
                         
-                        # Send farewell message before disconnecting
+                        # Send farewell message before disconnecting.
+                        # IMPORTANT: in non-OpenAI brain mode, do not trigger OpenAI responses.
                         try:
-                            if self.openai_ws:
+                            effective = "openai"
+                            try:
+                                effective = str(self._effective_brain_provider() or "openai").strip().lower()
+                            except Exception:
+                                effective = "openai"
+
+                            if effective == "openai" and self.openai_ws:
                                 await self.openai_ws.send(json.dumps({
                                     "type": "conversation.item.create",
                                     "item": {
@@ -5146,9 +8498,17 @@ You must use ONLY this information when answering questions about services, area
                                     }
                                 }))
                                 await self.openai_ws.send(json.dumps({"type": "response.create"}))
-                                
+
                                 # Wait briefly for the message to be sent
                                 await asyncio.sleep(3)
+                            else:
+                                msg = (
+                                    "I'm sorry, but this account's call credits have run out, so I need to end the call now. "
+                                    "Please contact the business to top up. Thanks for calling."
+                                )
+                                await self._speak_text_via_voice_provider(msg)
+                                self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {msg}")
+                                await asyncio.sleep(2)
                         except Exception as e:
                             logger.error(f"[{self.call_uuid}] Error sending credit depletion message: {e}")
                         
@@ -5227,6 +8587,22 @@ You must use ONLY this information when answering questions about services, area
             logger.info(f"[{self.call_uuid}] Average response time: {avg_response_time:.0f}ms from {len(self._response_times)} responses")
         
         CallLogger.log_call_end(self.call_uuid, full_transcript, avg_response_time, self.sales_confidence, self.sales_reasoning, self.sales_ended_call)
+
+        # Persist fallback diagnostics (best-effort).
+        try:
+            CallLogger.persist_call_fallback_info(
+                self.call_uuid,
+                openai_fallback_turns=int(getattr(self, "_openai_fallback_turns", 0) or 0),
+                openai_fallback_reasons=list(getattr(self, "_openai_fallback_reasons", []) or []),
+            )
+        except Exception:
+            pass
+
+        # Persist final brain usage snapshot (best-effort).
+        try:
+            self._brain_usage_db_upsert()
+        except Exception:
+            pass
         
         # Generate AI summary in background
         asyncio.create_task(CallLogger.generate_summary(self.call_uuid))
@@ -5254,21 +8630,26 @@ class SessionManager:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    '''
                     SELECT voice, use_elevenlabs, elevenlabs_voice_id, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
                            calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
                            business_info, agent_personality, agent_instructions, agent_name,
-                           call_greeting, transfer_number, transfer_people
+                           call_greeting, transfer_number, transfer_people,
+                           call_mode, transfer_instructions
                     FROM account_settings WHERE user_id = ?
-                ''', (user_id,))
+                    ''',
+                    (user_id,),
+                )
                 row = cursor.fetchone()
                 conn.close()
+
                 if row:
                     # OpenAI voice
-                    session.user_voice = row[0] if row[0] else 'shimmer'
+                    session.user_voice = row[0] if row[0] else 'sarah'
                     logger.info(f"[{call_uuid}] Loaded voice preference: {session.user_voice}")
-                    
-                    # Load business configuration (NEW)
+
+                    # Load business configuration
                     session.business_info = row[11] if len(row) > 11 and row[11] else ""
                     session.agent_personality = row[12] if len(row) > 12 and row[12] else "Friendly and professional. Keep responses brief and conversational."
                     session.agent_instructions = row[13] if len(row) > 13 and row[13] else "Answer questions about the business. Take messages if needed."
@@ -5280,6 +8661,7 @@ class SessionManager:
 
                     # Transfer-by-name offering list
                     session.transfer_people = []
+                    session.transfer_instructions = row[19] if len(row) > 19 and row[19] else ""
                     try:
                         import json as _json
                         raw_people = row[17] if len(row) > 17 and row[17] else "[]"
@@ -5288,13 +8670,14 @@ class SessionManager:
                             session.transfer_people = [str(p).strip() for p in parsed if str(p).strip()][:5]
                     except Exception:
                         session.transfer_people = []
-                    logger.info(f"[{call_uuid}] Loaded business config:")
-                    logger.info(f"[{call_uuid}]   - Agent Name: {session.agent_name}")
-                    logger.info(f"[{call_uuid}]   - Business Info: {session.business_info[:100] if session.business_info else '(empty)'}...")
-                    logger.info(f"[{call_uuid}]   - Personality: {session.agent_personality[:50]}...")
-                    logger.info(f"[{call_uuid}]   - Instructions: {session.agent_instructions[:50]}...")
-                    
-                    # Voice provider (openai, elevenlabs, cartesia, google, playht)
+
+                    # Call mode (realtime vs non-realtime)
+                    try:
+                        session.call_mode = str(row[18] if len(row) > 18 and row[18] else "").strip().lower()
+                    except Exception:
+                        session.call_mode = ""
+
+                    # Voice provider
                     session.voice_provider = row[3] if row[3] else 'openai'
                     logger.info(f"[{call_uuid}] Voice provider: {session.voice_provider}")
 
@@ -5314,49 +8697,34 @@ class SessionManager:
                     if session.voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
                         logger.warning(f"[{call_uuid}] Speechmatics selected but not configured; falling back to 'openai'")
                         session.voice_provider = 'openai'
-                    
+
                     # Legacy ElevenLabs toggle (for backwards compatibility)
                     session.use_elevenlabs = bool(row[1]) if row[1] is not None else False
-                    
-                    # ElevenLabs voice ID
+
+                    # Provider-specific voice IDs
                     session.elevenlabs_voice_id = row[2] if row[2] else 'EXAVITQu4vr4xnSDxMaL'
-                    if session.voice_provider == 'elevenlabs':
-                        logger.info(f"[{call_uuid}] ElevenLabs voice ID: {session.elevenlabs_voice_id}")
-                    
-                    # Cartesia voice ID
                     session.cartesia_voice_id = row[4] if row[4] else 'a0e99841-438c-4a64-b679-ae501e7d6091'
-                    if session.voice_provider == 'cartesia':
-                        logger.info(f"[{call_uuid}] Cartesia voice ID: {session.cartesia_voice_id}")
-                    
-                    # Google voice
                     session.google_voice = row[5] if row[5] else 'en-GB-Neural2-A'
-                    if session.voice_provider == 'google':
-                        logger.info(f"[{call_uuid}] Google voice: {session.google_voice}")
-                    
-                    # PlayHT voice
                     session.playht_voice_id = row[6] if row[6] else 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
-                    if session.voice_provider == 'playht':
-                        logger.info(f"[{call_uuid}] PlayHT voice ID: {session.playht_voice_id}")
-                    
-                    # Speechmatics voice (typically 'sarah')
-                    session.speechmatics_voice_id = 'sarah'  # Default to Sarah
-                    if session.voice_provider == 'speechmatics':
-                        logger.info(f"[{call_uuid}] Speechmatics voice: {session.speechmatics_voice_id}")
-                    
+                    session.speechmatics_voice_id = 'sarah'
+
                     # Bundle settings
                     session.calendar_booking_enabled = bool(row[7]) if len(row) > 7 and row[7] is not None else True
                     session.tasks_enabled = bool(row[8]) if len(row) > 8 and row[8] is not None else True
                     session.advanced_voice_enabled = bool(row[9]) if len(row) > 9 and row[9] is not None else False
                     session.sales_detector_enabled = bool(row[10]) if len(row) > 10 and row[10] is not None else False
-                    logger.info(f"[{call_uuid}] Bundle settings - Calendar: {session.calendar_booking_enabled}, Tasks: {session.tasks_enabled}, AdvancedVoice: {session.advanced_voice_enabled}, SalesDetector: {session.sales_detector_enabled}")
+                    logger.info(
+                        f"[{call_uuid}] Bundle settings - Calendar: {session.calendar_booking_enabled}, Tasks: {session.tasks_enabled}, AdvancedVoice: {session.advanced_voice_enabled}, SalesDetector: {session.sales_detector_enabled}"
+                    )
                 else:
-                    session.user_voice = 'shimmer'
-                    session.voice_provider = 'openai'
+                    session.user_voice = 'sarah'
+                    session.voice_provider = 'speechmatics'
                     session.use_elevenlabs = False
                     session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                     session.cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
                     session.google_voice = 'en-GB-Neural2-A'
                     session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                    session.speechmatics_voice_id = 'sarah'
                     session.calendar_booking_enabled = True
                     session.tasks_enabled = True
                     session.sales_detector_enabled = False
@@ -5366,9 +8734,16 @@ class SessionManager:
                     session.agent_instructions = "Answer questions about the business. Take messages if needed."
                     session.agent_name = CONFIG['AGENT_NAME']
                     session.call_greeting = ""
+
+                # Freeze the brain provider once settings are loaded.
+                try:
+                    session.lock_brain_provider_for_call()
+                except Exception:
+                    pass
+
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to load preferences: {e}")
-                session.user_voice = 'shimmer'
+                session.user_voice = 'sarah'
                 session.use_elevenlabs = False
                 session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                 session.google_voice = 'en-GB-Neural2-A'
@@ -5378,8 +8753,12 @@ class SessionManager:
                 session.agent_instructions = "Answer questions about the business. Take messages if needed."
                 session.agent_name = CONFIG['AGENT_NAME']
                 session.call_greeting = ""
+                try:
+                    session.lock_brain_provider_for_call()
+                except Exception:
+                    pass
         else:
-            session.user_voice = 'shimmer'
+            session.user_voice = 'sarah'
             session.use_elevenlabs = False
             session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
             session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
@@ -5388,15 +8767,36 @@ class SessionManager:
             session.agent_instructions = "Answer questions about the business. Take messages if needed."
             session.agent_name = CONFIG['AGENT_NAME']
             session.call_greeting = ""
+            try:
+                session.lock_brain_provider_for_call()
+            except Exception:
+                pass
         
         self._sessions[call_uuid] = session
         # Log call start with user_id
         CallLogger.log_call_start(call_uuid, caller, called, user_id)
+
+        # Persist selected vs effective brain provider for post-call auditing.
+        try:
+            CallLogger.persist_call_brain_info(
+                call_uuid,
+                user_id=user_id,
+                call_mode=str(getattr(session, "call_mode", "") or "").strip().lower() or None,
+                selected_provider=str(getattr(session, "_brain_provider_selected", None) or CONFIG.get("AI_BRAIN_PROVIDER", "openai") or "openai").strip().lower(),
+                effective_provider=str(getattr(session, "_brain_provider_locked", None) or session._effective_brain_provider() or "openai").strip().lower(),
+                reasons=list(getattr(session, "_brain_provider_lock_reasons", []) or []),
+            )
+        except Exception:
+            pass
+
         return session
     
     def get_session(self, call_uuid: str) -> Optional[CallSession]:
         """Get an existing session"""
         return self._sessions.get(call_uuid)
+
+    def list_sessions(self) -> list:
+        return list(self._sessions.values())
     
     async def close_session(self, call_uuid: str):
         """Close and remove a session"""
@@ -5422,8 +8822,42 @@ sessions = SessionManager()
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     logger.info("🚀 Vonage Voice Agent starting...")
-    logger.info(f"📞 Answer URL: {CONFIG['PUBLIC_URL']}/webhooks/answer")
-    logger.info(f"📋 Event URL: {CONFIG['PUBLIC_URL']}/webhooks/events")
+    provider, synced_url = _sync_public_url_from_db_best_effort()
+    if synced_url:
+        logger.info(f"🌐 Tunnel provider (DB): {provider or 'unknown'}")
+        logger.info(f"📞 Answer URL: {synced_url}/webhooks/answer")
+        logger.info(f"📋 Event URL: {synced_url}/webhooks/events")
+    else:
+        logger.info(f"📞 Answer URL: {CONFIG['PUBLIC_URL']}/webhooks/answer")
+        logger.info(f"📋 Event URL: {CONFIG['PUBLIC_URL']}/webhooks/events")
+
+    # If Cloudflare is selected, try to ensure a tunnel is running so Vonage can
+    # reach the answer/event webhooks. This is best-effort and must not block startup.
+    try:
+        if (provider or "").lower() == "cloudflare":
+            running = _is_process_running("cloudflared.exe" if os.name == "nt" else "cloudflared")
+            if not running:
+                logger.warning("Cloudflare tunnel selected but not running; attempting to start it...")
+                try:
+                    await _start_tunnel_impl("cloudflare")
+                except Exception as e:
+                    logger.warning(f"Cloudflare auto-start failed: {e}")
+            else:
+                # If it's running but URL isn't in CONFIG yet, refresh from log.
+                url_from_log = ""
+                try:
+                    url_from_log = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+                except Exception:
+                    url_from_log = ""
+                if url_from_log and url_from_log != _normalize_public_url(CONFIG.get("PUBLIC_URL") or ""):
+                    CONFIG["PUBLIC_URL"] = url_from_log
+                    _persist_public_url(url_from_log)
+                    try:
+                        _update_vonage_application_webhooks(url_from_log)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
     # If any account has auto-transfer enabled, ensure Vonage app auth is configured.
     try:
@@ -5464,6 +8898,28 @@ app = FastAPI(
 # Mount static files for the UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+# Serve static HTML pages at the root
+@app.get("/")
+@app.get("/signup.html")
+async def serve_signup():
+    return FileResponse('static/signup.html')
+
+@app.get("/signup_verified.html")
+async def serve_signup_verified():
+    return FileResponse('static/signup_verified.html')
+
+@app.get("/signin.html")
+async def serve_signin():
+    return FileResponse('static/signin.html')
+
+@app.get("/admin.html")
+async def serve_admin():
+    return FileResponse('static/admin.html')
+
+@app.get("/super-admin.html")
+async def serve_super_admin():
+    return FileResponse('static/super-admin_current.html', headers={"Cache-Control": "no-store"})
 
 @app.get("/api/public/captcha-config")
 async def public_captcha_config():
@@ -5775,10 +9231,10 @@ async def get_config(authorization: Optional[str] = Header(None)):
     user_id = await get_current_user(authorization)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    voice = 'shimmer'
+    voice = 'sarah'
     use_elevenlabs = False
     elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
-    voice_provider = 'openai'
+    voice_provider = 'speechmatics'
     cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
     google_voice = 'en-GB-Neural2-A'
     playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
@@ -5791,6 +9247,7 @@ async def get_config(authorization: Optional[str] = Header(None)):
     call_greeting = ''
     transfer_number = ''
     transfer_people = []
+    transfer_instructions = ''
     calendar_booking_enabled = True
     tasks_enabled = True
     advanced_voice_enabled = False
@@ -5806,7 +9263,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
                    response_latency, voice_provider, cartesia_voice_id, google_voice, playht_voice_id,
                    agent_name, business_info, agent_personality, agent_instructions,
                    calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
-                   call_greeting, transfer_number, transfer_people, first_login_completed, sms_notifications_enabled
+                   call_greeting, transfer_number, transfer_people, first_login_completed, sms_notifications_enabled,
+                   transfer_instructions
             FROM account_settings WHERE user_id = ?
         ''', (user_id,))
         row = cursor.fetchone()
@@ -5868,6 +9326,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
 
             first_login_completed = bool(row[20]) if len(row) > 20 and row[20] is not None else False
 
+
+            transfer_instructions = row[22] if len(row) > 22 and row[22] else ''
             sms_notifications_enabled = bool(row[21]) if len(row) > 21 and row[21] is not None else False
     except Exception as e:
         logger.error(f"Failed to load user config: {e}")
@@ -5919,6 +9379,7 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "CALENDAR_BOOKING_CREDITS": calendar_credits,
         "TASK_CREDITS": task_credits,
         "ADVANCED_VOICE_CREDITS": voice_credits,
+        "TRANSFER_INSTRUCTIONS": transfer_instructions,
         "SALES_DETECTOR_CREDITS": sales_credits,
         "TRANSFER_NUMBER": transfer_number,
         "TRANSFER_PEOPLE": transfer_people,
@@ -5947,44 +9408,51 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             logger.info(f"Agent name updated to {data['AGENT_NAME']} for user {user_id}")
         
         if "BUSINESS_INFO" in data:
-            # CONTENT MODERATION: Check for inappropriate content
+            # CONTENT MODERATION: Only moderate if business info actually changed.
             business_info = data["BUSINESS_INFO"]
-            
-            # Check if account has been previously suspended (stricter checking)
-            cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
-            result = cursor.fetchone()
-            previous_suspensions = result[0] if result and result[0] else 0
-            
-            moderation_result = await moderate_business_content(business_info, user_id, previous_suspensions > 0)
-            
-            if not moderation_result["approved"]:
-                # Content flagged - suspend account
-                from datetime import datetime
-                suspension_reason = moderation_result["reason"]
-                flag_details = moderation_result.get("details", "")
-                
-                cursor.execute('''UPDATE account_settings 
-                                 SET is_suspended = 1, 
-                                     suspension_reason = ?, 
-                                     suspended_at = ?, 
-                                     suspension_count = suspension_count + 1,
-                                     last_flag_details = ?
-                                 WHERE user_id = ?''',
-                             (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
-                conn.commit()
-                conn.close()
-                
-                logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
-                
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Account suspended: {suspension_reason}. Please contact support."
-                )
-            
-            CONFIG["BUSINESS_INFO"] = data["BUSINESS_INFO"]
-            cursor.execute('UPDATE account_settings SET business_info = ? WHERE user_id = ?', 
-                         (data["BUSINESS_INFO"], user_id))
-            logger.info(f"Business info updated for user {user_id}")
+
+            cursor.execute('SELECT COALESCE(business_info, "") FROM account_settings WHERE user_id = ?', (user_id,))
+            existing_row = cursor.fetchone()
+            existing_business_info = existing_row[0] if existing_row else ""
+
+            if str(existing_business_info).strip() == str(business_info).strip():
+                logger.info(f"Business info unchanged for user {user_id}; skipping moderation")
+            else:
+                # Check if account has been previously suspended (stricter checking)
+                cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                previous_suspensions = result[0] if result and result[0] else 0
+
+                moderation_result = await moderate_business_content(business_info, user_id, previous_suspensions > 0)
+
+                if not moderation_result["approved"]:
+                    # Content flagged - suspend account
+                    from datetime import datetime
+                    suspension_reason = moderation_result["reason"]
+                    flag_details = moderation_result.get("details", "")
+
+                    cursor.execute('''UPDATE account_settings 
+                                     SET is_suspended = 1, 
+                                         suspension_reason = ?, 
+                                         suspended_at = ?, 
+                                         suspension_count = suspension_count + 1,
+                                         last_flag_details = ?
+                                     WHERE user_id = ?''',
+                                 (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                    conn.commit()
+                    conn.close()
+
+                    logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Account suspended: {suspension_reason}. Please contact support."
+                    )
+
+                CONFIG["BUSINESS_INFO"] = data["BUSINESS_INFO"]
+                cursor.execute('UPDATE account_settings SET business_info = ? WHERE user_id = ?',
+                             (data["BUSINESS_INFO"], user_id))
+                logger.info(f"Business info updated for user {user_id}")
         
         if "AGENT_PERSONALITY" in data:
             CONFIG["AGENT_PERSONALITY"] = data["AGENT_PERSONALITY"]
@@ -6033,6 +9501,11 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             cursor.execute('UPDATE account_settings SET transfer_number = ? WHERE user_id = ?', 
                          (data["TRANSFER_NUMBER"], user_id))
             logger.info(f"Transfer number updated to {data['TRANSFER_NUMBER']} for user {user_id}")
+
+        if "TRANSFER_INSTRUCTIONS" in data:
+            cursor.execute('UPDATE account_settings SET transfer_instructions = ? WHERE user_id = ?',
+                         (data["TRANSFER_INSTRUCTIONS"], user_id))
+            logger.info(f"Transfer instructions updated for user {user_id}")
 
         if "TRANSFER_PEOPLE" in data:
             # Accept list[str] or a single string (comma/newline separated)
@@ -8085,7 +11558,7 @@ async def signup_start(request: Request):
         signup_token = secrets.token_urlsafe(32)
         token_sha = _sha256_text(signup_token)
 
-        code = str(secrets.randbelow(10000)).zfill(4)
+        code = str(secrets.randbelow(100000)).zfill(5)
         code_sha = _sha256_text(code)
 
         created_at = datetime.now().isoformat()
@@ -8119,8 +11592,10 @@ async def signup_start(request: Request):
         conn.commit()
 
         # Send SMS
-        ok, err = _send_vonage_sms(mobile_e164, f"Your VoiceAI verification code is {code}")
+        logger.info(f"📱 Attempting to send verification code to {mobile_e164} (masked: {_masked_phone(mobile)})")
+        ok, err = _send_vonage_sms(mobile_e164, f"Your VoiceAI verification code is: {code}")
         if not ok:
+            logger.error(f"❌ Failed to send verification SMS to {mobile_e164}: {err}")
             # Best-effort cleanup of pending row
             try:
                 cursor.execute("DELETE FROM pending_signups WHERE token_sha256 = ?", (token_sha,))
@@ -8129,11 +11604,12 @@ async def signup_start(request: Request):
                 pass
             return JSONResponse({"success": False, "error": err}, status_code=500)
 
+        logger.info(f"✅ Signup started successfully for {username} ({email}), SMS sent to {mobile_e164}")
         return JSONResponse(
             {
                 "success": True,
                 "signup_token": signup_token,
-                "message": f"We sent a 4-digit code to your mobile ({_masked_phone(mobile)}).",
+                "message": f"We sent a 5-digit code to your mobile ({_masked_phone(mobile)}).",
             }
         )
 
@@ -8154,7 +11630,7 @@ async def signup_verify(request: Request):
         signup_token = (data.get("signup_token") or "").strip()
         code = (data.get("code") or "").strip()
 
-        if not signup_token or not code or not code.isdigit() or len(code) != 4:
+        if not signup_token or not code or not code.isdigit() or len(code) != 5:
             return JSONResponse({"success": False, "error": "Invalid code"}, status_code=400)
 
         token_sha = _sha256_text(signup_token)
@@ -8251,10 +11727,10 @@ async def signup_verify(request: Request):
         cursor.execute(
             """
             INSERT INTO account_settings (
-                user_id, minutes_remaining, total_minutes_purchased, trial_days_remaining, trial_start_date
-            ) VALUES (?, ?, ?, ?, ?)
+                user_id, minutes_remaining, total_minutes_purchased, trial_days_remaining, trial_start_date, voice, voice_provider
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, 50, 0, 3, trial_start),
+            (user_id, 50, 0, 3, trial_start, 'sarah', 'speechmatics'),
         )
 
         # Mark pending as verified
@@ -8295,7 +11771,20 @@ async def signin(request: Request):
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            cursor.execute('SELECT id, name, password_hash, status, suspension_message FROM users WHERE LOWER(username) = LOWER(?)', (username,))
+            cursor.execute('''
+                SELECT
+                    u.id,
+                    u.name,
+                    u.password_hash,
+                    COALESCE(u.status, 'active') as status,
+                    u.suspension_message,
+                    COALESCE(a.is_suspended, 0) as is_suspended,
+                    COALESCE(a.suspension_reason, '') as suspension_reason,
+                    COALESCE(a.last_flag_details, '') as last_flag_details
+                FROM users u
+                LEFT JOIN account_settings a ON u.id = a.user_id
+                WHERE LOWER(u.username) = LOWER(?)
+            ''', (username,))
             user = cursor.fetchone()
             if not user:
                 return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
@@ -8305,6 +11794,9 @@ async def signin(request: Request):
             password_hash = user[2] or ''
             status = user[3] or 'active'
             suspension_message = user[4]
+            is_suspended_ai = bool(user[5])
+            suspension_reason_ai = user[6] or ''
+            flag_details_ai = user[7] or ''
 
             if status == 'banned':
                 return JSONResponse({
@@ -8318,6 +11810,16 @@ async def signin(request: Request):
                     "success": False,
                     "error": "Account Suspended",
                     "message": suspension_message or "Your account has been suspended. Please contact support."
+                }, status_code=403)
+
+            if is_suspended_ai:
+                msg = suspension_reason_ai or "Your account has been suspended due to content policy violations."
+                if flag_details_ai:
+                    msg = f"{msg} ({flag_details_ai})"
+                return JSONResponse({
+                    "success": False,
+                    "error": "Account Suspended",
+                    "message": msg
                 }, status_code=403)
 
             if not password_hash or not _verify_password_from_spec(password, password_hash):
@@ -8346,7 +11848,18 @@ async def signin(request: Request):
         cursor = conn.cursor()
         
         # Find user and check status
-        cursor.execute('SELECT id, status, suspension_message FROM users WHERE name = ?', (name,))
+        cursor.execute('''
+            SELECT
+                u.id,
+                COALESCE(u.status, 'active') as status,
+                u.suspension_message,
+                COALESCE(a.is_suspended, 0) as is_suspended,
+                COALESCE(a.suspension_reason, '') as suspension_reason,
+                COALESCE(a.last_flag_details, '') as last_flag_details
+            FROM users u
+            LEFT JOIN account_settings a ON u.id = a.user_id
+            WHERE u.name = ?
+        ''', (name,))
         user = cursor.fetchone()
         
         if not user:
@@ -8355,6 +11868,9 @@ async def signin(request: Request):
         user_id = user[0]
         status = user[1] or 'active'
         suspension_message = user[2]
+        is_suspended_ai = bool(user[3])
+        suspension_reason_ai = user[4] or ''
+        flag_details_ai = user[5] or ''
         
         # Check if account is suspended or banned
         if status == 'banned':
@@ -8369,6 +11885,16 @@ async def signin(request: Request):
                 "success": False,
                 "error": "Account Suspended", 
                 "message": suspension_message or "Your account has been suspended. Please contact support."
+            }, status_code=403)
+
+        if is_suspended_ai:
+            msg = suspension_reason_ai or "Your account has been suspended due to content policy violations."
+            if flag_details_ai:
+                msg = f"{msg} ({flag_details_ai})"
+            return JSONResponse({
+                "success": False,
+                "error": "Account Suspended",
+                "message": msg
             }, status_code=403)
         
         # Update last login
@@ -8436,12 +11962,22 @@ async def verify_session(request: Request):
         
         session_token = auth_header.replace('Bearer ', '')
         
-        conn = sqlite3.connect('call_logs.db')
+        ensure_auth_schema()
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT s.user_id, u.name, s.expires_at, a.phone_number
-            FROM sessions s 
-            JOIN users u ON s.user_id = u.id 
+            SELECT
+                s.user_id,
+                u.name,
+                s.expires_at,
+                a.phone_number,
+                COALESCE(u.status, 'active') as user_status,
+                u.suspension_message,
+                COALESCE(a.is_suspended, 0) as is_suspended,
+                COALESCE(a.suspension_reason, '') as suspension_reason,
+                COALESCE(a.last_flag_details, '') as last_flag_details
+            FROM sessions s
+            JOIN users u ON s.user_id = u.id
             LEFT JOIN account_settings a ON u.id = a.user_id
             WHERE s.session_token = ?
         ''', (session_token,))
@@ -8452,11 +11988,31 @@ async def verify_session(request: Request):
         if not result:
             return JSONResponse({"valid": False, "error": "Invalid session"}, status_code=401)
         
-        user_id, user_name, expires_at, phone_number = result
+        user_id, user_name, expires_at, phone_number, user_status, suspension_message, is_suspended_ai, suspension_reason_ai, flag_details_ai = result
         
         # Check if expired
         if datetime.fromisoformat(expires_at) < datetime.now():
             return JSONResponse({"valid": False, "error": "Session expired"}, status_code=401)
+
+        # Check if account is suspended/banned
+        if user_status == 'banned':
+            return JSONResponse({
+                "valid": False,
+                "error": "Account Banned",
+                "message": suspension_message or "Your account has been permanently banned. Please contact support."
+            }, status_code=403)
+
+        if user_status == 'suspended' or bool(is_suspended_ai):
+            msg = suspension_message or "Your account has been suspended. Please contact support."
+            if bool(is_suspended_ai):
+                msg = suspension_reason_ai or msg
+                if flag_details_ai:
+                    msg = f"{msg} ({flag_details_ai})"
+            return JSONResponse({
+                "valid": False,
+                "error": "Account Suspended",
+                "message": msg
+            }, status_code=403)
         
         return JSONResponse({
             "valid": True,
@@ -9484,26 +13040,126 @@ async def delete_task(task_id: int, authorization: Optional[str] = Header(None))
 
 @app.get("/api/admin/ngrok-status")
 async def ngrok_status():
-    """Check ngrok tunnel status"""
+    """Check tunnel status (ngrok or cloudflare) - FAST version"""
     try:
-        import requests
-        response = requests.get("http://localhost:4040/api/tunnels", timeout=3)
-        data = response.json()
+        # Quick process check without heavy psutil iteration
+        cloudflare_running = False
+        ngrok_running = False
         
-        if data.get("tunnels"):
-            tunnel = data["tunnels"][0]
-            return {
-                "running": True,
-                "url": tunnel["public_url"],
-                "config": tunnel["config"]
-            }
-        return {"running": False, "message": "No tunnels found"}
-    except requests.exceptions.Timeout:
-        return {"running": False, "message": "Timeout connecting to ngrok"}
-    except requests.exceptions.ConnectionError:
-        return {"running": False, "message": "ngrok not responding (not running?)"}
+        # Fast process check
+        try:
+            import psutil
+            # Use a set for O(1) lookup
+            process_names = set()
+            for proc in psutil.process_iter(['name']):
+                try:
+                    name = (proc.info.get('name') or '').lower()
+                    process_names.add(name)
+                    if len(process_names) > 200:  # Limit iteration for speed
+                        break
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            
+            cloudflare_running = 'cloudflared.exe' in process_names or 'cloudflared' in process_names
+        except Exception as e:
+            logger.debug(f"Fast process check failed: {e}")
+        
+        # Quick ngrok check
+        ngrok_url = ""
+        try:
+            import requests
+            response = requests.get("http://localhost:4040/api/tunnels", timeout=1.5)
+            data = response.json()
+            if data.get("tunnels"):
+                ngrok_running = True
+                ngrok_url = data["tunnels"][0].get("public_url", "")
+        except:
+            ngrok_running = False
+        
+        # Get cloudflare URL
+        cloudflare_url = ""
+        if cloudflare_running:
+            cloudflare_url = (CONFIG.get("PUBLIC_URL") or "").strip()
+            if "trycloudflare.com" not in cloudflare_url:
+                try:
+                    cloudflare_url = _latest_trycloudflare_url_from_log("cloudflared_quick.log") or ""
+                except:
+                    pass
+        
+        # Get selected provider from DB (quick)
+        provider = 'ngrok'
+        stored_public_url = ""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT tunnel_provider, public_url FROM global_settings WHERE id = 1')
+            row = cursor.fetchone()
+            conn.close()
+            if row and row[0]:
+                provider = row[0].lower()
+                stored_public_url = row[1] or ""
+        except:
+            pass
+        
+        # Use stored URL if no active tunnel
+        if not cloudflare_url and provider == "cloudflare":
+            cloudflare_url = stored_public_url
+        if not ngrok_url and provider == "ngrok":
+            ngrok_url = stored_public_url
+        
+        # Build response
+        if provider == "cloudflare":
+            running = cloudflare_running
+            url = cloudflare_url
+            message = "Cloudflare running" if running else "Not running"
+        else:
+            running = ngrok_running
+            url = ngrok_url
+            message = "ngrok running" if running else "Not running"
+
+        return {
+            "provider": provider,
+            "running": running,
+            "url": url,
+            "message": message,
+            "ngrok_running": ngrok_running,
+            "ngrok_url": ngrok_url,
+            "cloudflare_running": cloudflare_running,
+            "cloudflare_url": cloudflare_url,
+            "stored_public_url": stored_public_url
+        }
     except Exception as e:
-        return {"running": False, "message": f"Error: {str(e)}"}
+        logger.error(f"Tunnel status error: {e}")
+        return {
+            "running": False,
+            "provider": "unknown",
+            "message": "Check failed",
+            "ngrok_running": False,
+            "ngrok_url": "",
+            "cloudflare_running": False,
+            "cloudflare_url": ""
+        }
+
+
+@app.get("/api/admin/last-webhook")
+async def admin_last_webhook():
+    """Debug: show the most recently received Vonage webhooks."""
+    payload = {
+        "server_time": datetime.now().isoformat(),
+        "answer": _debug_state_get("last_webhook:answer", _LAST_WEBHOOK.get("answer", {})),
+        "events": _debug_state_get("last_webhook:events", _LAST_WEBHOOK.get("events", {})),
+    }
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/admin/last-ncco")
+async def admin_last_ncco():
+    """Debug: show the most recently generated NCCO for /webhooks/answer."""
+    payload = {
+        "server_time": datetime.now().isoformat(),
+        "last_ncco": _debug_state_get("last_ncco", _LAST_NCCO),
+    }
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/admin/restart")
@@ -9520,7 +13176,7 @@ async def restart_ngrok():
             ["C:\\ngrok\\ngrok.exe", "http", "5004"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_CONSOLE
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
         await asyncio.sleep(3)
         
@@ -9563,7 +13219,7 @@ async def restart_ngrok_only():
                     [ngrok_path, "http", "5004"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
                 )
                 ngrok_started = True
                 break
@@ -9589,6 +13245,644 @@ async def restart_ngrok_only():
         return {"success": False, "message": "ngrok started but no tunnel found yet. Wait a few seconds and check status."}
     except Exception as e:
         logger.error(f"Failed to restart ngrok: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.get("/api/super-admin/tunnel-config")
+async def get_tunnel_config():
+    """Get current tunnel configuration"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT tunnel_provider, cloudflare_domain, cloudflare_tunnel_token FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                "success": True,
+                "provider": row[0] or "ngrok",
+                "cloudflare_domain": row[1] or "",
+                "has_tunnel_token": bool(row[2])
+            }
+        return {"success": False, "message": "No tunnel configuration found"}
+    except Exception as e:
+        logger.error(f"Failed to get tunnel config: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/super-admin/tunnel-config")
+async def set_tunnel_config(request: Request):
+    """Update tunnel provider configuration"""
+    try:
+        data = await request.json()
+        provider = data.get("provider", "ngrok")
+        cloudflare_domain = data.get("cloudflare_domain", "")
+        cloudflare_tunnel_token = data.get("cloudflare_tunnel_token", "")
+        
+        if provider not in ["ngrok", "cloudflare"]:
+            return {"success": False, "message": "Invalid provider. Must be 'ngrok' or 'cloudflare'"}
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE global_settings 
+            SET tunnel_provider = ?,
+                cloudflare_domain = ?,
+                cloudflare_tunnel_token = ?
+            WHERE id = 1
+        ''', (provider, cloudflare_domain or None, cloudflare_tunnel_token or None))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Tunnel provider updated to: {provider}")
+        return {"success": True, "provider": provider}
+    except Exception as e:
+        logger.error(f"Failed to update tunnel config: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/super-admin/start-tunnel")
+async def start_tunnel(request: Request):
+    """Start the selected tunnel (ngrok or cloudflare)"""
+    try:
+        data = await request.json()
+        provider = data.get("provider")
+        
+        if not provider:
+            # Get from database
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT tunnel_provider FROM global_settings WHERE id = 1')
+            row = cursor.fetchone()
+            conn.close()
+            provider = row[0] if row and row[0] else "ngrok"
+        
+        return await _start_tunnel_impl(provider)
+            
+    except Exception as e:
+        logger.error(f"Failed to start tunnel: {e}")
+        return {"success": False, "message": str(e)}
+
+
+async def _start_tunnel_impl(provider: str, force_restart: bool = True) -> Dict[str, Any]:
+    """Start the selected tunnel provider and update CONFIG + DB + Vonage webhooks.
+
+    This is used by both the Super Admin action and startup best-effort self-heal.
+    """
+    provider = (provider or "").strip().lower() or "ngrok"
+    if provider not in {"ngrok", "cloudflare"}:
+        return {"success": False, "message": "Invalid provider"}
+
+    if force_restart:
+        # Ensure only one tunnel is running (prevents conflicts + reduces console flashing)
+        _kill_process_images(["ngrok.exe", "ngrok"])
+        _kill_process_images(["cloudflared.exe", "cloudflared"])
+        await asyncio.sleep(1)
+
+    if provider == "cloudflare":
+        # Check if cloudflared exists
+        if os.name == 'nt':
+            cloudflared_paths = [
+                "cloudflared.exe",
+                "C:\\Windows\\cloudflared.exe",
+                "C:\\cloudflared\\cloudflared.exe",
+                os.path.expanduser("~\\cloudflared\\cloudflared.exe"),
+            ]
+        else:
+            cloudflared_paths = [
+                "cloudflared",
+                "/usr/local/bin/cloudflared",
+                os.path.expanduser("~/cloudflared"),
+            ]
+
+        cloudflared_path = None
+        for path in cloudflared_paths:
+            try:
+                result = subprocess.run([path, "--version"], capture_output=True, timeout=2)
+                if result.returncode == 0:
+                    cloudflared_path = path
+                    break
+            except Exception:
+                continue
+
+        if not cloudflared_path:
+            return {
+                "success": False,
+                "message": "cloudflared not found. Download from: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/",
+                "provider": "cloudflare",
+            }
+
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        subprocess.Popen(
+            [
+                cloudflared_path,
+                "tunnel",
+                "--url",
+                "http://localhost:5004",
+                "--logfile",
+                "cloudflared_quick.log",
+                "--loglevel",
+                "info",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+            text=True,
+        )
+
+        # Wait and parse the log file for the URL (more reliable than stdout)
+        await asyncio.sleep(2)
+
+        url = ""
+        for _ in range(20):
+            try:
+                url = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+            except Exception:
+                url = ""
+            if url:
+                break
+            await asyncio.sleep(0.4)
+
+        if url:
+            CONFIG["PUBLIC_URL"] = url
+            _persist_public_url(url)
+            logger.info(f"✅ Cloudflare tunnel started: {url}")
+
+            webhook_updated = False
+            try:
+                webhook_updated = bool(_update_vonage_application_webhooks(url))
+            except Exception:
+                webhook_updated = False
+            webhook_msg = " (Vonage webhooks updated)" if webhook_updated else " (Warning: Could not update Vonage webhooks - calls may not work)"
+            return {
+                "success": True,
+                "url": url,
+                "provider": "cloudflare",
+                "message": f"Cloudflare tunnel active at {url}{webhook_msg}",
+                "webhook_updated": webhook_updated,
+            }
+
+        logger.warning("Cloudflare tunnel process started but URL not found yet")
+        return {
+            "success": True,
+            "provider": "cloudflare",
+            "message": "Cloudflare tunnel started. Waiting for URL (check cloudflared_quick.log in 10-15 seconds)",
+        }
+
+    # ngrok
+    ngrok_paths = [
+        "C:\\ngrok\\ngrok.exe" if os.name == 'nt' else "ngrok",
+        "ngrok",
+        os.path.expanduser("~/ngrok/ngrok.exe" if os.name == 'nt' else "~/ngrok/ngrok"),
+    ]
+
+    ngrok_started = False
+    for ngrok_path in ngrok_paths:
+        try:
+            subprocess.Popen(
+                [ngrok_path, "http", "5004"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+            )
+            ngrok_started = True
+            break
+        except Exception:
+            continue
+
+    if not ngrok_started:
+        return {"success": False, "message": "ngrok not found. Please install ngrok.", "provider": "ngrok"}
+
+    await asyncio.sleep(3)
+
+    try:
+        import requests
+
+        response = requests.get("http://localhost:4040/api/tunnels", timeout=5)
+        data = response.json()
+        if data.get("tunnels"):
+            url = _normalize_public_url(data["tunnels"][0].get("public_url", ""))
+            if url:
+                CONFIG["PUBLIC_URL"] = url
+                _persist_public_url(url)
+                logger.info(f"✅ ngrok tunnel started: {url}")
+                webhook_updated = False
+                try:
+                    webhook_updated = bool(_update_vonage_application_webhooks(url))
+                except Exception:
+                    webhook_updated = False
+                webhook_msg = " (Vonage webhooks updated)" if webhook_updated else " (Warning: Could not update Vonage webhooks)"
+                return {
+                    "success": True,
+                    "url": url,
+                    "provider": "ngrok",
+                    "message": f"ngrok tunnel active{webhook_msg}",
+                    "webhook_updated": webhook_updated,
+                }
+    except Exception as e:
+        return {"success": False, "message": f"ngrok started but URL lookup failed: {e}", "provider": "ngrok"}
+
+    return {"success": False, "message": "ngrok started but no tunnel found yet", "provider": "ngrok"}
+
+
+@app.post("/api/super-admin/stop-tunnel")
+async def stop_tunnel():
+    """Stop the currently running tunnel"""
+    try:
+        # Get current provider
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT tunnel_provider FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+        provider = row[0] if row and row[0] else "ngrok"
+        
+        if provider == "cloudflare":
+            _kill_process_images(["cloudflared.exe", "cloudflared"])
+            
+            logger.info("✅ Cloudflare tunnel stopped")
+            return {"success": True, "message": "Cloudflare tunnel stopped", "provider": "cloudflare"}
+        else:
+            _kill_process_images(["ngrok.exe", "ngrok"])
+            
+            logger.info("✅ ngrok tunnel stopped")
+            return {"success": True, "message": "ngrok tunnel stopped", "provider": "ngrok"}
+            
+    except Exception as e:
+        logger.error(f"Failed to stop tunnel: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/super-admin/test-openrouter")
+async def test_openrouter_connection(request: Request):
+    """Test OpenRouter API connectivity with a minimal test request."""
+    try:
+        import httpx
+        import time
+        
+        api_key = CONFIG.get("OPENROUTER_API_KEY", "").strip()
+        if not api_key:
+            return {
+                "success": False,
+                "message": "OpenRouter API key not configured",
+                "details": "Please add your OpenRouter API key in the configuration above"
+            }
+        
+        model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+        
+        # Make a minimal test request (very short to minimize token usage)
+        test_messages = [
+            {"role": "user", "content": "Hi"}
+        ]
+        
+        start = time.time()
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "http://localhost:5004",
+                    "X-Title": "Vonage Voice Agent"
+                },
+                json={
+                    "model": model,
+                    "messages": test_messages,
+                    "max_tokens": 10,  # Minimal tokens to reduce cost
+                    "temperature": 0.7
+                }
+            )
+        
+        latency = time.time() - start
+        
+        if response.status_code == 200:
+            data = response.json()
+            response_text = ""
+            if "choices" in data and len(data["choices"]) > 0:
+                response_text = data["choices"][0].get("message", {}).get("content", "")
+            
+            return {
+                "success": True,
+                "message": f"OpenRouter API is working correctly with model '{model}'",
+                "details": {
+                    "model": model,
+                    "latency_ms": round(latency * 1000, 2),
+                    "response_preview": response_text[:50] + "..." if len(response_text) > 50 else response_text,
+                    "status_code": 200
+                }
+            }
+        else:
+            error_data = {}
+            try:
+                error_data = response.json()
+            except:
+                error_data = {"raw": response.text[:500]}
+            
+            return {
+                "success": False,
+                "message": f"OpenRouter API error (HTTP {response.status_code})",
+                "details": {
+                    "status_code": response.status_code,
+                    "error": error_data,
+                    "model": model
+                }
+            }
+    
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "message": "OpenRouter API request timed out",
+            "details": "The request took longer than 15 seconds. Check your internet connection."
+        }
+    except Exception as e:
+        logger.error(f"OpenRouter test failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"OpenRouter test failed: {type(e).__name__}",
+            "details": str(e)
+        }
+
+
+def _openrouter_speed_rank(model_id: str) -> int:
+    """Heuristic ordering: put typically low-latency providers first.
+
+    OpenRouter doesn't publish a universal latency ranking. This is a best-effort heuristic
+    based on common provider performance.
+    """
+    mid = (model_id or "").strip().lower()
+    if not mid:
+        return 10_000
+
+    # Provider prefix hints (OpenRouter model IDs often look like "provider/model").
+    if mid.startswith("groq/"):
+        base = 0
+    elif mid.startswith("cerebras/"):
+        base = 1
+    elif mid.startswith("fireworks/"):
+        base = 2
+    elif mid.startswith("together/"):
+        base = 3
+    elif mid.startswith("deepseek/"):
+        base = 4
+    elif mid.startswith("openai/"):
+        base = 5
+    elif mid.startswith("mistralai/") or mid.startswith("mistral/"):
+        base = 6
+    elif mid.startswith("google/"):
+        base = 7
+    elif mid.startswith("anthropic/"):
+        base = 8
+    else:
+        base = 50
+
+    # Size hints: huge models are usually slower.
+    size_penalty = 0
+    for token in ["405b", "671b", "200b", "120b", "90b", "70b", "72b", "34b", "32b"]:
+        if token in mid:
+            size_penalty = 5
+            break
+    if any(t in mid for t in ["8b", "7b", "mini", "small", "instant", "haiku"]):
+        size_penalty = max(size_penalty - 1, 0)
+
+    return base * 100 + size_penalty
+
+
+def _price_per_million_tokens(price_per_token: Any) -> Optional[float]:
+    try:
+        if price_per_token is None:
+            return None
+        return float(price_per_token) * 1_000_000.0
+    except Exception:
+        return None
+
+
+def _format_usd_per_million(v: Optional[float]) -> str:
+    if v is None:
+        return ""
+    try:
+        if v < 1:
+            return f"${v:.3f}"
+        return f"${v:.2f}"
+    except Exception:
+        return ""
+
+
+@app.get("/api/super-admin/openrouter-model")
+async def get_openrouter_model():
+    """Get the saved OpenRouter model (used when OpenRouter brain is active)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT openrouter_model FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+
+        model = str((row[0] if row else "") or "").strip()
+        if not model:
+            model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+
+        return {"success": True, "model": model}
+    except Exception as e:
+        logger.error(f"Failed to get OpenRouter model: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/openrouter-model")
+async def save_openrouter_model(request: Request):
+    """Save the OpenRouter model selection."""
+    try:
+        body = await request.json()
+        model = str(body.get('model', '') or '').strip()
+        updated_by = str(body.get('updated_by', 'admin') or 'admin').strip()
+
+        if not model:
+            return JSONResponse({"success": False, "error": "Missing 'model'"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        _ensure_column(cursor, "global_settings", "openrouter_model", "TEXT")
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET openrouter_model = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (model, updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["OPENROUTER_MODEL"] = model
+        logger.info(f"✅ OpenRouter model set to {model} by {updated_by}")
+        return {"success": True, "message": f"OpenRouter model set to {model}", "model": model}
+    except Exception as e:
+        logger.error(f"Failed to save OpenRouter model: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/openrouter-models")
+async def list_openrouter_models():
+    """List OpenRouter models (heuristically sorted fastest-first) with rough $/1M token pricing."""
+    try:
+        api_key = str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip()
+        if not api_key:
+            return {"success": False, "error": "OpenRouter API key not configured"}
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": str(CONFIG.get("OPENROUTER_HTTP_REFERER") or "http://localhost:5004"),
+            "X-Title": str(CONFIG.get("OPENROUTER_X_TITLE") or "website33"),
+        }
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get("https://openrouter.ai/api/v1/models", headers=headers)
+
+        if resp.status_code != 200:
+            try:
+                err = resp.json()
+            except Exception:
+                err = {"raw": (resp.text or "")[:800]}
+            return {
+                "success": False,
+                "error": f"OpenRouter models error (HTTP {resp.status_code})",
+                "details": err,
+            }
+
+        payload = resp.json() if resp.content else {}
+        models_raw = payload.get("data") or payload.get("models") or []
+        if not isinstance(models_raw, list):
+            models_raw = []
+
+        out = []
+        for m in models_raw:
+            if not isinstance(m, dict):
+                continue
+            mid = str(m.get("id") or "").strip()
+            if not mid:
+                continue
+
+            name = str(m.get("name") or mid).strip()
+            ctx = m.get("context_length")
+            try:
+                context_length = int(ctx) if ctx is not None else None
+            except Exception:
+                context_length = None
+
+            pricing = m.get("pricing") or {}
+            if not isinstance(pricing, dict):
+                pricing = {}
+
+            prompt_pm = _price_per_million_tokens(pricing.get("prompt"))
+            completion_pm = _price_per_million_tokens(pricing.get("completion"))
+
+            prompt_str = _format_usd_per_million(prompt_pm)
+            completion_str = _format_usd_per_million(completion_pm)
+
+            price_label = ""
+            if prompt_str or completion_str:
+                # Keep it very compact to fit in dropdown.
+                if prompt_str and completion_str:
+                    price_label = f"{prompt_str}/{completion_str}"
+                elif prompt_str:
+                    price_label = f"{prompt_str}"
+                else:
+                    price_label = f"{completion_str}"
+
+            speed_rank = _openrouter_speed_rank(mid)
+            # Convert speed_rank to call latency score (1-10, where 10=fastest)
+            # Lower speed_rank = faster, so invert it
+            # Map speed_rank 0-500 to score 10-1
+            if speed_rank <= 50:
+                call_score = 10
+            elif speed_rank <= 100:
+                call_score = 9
+            elif speed_rank <= 200:
+                call_score = 8
+            elif speed_rank <= 300:
+                call_score = 7
+            elif speed_rank <= 400:
+                call_score = 6
+            elif speed_rank <= 500:
+                call_score = 5
+            elif speed_rank <= 700:
+                call_score = 4
+            elif speed_rank <= 1000:
+                call_score = 3
+            elif speed_rank <= 3000:
+                call_score = 2
+            else:
+                call_score = 1
+
+            out.append(
+                {
+                    "id": mid,
+                    "name": name,
+                    "context_length": context_length,
+                    "pricing_per_million": {
+                        "prompt_usd": prompt_pm,
+                        "completion_usd": completion_pm,
+                        "label": price_label,
+                    },
+                    "speed_rank": speed_rank,
+                    "call_latency_score": call_score,
+                }
+            )
+
+        out.sort(key=lambda x: (int(x.get("speed_rank") or 10_000), str(x.get("id") or "")))
+
+        selected = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+        return {"success": True, "models": out, "selected_model": selected}
+    except Exception as e:
+        logger.error(f"Failed to list OpenRouter models: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/fix-engaged")
+async def fix_engaged_tone(request: Request):
+    """One-click self-heal for 'engaged/busy tone' incidents.
+
+    Typical root cause is Vonage not being able to reach the Answer/Event URLs
+    (stale PUBLIC_URL, tunnel down, or tunnel wedged). This endpoint:
+    - optionally persists selected tunnel provider
+    - clears any in-memory call sessions
+    - restarts the tunnel and refreshes PUBLIC_URL
+    - attempts to update Vonage app webhooks
+    """
+    try:
+        data: Dict[str, Any] = {}
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+
+        provider = (data.get("provider") or "cloudflare").strip().lower()
+        if provider not in {"ngrok", "cloudflare"}:
+            provider = "cloudflare"
+
+        # Persist the provider selection so restarts use the same tunnel.
+        try:
+            _set_global_tunnel_provider(provider)
+        except Exception:
+            pass
+
+        # Clear any stuck in-memory sessions.
+        try:
+            await sessions.close_all()
+        except Exception:
+            pass
+
+        result = await _start_tunnel_impl(provider, force_restart=True)
+        result["sessions_cleared"] = True
+        return result
+    except Exception as e:
+        logger.error(f"fix-engaged failed: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -9662,7 +13956,10 @@ async def analyze_website(request: Request):
         logger.info(f"🤖 Using DeepSeek AI to extract business information...")
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # IMPORTANT: without an explicit timeout, this request can hang and the UI stays on
+            # "Analyzing..." forever. Keep it bounded.
+            deepseek_timeout = aiohttp.ClientTimeout(total=25)
+            async with aiohttp.ClientSession(timeout=deepseek_timeout) as session:
                 async with session.post(
                     'https://api.deepseek.com/v1/chat/completions',
                     headers={
@@ -9676,22 +13973,9 @@ async def analyze_website(request: Request):
                                 'role': 'system',
                                 'content': '''You are a business information extraction AI. Extract comprehensive business information from website content and format it in FIRST PERSON (we/our/us) for an AI phone answering agent.
 
-Extract and include ALL relevant details:
-- Full range of products/services offered (be specific and detailed)
-- Pricing information (exact prices, price ranges, packages, discounts)
-- Business hours and availability
-- Service areas, locations, delivery options
-- Contact methods (phone, email, online forms)
-- Unique selling points, specialties, expertise
-- Company background, mission, values if mentioned
-- Customer service policies, guarantees, warranties
-- Any special programs, memberships, or loyalty options
-- Popular items, bestsellers, featured products
-- Technical specifications or product details when available
+Extract and include: services/products, pricing, hours, service area, contact methods, policies/guarantees, and any notable details.
 
-Write in first person as if YOU are the business. Use "we", "our", "us" - NEVER use "they" or "the company".
-Be comprehensive but organized. Aim for 8-12 detailed sentences covering all aspects.
-Make it conversational and informative so an AI agent can answer customer questions confidently.'''
+Write in first person as the business (we/our/us). Keep it organized and conversational.'''
                             },
                             {
                                 'role': 'user',
@@ -9699,24 +13983,31 @@ Make it conversational and informative so an AI agent can answer customer questi
                             }
                         ],
                         'temperature': 0.3,
-                        'max_tokens': 1500
+                        # Keep output bounded to reduce latency and avoid hanging.
+                        'max_tokens': 900
                     }
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(f"DeepSeek API error: {error_text}")
                         raise HTTPException(status_code=500, detail="DeepSeek API request failed")
-                    
+
                     result = await response.json()
-                    business_info = result['choices'][0]['message']['content'].strip()
-                    
+                    business_info = (result.get('choices', [{}])[0].get('message', {}) or {}).get('content', '')
+                    business_info = (business_info or '').strip()
+
+                    if not business_info:
+                        raise HTTPException(status_code=500, detail="DeepSeek returned empty result")
+
                     logger.info(f"✅ Successfully extracted business information ({len(business_info)} chars)")
-                    
+
                     return {
                         'business_info': business_info,
                         'url': url
                     }
-                    
+
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="DeepSeek timed out while analyzing the website")
         except aiohttp.ClientError as e:
             raise HTTPException(status_code=500, detail=f"DeepSeek API error: {str(e)}")
             
@@ -9822,7 +14113,7 @@ async def run_diagnostics():
                         subprocess.Popen([ngrok_path, "http", "5004"],
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE,
-                                       creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0)
+                                       creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                         await asyncio.sleep(3)
                         
                         response = requests.get("http://localhost:4040/api/tunnels", timeout=3)
@@ -9981,6 +14272,8 @@ async def answer_call(request: Request):
     caller = _extract_number(data.get("from"))
     called = _extract_number(data.get("to"))
 
+    _record_last_webhook("answer", request, data)
+
     # Normalize for DB lookup: stored phone numbers are digits-only in many installs.
     called_digits = "".join(ch for ch in called if ch.isdigit())
     called_candidates = []
@@ -10000,9 +14293,14 @@ async def answer_call(request: Request):
     
     # First, try to find the user who owns this phone number
     cursor.execute('''
-        SELECT a.user_id, a.minutes_remaining, u.name 
-        FROM account_settings a 
-        JOIN users u ON a.user_id = u.id 
+        SELECT
+            a.user_id,
+            a.minutes_remaining,
+            u.name,
+            COALESCE(a.is_suspended, 0) as is_suspended,
+            COALESCE(u.status, 'active') as user_status
+        FROM account_settings a
+        JOIN users u ON a.user_id = u.id
         WHERE a.phone_number IN (?, ?, ?, ?)
     ''', tuple(called_candidates[:4]))
     result = cursor.fetchone()
@@ -10047,7 +14345,7 @@ async def answer_call(request: Request):
         except Exception as e:
             conn.close()
             logger.error(f"❌ Failed to auto-create account for {called}: {e}")
-            return JSONResponse([
+            ncco = [
                 {
                     "action": "talk",
                     "text": "We're sorry, there was an error setting up this phone number. Please try again later."
@@ -10055,17 +14353,35 @@ async def answer_call(request: Request):
                 {
                     "action": "hangup"
                 }
-            ])
+            ]
+            _record_last_ncco(request, call_uuid, ncco, ws_url=None, note="auto_create_failed")
+            return JSONResponse(ncco)
     else:
         assigned_user_id = result[0]
         minutes_remaining = result[1]
         user_name = result[2]
+
+        is_suspended = bool(result[3])
+        user_status = (result[4] or 'active')
+
+        if is_suspended or user_status in ('suspended', 'banned'):
+            conn.close()
+            logger.warning(f"⚠️ Call rejected - account restricted (user_id={assigned_user_id}, is_suspended={is_suspended}, status={user_status})")
+            message = "We're sorry, this account is currently unavailable."
+            if user_status == 'banned':
+                message = "We're sorry, this account has been disabled."
+            ncco = [
+                {"action": "talk", "text": message},
+                {"action": "hangup"}
+            ]
+            _record_last_ncco(request, call_uuid, ncco, ws_url=None, note="restricted_account")
+            return JSONResponse(ncco)
     
     if minutes_remaining <= 0:
         # User exists but no minutes
         conn.close()
         logger.warning(f"⚠️ Call rejected - User {user_name} has no credits remaining")
-        return JSONResponse([
+        ncco = [
             {
                 "action": "talk",
                 "text": "We're sorry, but this account has no credits remaining. Please contact support to add more credits."
@@ -10073,7 +14389,9 @@ async def answer_call(request: Request):
             {
                 "action": "hangup"
             }
-        ])
+        ]
+        _record_last_ncco(request, call_uuid, ncco, ws_url=None, note="no_credits")
+        return JSONResponse(ncco)
     
     conn.close()
     logger.info(f"📞 Call assigned to {user_name} (user_id: {assigned_user_id})")
@@ -10083,9 +14401,9 @@ async def answer_call(request: Request):
     # after the websocket connects.
     await sessions.create_session(call_uuid, caller, called, assigned_user_id)
     
-    # Build WebSocket URL (remove https:// and use wss://)
-    ws_host = CONFIG["PUBLIC_URL"].replace("https://", "").replace("http://", "")
-    ws_url = f"wss://{ws_host}/socket/{call_uuid}"
+    # Build WebSocket URL from the incoming webhook host.
+    # This avoids mismatches when switching tunnels (ngrok <-> Cloudflare).
+    ws_url = _public_ws_url_from_request(request, f"/socket/{call_uuid}")
     
     # Return NCCO to connect audio via WebSocket
     # The AI agent will handle the greeting
@@ -10101,6 +14419,8 @@ async def answer_call(request: Request):
             ]
         }
     ]
+
+    _record_last_ncco(request, call_uuid, ncco, ws_url=ws_url, note="connect_websocket")
     
     logger.info(f"[{call_uuid}] Returning NCCO with WebSocket: {ws_url}")
     return JSONResponse(ncco)
@@ -10116,6 +14436,8 @@ async def transfer_ncco(request: Request, to: str = "", from_number: str = Query
     - from: optional caller ID / originating number
     - uuid: original call UUID for tracking
     """
+    # Vonage typically accepts E.164 digits (often without '+').
+    # Keep digits-only for maximum compatibility.
     to = (to or "").strip().replace("+", "")
     from_num = (from_number or "").strip().replace("+", "")
     call_uuid = (uuid or "").strip()
@@ -10123,7 +14445,7 @@ async def transfer_ncco(request: Request, to: str = "", from_number: str = Query
     if not to:
         return JSONResponse({"error": "Missing 'to' query param"}, status_code=400)
 
-    # Build simple connect action
+    # Build connect-to-phone action
     connect_action = {
         "action": "connect",
         "endpoint": [{"type": "phone", "number": to}]
@@ -10135,8 +14457,28 @@ async def transfer_ncco(request: Request, to: str = "", from_number: str = Query
     
     # Add eventUrl to track transfer status and duration for billing
     if call_uuid:
-        connect_action["eventUrl"] = [f"{CONFIG['PUBLIC_URL']}/webhooks/transfer-event?original_uuid={call_uuid}"]
-    
+        base_url = _public_base_url_from_request(request)
+        connect_action["eventUrl"] = [f"{base_url}/webhooks/transfer-event?original_uuid={call_uuid}"]
+
+    # IMPORTANT: Without a second action, a failed/unanswered transfer ends the call.
+    # Provide a fallback that reconnects the caller back to the agent WebSocket.
+    if call_uuid:
+        try:
+            ws_url = _public_ws_url_from_request(request, f"/socket/{call_uuid}")
+            fallback_connect = {
+                "action": "connect",
+                "endpoint": [
+                    {
+                        "type": "websocket",
+                        "uri": ws_url,
+                        "content-type": "audio/l16;rate=16000",
+                    }
+                ],
+            }
+            return JSONResponse([connect_action, fallback_connect])
+        except Exception as e:
+            logger.warning(f"[{call_uuid}] Could not build fallback websocket connect for transfer NCCO: {e}")
+
     return JSONResponse([connect_action])
 
 
@@ -10192,7 +14534,35 @@ async def transfer_event_webhook(request: Request):
                 logger.error(f"❌ Error calculating transfer credits: {e}")
                 
         elif direction == "outbound" and status in ["unanswered", "failed", "rejected", "busy", "timeout"]:
-            logger.warning(f"⚠️ Transfer failed for call {original_uuid}: {status}")
+            # Log full payload so we can see Vonage's failure reason/codes.
+            logger.warning(f"⚠️ Transfer failed for call {original_uuid}: {status} payload={body}")
+
+            # If the caller is reconnected (via fallback NCCO), inform them and continue.
+            try:
+                session = sessions.get_session(original_uuid)
+            except Exception:
+                session = None
+
+            if session and getattr(session, "is_active", False):
+                try:
+                    session._is_transferring = False
+                except Exception:
+                    pass
+
+                try:
+                    person_name = str(getattr(session, "_transfer_person_name", "them") or "them")
+                except Exception:
+                    person_name = "them"
+
+                try:
+                    asyncio.create_task(
+                        session._handle_failed_transfer(
+                            reason_text=f"({status})",
+                            person_name=person_name,
+                        )
+                    )
+                except Exception:
+                    pass
         
         return JSONResponse({"status": "ok"})
     
@@ -10220,6 +14590,8 @@ async def call_events(request: Request):
     status = data.get("status", "unknown")
     direction = data.get("direction", "unknown")
     to_uri = data.get("to", "")
+
+    _record_last_webhook("events", request, data)
     
     # Log rejection details for debugging transfer failures
     if status == "rejected":
@@ -10272,32 +14644,54 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
         session.start_openai_listener()
         session.start_credit_monitor()
     
-    # Trigger the AI to greet the caller immediately
+    # Trigger the greeting immediately.
+    # If the call is locked to a non-OpenAI brain, do NOT use OpenAI to generate the greeting,
+    # otherwise the call will be recorded as OpenAI usage and may start producing OpenAI turns.
     try:
-        if session.openai_ws:
-            strict_greeting = getattr(session, 'call_greeting', '') or ''
-            logger.info(f"[{call_uuid}] ⭐ GREETING CONFIG: strict_greeting = '{strict_greeting}'")
+        brain_provider = "openai"
+        try:
+            brain_provider = str(session._effective_brain_provider() or "openai").strip().lower()
+        except Exception:
+            brain_provider = "openai"
+
+        strict_greeting = getattr(session, 'call_greeting', '') or ''
+        logger.info(f"[{call_uuid}] ⭐ GREETING CONFIG: strict_greeting = '{strict_greeting}'")
+
+        if brain_provider != "openai":
+            # Fast, deterministic greeting (low latency) without invoking OpenAI.
             if strict_greeting.strip():
-                greet_instructions = (
-                    f"You must respond with ONLY these exact words, nothing more, nothing less: '{strict_greeting.strip()}'"
-                )
-                logger.info(f"[{call_uuid}] ⭐ Using STRICT greeting: {strict_greeting}")
+                greeting_text = strict_greeting.strip()
+                logger.info(f"[{call_uuid}] ⭐ Using STRICT greeting (non-OpenAI brain): {greeting_text}")
             else:
-                greet_instructions = "Greet the caller warmly and professionally. Sound friendly and welcoming. Say hello, introduce yourself naturally, and ask how you can help them today. Be conversational and friendly."
-                logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting")
-            # Use the session's configured modalities for the greeting
-            greeting_modalities = getattr(session, 'modalities', ["text", "audio"])
-            await session.openai_ws.send(json.dumps({
-                "type": "response.create",
-                "response": {
-                    "modalities": greeting_modalities,
-                    "instructions": greet_instructions
-                }
-            }))
-            logger.info(f"[{call_uuid}] Greeting using modalities: {greeting_modalities}")
-            logger.info(f"[{call_uuid}] ✅ Greeting triggered successfully")
+                agent_name = getattr(session, 'agent_name', None) or CONFIG.get('AGENT_NAME', 'Hello')
+                greeting_text = f"Hello, this is {agent_name}. How can I help you today?"
+                logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting (non-OpenAI brain)")
+
+            await session._speak_text_via_voice_provider(greeting_text)
+            session.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {greeting_text}")
         else:
-            logger.error(f"[{call_uuid}] ❌ OpenAI WebSocket not connected!")
+            if session.openai_ws:
+                if strict_greeting.strip():
+                    greet_instructions = (
+                        f"You must respond with ONLY these exact words, nothing more, nothing less: '{strict_greeting.strip()}'"
+                    )
+                    logger.info(f"[{call_uuid}] ⭐ Using STRICT greeting: {strict_greeting}")
+                else:
+                    greet_instructions = "Greet the caller warmly and professionally. Sound friendly and welcoming. Say hello, introduce yourself naturally, and ask how you can help them today. Be conversational and friendly."
+                    logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting")
+
+                greeting_modalities = getattr(session, 'modalities', ["text", "audio"])
+                await session.openai_ws.send(json.dumps({
+                    "type": "response.create",
+                    "response": {
+                        "modalities": greeting_modalities,
+                        "instructions": greet_instructions
+                    }
+                }))
+                logger.info(f"[{call_uuid}] Greeting using modalities: {greeting_modalities}")
+                logger.info(f"[{call_uuid}] ✅ Greeting triggered successfully")
+            else:
+                logger.error(f"[{call_uuid}] ❌ OpenAI WebSocket not connected!")
     except Exception as e:
         logger.error(f"[{call_uuid}] ❌ Failed to trigger greeting: {e}")
     
@@ -10457,7 +14851,7 @@ async def get_all_accounts():
                 COALESCE(a.trial_start_date, NULL) as trial_start_date,
                 COALESCE(a.trial_days_remaining, NULL) as trial_days_remaining,
                 COALESCE(a.trial_total_days, 3) as trial_total_days,
-                COALESCE(a.voice, 'shimmer') as voice,
+                COALESCE(a.voice, 'sarah') as voice,
                 COALESCE(a.use_elevenlabs, 0) as use_elevenlabs,
                 (SELECT COUNT(*) FROM calls c WHERE c.user_id = u.id AND DATE(c.start_time) = DATE('now')) as calls_today,
                 (SELECT MAX(start_time) FROM calls c WHERE c.user_id = u.id) as last_call,
@@ -10527,6 +14921,61 @@ async def get_all_accounts():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/account-details/{user_id}")
+async def get_account_details(user_id: int):
+    """Get detailed signup information for a specific account (super admin only)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get user details from users table
+        cursor.execute('''
+            SELECT 
+                u.id,
+                u.name,
+                u.username,
+                u.email,
+                u.mobile,
+                u.mobile_e164,
+                u.business_name,
+                u.website_url,
+                u.created_at,
+                COALESCE(u.status, 'active') as status,
+                a.phone_number,
+                COALESCE(a.business_info, '') as business_info
+            FROM users u
+            LEFT JOIN account_settings a ON u.id = a.user_id
+            WHERE u.id = ?
+        ''', (user_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return JSONResponse({"error": "Account not found"}, status_code=404)
+        
+        return {
+            "success": True,
+            "details": {
+                "user_id": row[0],
+                "name": row[1],
+                "username": row[2],
+                "email": row[3],
+                "mobile": row[4],
+                "mobile_e164": row[5],
+                "business_name": row[6],
+                "website_url": row[7],
+                "created_at": row[8],
+                "status": row[9],
+                "phone_number": row[10],
+                "business_info": row[11]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get account details for user {user_id}: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/flagged-accounts")
 async def get_flagged_accounts():
     """Get all suspended/flagged user accounts"""
@@ -10539,16 +14988,20 @@ async def get_flagged_accounts():
                 u.id as user_id,
                 u.name,
                 a.phone_number,
-                a.is_suspended,
+                COALESCE(a.is_suspended, 0) as is_suspended,
                 a.suspension_reason,
                 a.suspended_at,
                 a.suspension_count,
                 a.last_flag_details,
-                a.business_info
+                a.business_info,
+                COALESCE(u.status, 'active') as user_status,
+                u.suspension_message,
+                u.suspended_at,
+                u.suspended_by
             FROM users u
-            JOIN account_settings a ON u.id = a.user_id
-            WHERE a.is_suspended = 1
-            ORDER BY a.suspended_at DESC
+            LEFT JOIN account_settings a ON u.id = a.user_id
+            WHERE COALESCE(a.is_suspended, 0) = 1 OR COALESCE(u.status, 'active') IN ('suspended', 'banned')
+            ORDER BY COALESCE(a.suspended_at, u.suspended_at) DESC
         ''')
         
         flagged_accounts = []
@@ -10562,7 +15015,11 @@ async def get_flagged_accounts():
                 "suspended_at": row[5],
                 "suspension_count": row[6],
                 "flag_details": row[7],
-                "business_info": row[8]
+                "business_info": row[8],
+                "user_status": row[9],
+                "suspension_message": row[10],
+                "user_suspended_at": row[11],
+                "user_suspended_by": row[12]
             })
         
         conn.close()
@@ -10660,7 +15117,7 @@ async def get_account_details(user_id: int):
                 u.id, u.name,
                 COALESCE(a.minutes_remaining, 0),
                 COALESCE(a.total_minutes_purchased, 0),
-                COALESCE(a.voice, 'shimmer'),
+                COALESCE(a.voice, 'sarah'),
                 COALESCE(a.use_elevenlabs, 0),
                 COALESCE(a.elevenlabs_voice_id, 'EXAVITQu4vr4xnSDxMaL'),
                 COALESCE(u.status, 'active'),
@@ -11563,6 +16020,136 @@ async def save_deepseek_key(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/groq-key")
+async def get_groq_key_status():
+    """Check if Groq API key is configured"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT groq_api_key FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
+
+        return {
+            "success": True,
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else ""
+        }
+    except Exception as e:
+        logger.error(f"Failed to get Groq key status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/groq-key")
+async def save_groq_key(request: Request):
+    """Save Groq API key globally"""
+    try:
+        body = await request.json()
+        api_key = body.get('api_key', '').strip()
+        updated_by = body.get('updated_by', 'admin')
+
+        if not api_key:
+            return JSONResponse({"success": False, "error": "API key is required"}, status_code=400)
+
+        # Guardrail: users frequently confuse Groq (GroqCloud) with xAI Grok.
+        # xAI keys typically start with "xai-" and won't work against api.groq.com.
+        low = api_key.lower()
+        if low.startswith("xai-"):
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "That key looks like an xAI Grok key (xai-...). This field is for Groq (GroqCloud) keys (often start with gsk_...). If you want xAI Grok support, tell me and I can add it as a separate brain provider.",
+                },
+                status_code=400,
+            )
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            UPDATE global_settings
+            SET groq_api_key = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+        ''', (_encrypt_secret(api_key), updated_by))
+
+        conn.commit()
+        conn.close()
+
+        # Update CONFIG immediately
+        CONFIG["GROQ_API_KEY"] = api_key
+
+        logger.info(f"✅ Groq API key updated by {updated_by}")
+        return {
+            "success": True,
+            "message": "Groq API key saved successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to save Groq API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/openrouter-key")
+async def get_openrouter_key_status():
+    """Check if OpenRouter API key is configured"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT openrouter_api_key FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
+
+        return {
+            "success": True,
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else ""
+        }
+    except Exception as e:
+        logger.error(f"Failed to get OpenRouter key status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/openrouter-key")
+async def save_openrouter_key(request: Request):
+    """Save OpenRouter API key globally"""
+    try:
+        body = await request.json()
+        api_key = body.get('api_key', '').strip()
+        updated_by = body.get('updated_by', 'admin')
+
+        if not api_key:
+            return JSONResponse({"success": False, "error": "API key is required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET openrouter_api_key = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (_encrypt_secret(api_key), updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["OPENROUTER_API_KEY"] = api_key
+        logger.info(f"✅ OpenRouter API key updated by {updated_by}")
+        return {"success": True, "message": "OpenRouter API key saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to save OpenRouter API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/vonage-keys")
 async def get_vonage_keys_status():
     """Check if Vonage API keys are configured"""
@@ -11807,14 +16394,14 @@ async def get_brain_provider():
 
 @app.post("/api/super-admin/brain-provider")
 async def save_brain_provider(request: Request):
-    """Save AI brain provider selection (openai or deepseek)"""
+    """Save AI brain provider selection (openai, deepseek, groq, grok, or openrouter)"""
     try:
         body = await request.json()
         provider = body.get('provider', 'openai').strip().lower()
         updated_by = body.get('updated_by', 'admin')
         
-        if provider not in ['openai', 'deepseek']:
-            return JSONResponse({"success": False, "error": "Provider must be 'openai' or 'deepseek'"}, status_code=400)
+        if provider not in ['openai', 'deepseek', 'groq', 'grok', 'openrouter']:
+            return JSONResponse({"success": False, "error": "Provider must be 'openai', 'deepseek', 'groq', 'grok', or 'openrouter'"}, status_code=400)
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -11849,6 +16436,13 @@ async def get_recent_calls_analysis():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # Backward-compatible: ensure auditing columns exist.
+        _ensure_column(cursor, "calls", "selected_brain_provider", "TEXT")
+        _ensure_column(cursor, "calls", "effective_brain_provider", "TEXT")
+        _ensure_column(cursor, "calls", "brain_gating_reasons", "TEXT")
+        _ensure_column(cursor, "calls", "openai_fallback_turns", "INTEGER DEFAULT 0")
+        _ensure_column(cursor, "calls", "openai_fallback_reasons", "TEXT")
         
         cursor.execute('''
             SELECT 
@@ -11859,7 +16453,13 @@ async def get_recent_calls_analysis():
                 c.duration,
                 c.average_response_time,
                 c.called_number as user_phone,
-                u.name as business_name
+                u.name as business_name,
+                c.call_mode,
+                c.selected_brain_provider,
+                c.effective_brain_provider,
+                c.brain_gating_reasons,
+                c.openai_fallback_turns,
+                c.openai_fallback_reasons
             FROM calls c
             LEFT JOIN users u ON c.user_id = u.id
             WHERE c.end_time IS NOT NULL
@@ -11877,13 +16477,101 @@ async def get_recent_calls_analysis():
                 "duration": row[4],
                 "average_response_time": row[5],
                 "user_phone": row[6],
-                "business_name": row[7]
+                "business_name": row[7],
+                "call_mode": row[8],
+                "selected_brain_provider": row[9],
+                "effective_brain_provider": row[10],
+                "brain_gating_reasons": row[11],
+                "openai_fallback_turns": row[12],
+                "openai_fallback_reasons": row[13],
             })
         
         conn.close()
         return {"success": True, "calls": calls}
     except Exception as e:
         logger.error(f"Failed to get recent calls: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/live-brain-usage")
+async def super_admin_live_brain_usage(request: Request):
+    """Return live brain usage percentages for any currently active calls.
+
+    Percentages are computed by completed assistant turns.
+    """
+    _super_admin_require_auth(request)
+    try:
+        active = []
+        for s in sessions.list_sessions():
+            try:
+                snap = s._brain_usage_snapshot()
+
+                selected = str(getattr(s, "_brain_provider_selected", None) or CONFIG.get("AI_BRAIN_PROVIDER", "openai") or "openai").strip().lower()
+                effective = "openai"
+                try:
+                    effective = str(getattr(s, "_brain_provider_locked", None) or s._effective_brain_provider() or "openai").strip().lower()
+                except Exception:
+                    effective = "openai"
+
+                voice_provider = str(getattr(s, "voice_provider", "openai") or "openai").strip().lower()
+                calendar_enabled = bool(getattr(s, "calendar_booking_enabled", True))
+                has_speechmatics = bool(str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip())
+                has_deepseek = bool(
+                    str(CONFIG.get("DEEPSEEK_API_KEY", "") or "").strip()
+                    or str(CONFIG.get("DEEPSEEK_API_KEY_FALLBACK", "") or "").strip()
+                )
+                has_groq = bool(str(CONFIG.get("GROQ_API_KEY", "") or "").strip())
+                has_grok = bool(str(CONFIG.get("GROK_API_KEY", "") or "").strip())
+                has_openrouter = bool(str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip())
+
+                reasons = []
+                try:
+                    locked_reasons = list(getattr(s, "_brain_provider_lock_reasons", []) or [])
+                    reasons.extend([str(r) for r in locked_reasons if str(r)])
+                except Exception:
+                    pass
+
+                if not reasons and selected in ["deepseek", "groq", "grok", "openrouter"] and effective == "openai":
+                    if voice_provider != "speechmatics":
+                        reasons.append("voice_provider_not_speechmatics")
+                    if calendar_enabled:
+                        reasons.append("calendar_booking_enabled")
+                    if selected == "deepseek" and not has_deepseek:
+                        reasons.append("missing_deepseek_key")
+                    if selected == "groq" and not has_groq:
+                        reasons.append("missing_groq_key")
+                    if selected == "grok" and not has_grok:
+                        reasons.append("missing_grok_key")
+                    if selected == "openrouter" and not has_openrouter:
+                        reasons.append("missing_openrouter_key")
+                    if voice_provider == "speechmatics" and not has_speechmatics:
+                        reasons.append("missing_speechmatics_key")
+
+                snap.update(
+                    {
+                        "selected_provider": selected,
+                        "effective_provider": effective,
+                        "gating_reasons": reasons,
+                        "voice_provider": voice_provider,
+                        "calendar_booking_enabled": calendar_enabled,
+                        "speechmatics_key_configured": has_speechmatics,
+                        "deepseek_key_configured": has_deepseek,
+                        "groq_key_configured": has_groq,
+                        "grok_key_configured": has_grok,
+                        "openrouter_key_configured": has_openrouter,
+                        "session_started_at": float(getattr(s, "_session_started_at", 0.0) or 0.0),
+                    }
+                )
+
+                active.append(snap)
+            except Exception:
+                continue
+
+        # Prefer newest by in-memory session start.
+        active.sort(key=lambda x: float(x.get("session_started_at") or 0.0), reverse=True)
+        return {"success": True, "active_calls": active}
+    except Exception as e:
+        logger.error(f"Failed to get live brain usage: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 

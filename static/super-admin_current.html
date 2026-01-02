@@ -48,6 +48,8 @@
         .alert { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: min(980px, calc(100vw - 40px)); width: calc(100vw - 40px); padding: 15px 20px; border-radius: 8px; font-weight: 600; display: none; font-size: 15px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
         .alert-success { background: rgba(46, 204, 113, 0.3); color: #2ecc71; border: 2px solid #2ecc71; }
         .alert-error { background: rgba(231, 76, 60, 0.3); color: #e74c3c; border: 2px solid #e74c3c; }
+        .alert-warning { background: rgba(243, 156, 18, 0.95); color: white; border: 2px solid rgba(255, 255, 255, 0.3); }
+        .alert-info { background: rgba(52, 152, 219, 0.3); color: #3498db; border: 2px solid #3498db; }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes slideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-20px); opacity: 0; } }
         .filler-section { background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 25px; margin-bottom: 20px; }
@@ -712,6 +714,23 @@
                 <div class="streaming-mode" id="streamingMode"></div>
             </div>
         </div>
+
+        <!-- Live Brain Usage (OpenAI vs DeepSeek vs Groq) -->
+        <div class="panel" style="margin-bottom: 25px;">
+            <div class="panel-header">
+                <h2>🧠 Live Brain Usage</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Shows what % of assistant turns were produced by OpenAI vs DeepSeek vs Groq in the current active call</p>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <div>
+                    <div style="font-weight: 800;">Active Call</div>
+                    <div id="liveBrainUsageCall" style="font-size: 12px; opacity: 0.8; margin-top: 4px;">Checking…</div>
+                    <div id="liveBrainUsageProviders" style="font-size: 12px; margin-top: 6px; opacity: 0.95;"></div>
+                    <div id="liveBrainUsageReasons" style="font-size: 12px; margin-top: 4px; opacity: 0.75;"></div>
+                </div>
+                <div id="liveBrainUsageText" style="font-size: 16px; font-weight: 900;">OpenAI 0% | DeepSeek 0% | Groq 0%</div>
+            </div>
+        </div>
         
         <div class="header">
             <h1>🔧 Super Admin - System Configuration</h1>
@@ -809,6 +828,13 @@
                     <div class="health-label">Ngrok Tunnel</div>
                     <div class="health-status" id="status-ngrok">Checking...</div>
                 </div>
+                <div class="health-item" onclick="showHealthDetails('cloudflare')" ondblclick="startCloudflare(event)">
+                    <div class="health-circle checking" id="health-cloudflare">
+                        <div class="health-icon">☁️</div>
+                    </div>
+                    <div class="health-label">Cloudflare Tunnel</div>
+                    <div class="health-status" id="status-cloudflare">Checking...</div>
+                </div>
                 <div class="health-item" onclick="showHealthDetails('activecalls')">
                     <div class="health-circle checking" id="health-activecalls">
                         <div class="health-icon">📞</div>
@@ -866,6 +892,127 @@
                 <button class="btn" id="reloadConfigBtn" style="background: linear-gradient(135deg, #f39c12, #e67e22); display: none;" onclick="reloadConfiguration()">
                     🔄 Reload Configuration
                 </button>
+            </div>
+        </div>
+
+        <!-- Recent Calls (for Brain Provider audit) -->
+        <div class="panel" style="margin-bottom: 25px;">
+            <div class="panel-header">
+                <h2>📞 Recent Calls</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Shows the last 5 completed calls and which brain was selected vs actually used</p>
+            </div>
+            <div class="call-selector">
+                <div id="recentCallsList" style="text-align: center; color: rgba(255,255,255,0.75); padding: 16px;">Loading…</div>
+            </div>
+        </div>
+
+        <!-- Tunnel Provider Configuration -->
+        <div class="panel" style="margin-bottom: 25px;">
+            <div class="panel-header">
+                <h2>🌐 Tunnel Provider</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Choose your public tunnel provider (ngrok or Cloudflare)</p>
+            </div>
+            
+            <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 20px; margin-top: 15px;">
+                <!-- Provider Selection -->
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">Provider:</label>
+                    <select id="tunnelProvider" style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px;" onchange="handleTunnelProviderChange()">
+                        <option value="ngrok">ngrok (Free, Random URLs)</option>
+                        <option value="cloudflare">Cloudflare Quick (Temporary .trycloudflare.com URLs)</option>
+                    </select>
+                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 8px;">
+                        <strong>ngrok:</strong> Free random URLs (~50-150ms latency)<br>
+                        <strong>Cloudflare:</strong> Temporary URLs (~20-80ms faster, more stable)
+                    </div>
+                </div>
+
+                <!-- Cloudflare Options (hidden by default) -->
+                <div id="cloudflareOptions" style="display: none; margin-bottom: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">Custom Domain (Optional):</label>
+                    <input type="text" id="cloudflareDomain" placeholder="example.yourdomain.com" style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; margin-bottom: 10px;">
+                    
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">Tunnel Token (Optional):</label>
+                    <input type="password" id="cloudflareTunnelToken" placeholder="eyJhIjoixxxx..." style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-family: 'Courier New', monospace;">
+                    
+                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 8px;">
+                        Leave blank for temporary .trycloudflare.com URLs (no setup required)
+                    </div>
+                </div>
+
+                <!-- Current Tunnel Status -->
+                <div style="background: rgba(0, 0, 0, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: 600;">Status:</span>
+                        <span id="tunnelStatus" style="padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; background: rgba(231, 76, 60, 0.2); color: #e74c3c;">Not Running</span>
+                    </div>
+                    <div id="tunnelUrlDisplay" style="display: none;">
+                        <span style="font-weight: 600; display: block; margin-bottom: 5px;">Public URL:</span>
+                        <code style="display: block; background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; font-size: 13px; word-break: break-all; color: #2ecc71;" id="tunnelUrl">-</code>
+                    </div>
+                </div>
+
+                <!-- Vonage Webhook URLs -->
+                <div style="background: rgba(52, 152, 219, 0.15); border: 2px solid rgba(52, 152, 219, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                    <div style="font-weight: 700; font-size: 12px; color: #3498db; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">📞 Vonage Webhook URLs</div>
+                    <div style="margin-bottom: 6px;">
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6); display: block; margin-bottom: 3px;">Answer URL:</span>
+                        <code style="display: block; background: rgba(0, 0, 0, 0.3); padding: 6px 8px; border-radius: 4px; font-size: 11px; word-break: break-all; color: #ecf0f1; font-family: 'Courier New', monospace;" id="vonageAnswerUrl">-</code>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6); display: block; margin-bottom: 3px;">Event URL:</span>
+                        <code style="display: block; background: rgba(0, 0, 0, 0.3); padding: 6px 8px; border-radius: 4px; font-size: 11px; word-break: break-all; color: #ecf0f1; font-family: 'Courier New', monospace;" id="vonageEventUrl">-</code>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn" id="startTunnelBtn" style="background: linear-gradient(135deg, #2ecc71, #27ae60); flex: 1; min-width: 150px;" onclick="startTunnel()">
+                        ▶️ Start Tunnel
+                    </button>
+                    <button class="btn" id="stopTunnelBtn" style="background: linear-gradient(135deg, #e74c3c, #c0392b); flex: 1; min-width: 150px; display: none;" onclick="stopTunnel()">
+                        ⏹️ Stop Tunnel
+                    </button>
+                    <button class="btn" id="fixEngagedBtn" style="background: linear-gradient(135deg, #f39c12, #e67e22); flex: 1; min-width: 180px;" onclick="fixEngagedTone()">
+                        🛠 Fix Engaged Tone
+                    </button>
+                    <button class="btn" style="background: linear-gradient(135deg, #3498db, #2980b9); flex: 1; min-width: 150px;" onclick="saveTunnelConfig()">
+                        💾 Save Configuration
+                    </button>
+                </div>
+
+                <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 15px; padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 6px;">
+                    ⚠️ <strong>Note:</strong> Cloudflare requires <code>cloudflared</code> to be installed. Download from <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" style="color: #3498db;">cloudflare.com</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- OpenRouter Test Panel -->
+        <div class="panel">
+            <h2>🧪 OpenRouter API Test</h2>
+            <p style="margin-bottom: 15px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                Test OpenRouter connectivity and verify your API key is working. This will make a minimal API call (uses ~10 tokens).
+            </p>
+
+            <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
+                <div style="font-size: 14px; font-weight: 700; margin-bottom: 10px;">OpenRouter Voice Model (fastest first) — $/1M tokens</div>
+                <select id="openrouterModelSelect" style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 13px; font-family: 'Courier New', monospace;">
+                    <option value="" style="background: #34495e; color: #ecf0f1;">Loading models...</option>
+                </select>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                    <button class="btn" id="refreshOpenRouterModelsBtn" style="background: linear-gradient(135deg, #34495e, #2c3e50); flex: 1; min-width: 160px;" onclick="loadOpenRouterModels()">🔄 Refresh Models</button>
+                    <button class="btn" id="saveOpenRouterModelBtn" style="background: linear-gradient(135deg, #3498db, #2980b9); flex: 1; min-width: 160px;" onclick="saveOpenRouterModel()">💾 Save Model</button>
+                </div>
+                <div id="openrouterModelStatus" style="margin-top: 10px; font-size: 13px; opacity: 0.85;"></div>
+            </div>
+            
+            <button class="btn" id="testOpenRouterBtn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); width: 100%; max-width: 300px;" onclick="testOpenRouter()">
+                🔌 Test OpenRouter Connection
+            </button>
+            
+            <div id="openrouterTestResult" style="margin-top: 15px; padding: 15px; border-radius: 8px; display: none;">
+                <div id="openrouterTestMessage" style="font-weight: 600; margin-bottom: 8px;"></div>
+                <div id="openrouterTestDetails" style="font-size: 13px; opacity: 0.9; font-family: 'Courier New', monospace;"></div>
             </div>
         </div>
 
@@ -972,6 +1119,16 @@
                         <div class="brain-option-title">DeepSeek</div>
                         <div class="brain-option-desc">Advanced reasoning engine</div>
                     </label>
+                    <label class="brain-option" id="brainGroq">
+                        <input type="radio" name="brain" value="groq" onclick="selectBrain('groq')">
+                        <div class="brain-option-title">Groq</div>
+                        <div class="brain-option-desc">GroqCloud low-latency chat (not xAI Grok)</div>
+                    </label>
+                    <label class="brain-option" id="brainOpenRouter">
+                        <input type="radio" name="brain" value="openrouter" onclick="selectBrain('openrouter')">
+                        <div class="brain-option-title">OpenRouter</div>
+                        <div class="brain-option-desc">OpenRouter models (OpenAI-compatible)</div>
+                    </label>
                 </div>
             </div>
         </div>
@@ -995,6 +1152,22 @@
                         <input type="password" id="inputDeepSeek" placeholder="Enter API key">
                     </div>
                     <button class="btn-save" onclick="saveAPIKey('deepseek')">💾 Save</button>
+                </div>
+
+                <div class="api-key-section">
+                    <h3>Groq <span class="status not-configured" id="statusGroq">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputGroq" placeholder="gsk_... (GroqCloud key)">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('groq')">💾 Save</button>
+                </div>
+
+                <div class="api-key-section">
+                    <h3>OpenRouter <span class="status not-configured" id="statusOpenRouter">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputOpenRouter" placeholder="sk-or-...">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('openrouter')">💾 Save</button>
                 </div>
 
                 <div class="api-key-section">
@@ -1052,29 +1225,6 @@
         </div>
 
         <div class="panel">
-            <h2>🧠 Voice Agent Behaviour &amp; Learning Guardrails</h2>
-            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Edit the master guardrails text and review the latest post-call learning outputs. Newest reports appear at the top.</p>
-
-            <div class="filler-section" style="margin-bottom: 20px;">
-                <h3 style="color: #667eea; margin-bottom: 10px; font-size: 16px;">🛡️ Guardrails Text (Editable)</h3>
-                <textarea id="learningGuardrails" placeholder="Paste your Voice Agent Behaviour & Learning Guardrails here" style="min-height: 220px;"></textarea>
-                <div class="hint">This text is stored in the database and can be updated anytime.</div>
-                <button class="btn-save" onclick="saveLearningGuardrails()" style="margin-top: 12px;">💾 Save Guardrails</button>
-            </div>
-
-            <div class="filler-section" style="margin-bottom: 0;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 10px;">
-                    <h3 style="color: #667eea; margin: 0; font-size: 16px;">📊 Post-Call Performance Scores &amp; Next-Call Improvements</h3>
-                    <button type="button" onclick="loadLearningReports()" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.90); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🔄 Refresh</button>
-                </div>
-                <div id="learningReportsMeta" class="hint" style="margin-top: 0;">Loading…</div>
-                <div id="learningReportsTable" style="max-height: 420px; overflow-y: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22);">
-                    <div style="padding: 16px; color: rgba(255,255,255,0.75);">Loading…</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel">
             <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
                 <h2 style="margin: 0;">👥 Active Accounts</h2>
                 <button type="button" onclick="refreshAccountsList(event)" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.90); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🔄 Refresh</button>
@@ -1086,8 +1236,8 @@
         <div class="panel">
             <h2>🎛️ Backchannel / Turn-Taking Tuning</h2>
             <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
-                Defaults are hard-set for correct turn-taking and will persist unless you manually change them here.
-                This prevents short acknowledgements like “ok/yeah/right/thanks” from triggering filler + a response.
+                Use this to stop the agent treating short acknowledgements like “ok/yeah/right” as full turns.
+                Higher thresholds = harder to trigger filler + AI response.
             </p>
 
             <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
@@ -1096,31 +1246,31 @@
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Ignore Backchannels</div>
                         <label style="display:flex; gap: 10px; align-items:center; font-size: 13px; color: rgba(255,255,255,0.85);">
-                            <input type="checkbox" id="ignoreBackchannelsAlways" style="transform: scale(1.15);" checked>
+                            <input type="checkbox" id="ignoreBackchannelsAlways" style="transform: scale(1.15);">
                             Ignore “ok/yeah/right/thanks” even when agent is silent
                         </label>
                         <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">
-                            Default ON.
+                            Recommended ON to prevent “ok” from triggering filler + response.
                         </div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Backchannel Max Words</div>
-                        <input id="backchannelMaxWords" type="number" min="1" max="8" step="1" value="2" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
+                        <input id="backchannelMaxWords" type="number" min="1" max="8" step="1" value="3" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
                         <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">If an utterance has more than this many words, it’s treated as a real request.</div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Min User Turn (seconds)</div>
-                        <input id="minUserTurnSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.30" style="width: 100%;">
-                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="minUserTurnSecondsLabel">0.30</span>s</div>
+                        <input id="minUserTurnSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.45" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="minUserTurnSecondsLabel">0.45</span>s</div>
                         <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">Utterances shorter than this won’t trigger filler/AI in Speechmatics mode.</div>
                     </div>
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Barge-in Min Speech (seconds)</div>
-                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.25" style="width: 100%;">
-                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.25</span>s</div>
+                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.55" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.55</span>s</div>
                         <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">How long caller must talk before we cancel agent speech (interrupt).</div>
                     </div>
 
@@ -1136,24 +1286,6 @@
 
         <div class="panel">            <h2>�💬 Filler Words (Sarah Voice)</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">10 audio files using Speechmatics Sarah voice. These will be randomly played during pauses to cover latency.</p>
-
-            <div style="margin-bottom: 16px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
-                <div style="font-size: 13px; font-weight: 900; color: rgba(255,255,255,0.90); margin-bottom: 8px;">🚫 No-Filler-After Phrases</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.70); margin-bottom: 10px; line-height: 1.35;">
-                    If the caller says any of these phrases, the system will NOT play a filler after their turn.
-                    The OpenAI response will still continue as normal.
-                </div>
-                <textarea id="fillerSuppressionPhrases" placeholder="One phrase per line (examples):
-thank you
-bye
-no thanks
-that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;"></textarea>
-                <div style="margin-top: 10px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
-                    <button class="btn-save" onclick="saveFillerSuppressionPhrases()">💾 Save Phrases</button>
-                    <button class="btn-save" onclick="loadFillerSuppressionPhrases()" style="background: rgba(255,255,255,0.12);">↻ Reload</button>
-                    <span id="fillerSuppressionStatus" style="font-size: 13px; opacity: 0.85;"></span>
-                </div>
-            </div>
             
             <div style="margin-bottom: 25px;">
                 <button class="btn-save" onclick="generateAllFillers()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 28px;">
@@ -1394,6 +1526,7 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
             loadAllSettings(); 
             loadFlaggedAccountsBadge();
             startStreamingStatusPolling(); 
+            startBrainUsagePolling();
             // Delay health monitoring start by 1 second to ensure server is ready after restart
             setTimeout(() => {
                 startHealthMonitoring();
@@ -1404,132 +1537,35 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
             try { await fetch('/api/super-admin/logout', { method: 'POST' }); } catch (_) {}
             location.reload();
         }
-        async function loadAllSettings() { try { const brainResp = await fetch('/api/super-admin/brain-provider'); const brainData = await brainResp.json(); if (brainData.success) selectBrain(brainData.provider); await checkAPIKeyStatus('openai'); await checkAPIKeyStatus('deepseek'); await checkAPIKeyStatus('speechmatics'); await checkAPIKeyStatus('vonage'); await loadGlobalInstructions(); await loadLearningGuardrails(); await loadLearningReports(); await loadBackchannelSettings(); await loadAccountsList(); await loadFillerSuppressionPhrases(); await loadFillerSlots(); await loadRecentCalls(); } catch (error) { console.error('Error loading settings:', error); } }
-
-        async function loadLearningGuardrails() {
-            try {
-                const resp = await fetch('/api/super-admin/learning-guardrails');
-                const data = await resp.json();
-                if (!data || !data.success) return;
-                const el = document.getElementById('learningGuardrails');
-                if (el) el.value = data.guardrails || '';
-            } catch (error) {
-                console.error('Error loading learning guardrails:', error);
-            }
-        }
-
-        async function saveLearningGuardrails() {
-            try {
-                const el = document.getElementById('learningGuardrails');
-                if (!el) return;
-                const guardrails = el.value || '';
-                const resp = await fetch('/api/super-admin/learning-guardrails', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ guardrails, updated_by: 'super-admin' })
-                });
-                const data = await resp.json();
-                if (data && data.success) showAlert('✅ Learning guardrails saved', 'success');
-                else showAlert('❌ Failed to save guardrails: ' + (data?.error || data?.detail || 'Unknown error'), 'error');
-            } catch (error) {
-                console.error('Error saving learning guardrails:', error);
-                showAlert('❌ Error saving guardrails: ' + (error.message || error), 'error');
-            }
-        }
-
-        function _escapeHtmlLite(str) {
-            return String(str ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
-        async function loadLearningReports() {
-            const tableEl = document.getElementById('learningReportsTable');
-            const metaEl = document.getElementById('learningReportsMeta');
-            if (tableEl) tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">Loading…</div>';
-            if (metaEl) metaEl.textContent = 'Loading…';
-
-            try {
-                const resp = await fetch('/api/super-admin/learning-reports?limit=200');
-                const data = await resp.json();
-                if (!data || !data.success) throw new Error(data?.error || data?.detail || 'Failed to load');
-
-                const reports = Array.isArray(data.reports) ? data.reports : [];
-                if (metaEl) metaEl.textContent = `${reports.length} report(s)`;
-
-                if (!tableEl) return;
-                if (reports.length === 0) {
-                    tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">No learning reports yet.</div>';
-                    return;
+        async function loadAllSettings() {
+            const safe = async (label, fn) => {
+                try {
+                    await fn();
+                } catch (e) {
+                    console.error(`Error in ${label}:`, e);
                 }
+            };
 
-                const rows = reports.map(r => {
-                    const id = Number(r.id);
-                    const createdAt = _escapeHtmlLite(r.created_at || '');
-                    const callUuid = _escapeHtmlLite(r.call_uuid || '');
-                    const userId = _escapeHtmlLite(r.user_id ?? '');
-                    const score = (r.overall_score === null || r.overall_score === undefined || r.overall_score === '') ? '—' : String(r.overall_score);
-                    const scoresJson = _escapeHtmlLite(r.scores_json || '');
-                    const improvements = _escapeHtmlLite(r.next_call_improvements || '');
-                    return `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.10);">
-                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.78); white-space: nowrap;">${createdAt || '—'}</td>
-                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.92);">${callUuid || '—'}</td>
-                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.92); text-align: center; white-space: nowrap;">${userId || '—'}</td>
-                            <td style="padding: 10px 8px; font-size: 12px; font-weight: 900; color: rgba(255,255,255,0.95); text-align: center; white-space: nowrap;">${_escapeHtmlLite(score)}</td>
-                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.88); white-space: pre-wrap; word-break: break-word;">${scoresJson || '—'}</td>
-                            <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.90); white-space: pre-wrap; word-break: break-word;">${improvements || '—'}</td>
-                            <td style="padding: 10px 8px; text-align: right; white-space: nowrap;">
-                                <button onclick="deleteLearningReport(${id})" style="background: rgba(231, 76, 60, 0.8); color: white; border: none; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px;">🗑 Delete</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+            await safe('brain-provider', async () => {
+                const brainResp = await fetch('/api/super-admin/brain-provider');
+                const brainData = await brainResp.json();
+                if (brainData && brainData.success) selectBrain(brainData.provider);
+            });
 
-                tableEl.innerHTML = `
-                    <div style="overflow-x:auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: rgba(255,255,255,0.06);">
-                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">When</th>
-                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Call UUID</th>
-                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">User</th>
-                                    <th style="text-align:center; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Score</th>
-                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Scores</th>
-                                    <th style="text-align:left; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Next-call improvements</th>
-                                    <th style="text-align:right; padding: 10px 8px; color: rgba(255,255,255,0.85); font-size: 12px; letter-spacing: 0.4px;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error loading learning reports:', error);
-                if (metaEl) metaEl.textContent = 'Failed to load';
-                if (tableEl) tableEl.innerHTML = '<div style="padding: 16px; color: rgba(255,255,255,0.75);">Failed to load reports: ' + _escapeHtmlLite(error.message || error) + '</div>';
-            }
-        }
+            await safe('checkAPIKeyStatus(openai)', () => checkAPIKeyStatus('openai'));
+            await safe('checkAPIKeyStatus(deepseek)', () => checkAPIKeyStatus('deepseek'));
+            await safe('checkAPIKeyStatus(groq)', () => checkAPIKeyStatus('groq'));
+            await safe('checkAPIKeyStatus(openrouter)', () => checkAPIKeyStatus('openrouter'));
+            await safe('checkAPIKeyStatus(speechmatics)', () => checkAPIKeyStatus('speechmatics'));
+            await safe('checkAPIKeyStatus(vonage)', () => checkAPIKeyStatus('vonage'));
 
-        async function deleteLearningReport(reportId) {
-            if (!reportId) return;
-            if (!confirm('Delete this learning report?')) return;
-            try {
-                const resp = await fetch(`/api/super-admin/learning-reports/${reportId}`, { method: 'DELETE' });
-                const data = await resp.json();
-                if (data && data.success) {
-                    showAlert('✅ Report deleted', 'success');
-                    loadLearningReports();
-                } else {
-                    showAlert('❌ Delete failed: ' + (data?.error || data?.detail || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                console.error('Error deleting learning report:', error);
-                showAlert('❌ Error deleting report: ' + (error.message || error), 'error');
-            }
+            await safe('loadGlobalInstructions', () => loadGlobalInstructions());
+            await safe('loadBackchannelSettings', () => loadBackchannelSettings());
+            await safe('loadAccountsList', () => loadAccountsList());
+            await safe('loadFillerSlots', () => loadFillerSlots());
+            await safe('loadRecentCalls', () => loadRecentCalls());
+            await safe('loadTunnelConfig', () => loadTunnelConfig());
+            await safe('loadOpenRouterModels', () => loadOpenRouterModels());
         }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
@@ -1681,12 +1717,18 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 const name = escapeHtml(account.name || ('User ' + userId));
                 const phone = escapeHtml(account.phone_number || '');
                 const isSuspended = !!account.is_suspended;
-                const status = isSuspended
-                    ? '<span style="background: rgba(231,76,60,0.25); border: 1px solid rgba(231,76,60,0.55); color: #ffb3b3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">🔒 Suspended</span>'
-                    : '<span style="background: rgba(243,156,18,0.22); border: 1px solid rgba(243,156,18,0.55); color: #ffd7a3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">⚠️ Flagged</span>';
+                const userStatus = String(account.user_status || 'active');
+                let status = '<span style="background: rgba(243,156,18,0.22); border: 1px solid rgba(243,156,18,0.55); color: #ffd7a3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">⚠️ Flagged</span>';
+                if (userStatus === 'banned') {
+                    status = '<span style="background: rgba(231,76,60,0.25); border: 1px solid rgba(231,76,60,0.65); color: #ffd0d0; padding: 4px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;">⛔ Banned</span>';
+                } else if (userStatus === 'suspended' || isSuspended) {
+                    status = '<span style="background: rgba(231,76,60,0.25); border: 1px solid rgba(231,76,60,0.55); color: #ffb3b3; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px;">🔒 Suspended</span>';
+                }
                 const count = Number(account.suspension_count || 0);
-                const reason = escapeHtml(account.suspension_reason || '');
-                const when = escapeHtml(account.suspended_at || '');
+                const reasonText = (account.suspension_reason || account.suspension_message || '');
+                const reason = escapeHtml(reasonText);
+                const whenText = (account.suspended_at || account.user_suspended_at || '');
+                const when = escapeHtml(whenText);
                 const details = escapeHtml(account.flag_details || account.last_flag_details || '');
                 const businessInfo = escapeHtml(account.business_info || '');
 
@@ -1702,6 +1744,8 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                         <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.85);">${reason || '—'}</td>
                         <td style="padding: 10px 8px; text-align:right; white-space: nowrap;">
                             ${isSuspended ? `<button onclick="unsuspendAccountFromModal(${userId})" style="background: rgba(39,174,96,0.25); border: 1px solid rgba(39,174,96,0.6); color: #b7ffcf; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 800;">✓ Unsuspend</button>` : ''}
+                            ${(userStatus === 'suspended' || userStatus === 'banned') ? `<button onclick="reactivateAccountFromModal(${userId})" style="margin-left: 8px; background: rgba(39,174,96,0.18); border: 1px solid rgba(39,174,96,0.45); color: rgba(255,255,255,0.92); padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 900;">↩ Reactivate</button>` : ''}
+                            ${(userStatus !== 'banned') ? `<button onclick="banAccountFromModal(${userId})" style="margin-left: 8px; background: rgba(231,76,60,0.20); border: 1px solid rgba(231,76,60,0.55); color: #ffd0d0; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 900;">⛔ Ban</button>` : ''}
                             <button onclick="showAccountConfigModal(${userId})" style="margin-left: 8px; background: rgba(52,152,219,0.22); border: 1px solid rgba(52,152,219,0.55); color: #cde8ff; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 800;">👁 Details</button>
                         </td>
                     </tr>
@@ -1746,8 +1790,144 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
             }
         }
 
+        async function banAccountFromModal(userId) {
+            if (!confirm('Ban this account permanently?')) return;
+            try {
+                const response = await fetch(`/api/super-admin/account/${userId}/ban`, {
+                    method: 'POST'
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || (data && data.success === false)) throw new Error(data?.error || data?.detail || 'Failed to ban');
+                if (typeof showAlert === 'function') showAlert('⛔ Account banned', 'success');
+                loadFlaggedAccountsForModal();
+                if (typeof loadAccountsList === 'function') loadAccountsList();
+            } catch (error) {
+                console.error('Failed to ban account:', error);
+                if (typeof showAlert === 'function') showAlert('❌ Failed to ban: ' + (error.message || error), 'error');
+            }
+        }
+
+        async function reactivateAccountFromModal(userId) {
+            if (!confirm('Reactivate this account?')) return;
+            try {
+                const response = await fetch(`/api/super-admin/account/${userId}/reactivate`, {
+                    method: 'POST'
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || (data && data.success === false)) throw new Error(data?.error || data?.detail || 'Failed to reactivate');
+                if (typeof showAlert === 'function') showAlert('✅ Account reactivated', 'success');
+                loadFlaggedAccountsForModal();
+                if (typeof loadAccountsList === 'function') loadAccountsList();
+            } catch (error) {
+                console.error('Failed to reactivate account:', error);
+                if (typeof showAlert === 'function') showAlert('❌ Failed to reactivate: ' + (error.message || error), 'error');
+            }
+        }
+
         function closeAccountConfigModal() {
             const modal = document.getElementById('accountConfigModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function showAccountDetailsModal(userId, userName) {
+            // Create modal if it doesn't exist
+            let modal = document.getElementById('accountDetailsModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'accountDetailsModal';
+                modal.style.cssText = 'display: none; position: fixed; z-index: 999999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); align-items: center; justify-content: center; animation: fadeIn 0.2s ease;';
+                modal.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0; border-radius: 20px; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+                        <div style="position: sticky; top: 0; background: rgba(26, 26, 46, 0.95); backdrop-filter: blur(10px); padding: 24px 28px; border-bottom: 2px solid rgba(155, 89, 182, 0.3); z-index: 10; border-radius: 20px 20px 0 0;">
+                            <h2 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 900; background: linear-gradient(90deg, #9b59b6, #e74c3c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">👤 Account Signup Details</h2>
+                            <div id="accountDetailsModalSubtitle" style="font-size: 13px; color: rgba(255,255,255,0.65); font-weight: 600;"></div>
+                        </div>
+                        <div id="accountDetailsModalContent" style="padding: 28px;"></div>
+                        <div style="padding: 20px 28px; border-top: 1px solid rgba(255,255,255,0.08); text-align: right;">
+                            <button onclick="closeAccountDetailsModal()" style="background: rgba(155, 89, 182, 0.22); border: 1px solid rgba(155, 89, 182, 0.55); color: #e8d4ff; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 13px;">Close</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            const subtitle = document.getElementById('accountDetailsModalSubtitle');
+            const content = document.getElementById('accountDetailsModalContent');
+            
+            modal.style.display = 'flex';
+            subtitle.textContent = 'Loading…';
+            content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading account details…</div>';
+
+            try {
+                const response = await fetch(`/api/super-admin/account-details/${userId}`);
+                const data = await response.json();
+                
+                if (!data || !data.success) {
+                    throw new Error(data?.error || 'Failed to load account details');
+                }
+
+                const d = data.details || {};
+                const escapeHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+
+                subtitle.textContent = `${userName} (User ID: ${userId})`;
+
+                const fieldBlock = (label, value, icon = '') => {
+                    const displayValue = value || '<span style="opacity:0.5;">(not provided)</span>';
+                    return `
+                        <div style="margin-bottom: 16px;">
+                            <div style="font-size: 11px; letter-spacing: 0.5px; font-weight: 900; color: rgba(155, 89, 182, 0.85); margin-bottom: 6px; text-transform: uppercase;">${icon} ${label}</div>
+                            <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(155, 89, 182, 0.25); border-radius: 10px; padding: 12px 14px; color: rgba(255,255,255,0.95); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 13px; word-break: break-word; line-height: 1.5;">${displayValue}</div>
+                        </div>
+                    `;
+                };
+
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return 'N/A';
+                    try {
+                        const date = new Date(dateStr);
+                        return date.toLocaleString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    } catch {
+                        return dateStr;
+                    }
+                };
+
+                content.innerHTML = `
+                    <div style="display: grid; gap: 12px;">
+                        ${fieldBlock('Username', escapeHtml(d.username), '🔑')}
+                        ${fieldBlock('Email Address', escapeHtml(d.email), '📧')}
+                        ${fieldBlock('Mobile Number', escapeHtml(d.mobile), '📱')}
+                        ${fieldBlock('Mobile E.164 Format', escapeHtml(d.mobile_e164), '🌍')}
+                        ${fieldBlock('Business Name', escapeHtml(d.business_name), '🏢')}
+                        ${fieldBlock('Website URL', escapeHtml(d.website_url), '🌐')}
+                        ${fieldBlock('Full Name', escapeHtml(d.name), '👤')}
+                        ${fieldBlock('Assigned Phone Number', escapeHtml(d.phone_number), '☎️')}
+                        ${fieldBlock('Account Created', formatDate(d.created_at), '📅')}
+                        ${fieldBlock('Account Status', escapeHtml(d.status), '✨')}
+                        <div style="margin-top: 16px; padding: 14px; background: rgba(231, 76, 60, 0.12); border: 1px solid rgba(231, 76, 60, 0.3); border-radius: 10px; font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.6;">
+                            <div style="font-weight: 900; color: #ff6b6b; margin-bottom: 6px;">🔒 SECURITY NOTE</div>
+                            Passwords are securely hashed using PBKDF2 and cannot be displayed. Original passwords are never stored in plain text for security reasons.
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                subtitle.textContent = `${userName} (User ID: ${userId})`;
+                content.innerHTML = `
+                    <div style="text-align:center; padding: 30px;">
+                        <div style="color:#ff6b6b; font-weight: 800; font-size: 16px; margin-bottom: 10px;">❌ Failed to Load Account Details</div>
+                        <div style="color: rgba(255,255,255,0.7); font-size: 13px;">${escapeHtml(String(error.message || error))}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function closeAccountDetailsModal() {
+            const modal = document.getElementById('accountDetailsModal');
             if (modal) modal.style.display = 'none';
         }
 
@@ -1795,10 +1975,10 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.85); padding: 30px;"><div style="color:#ff6b6b; font-weight: 800;">Failed to load account configuration</div><div style="margin-top: 8px; opacity: 0.8;">' + String(error.message || error) + '</div></div>';
             }
         }
-        async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
-        function selectBrain(provider) { document.getElementById('brainOpenAI').classList.remove('selected'); document.getElementById('brainDeepSeek').classList.remove('selected'); if (provider === 'openai') { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; } else { document.getElementById('brainDeepSeek').classList.add('selected'); document.querySelector('input[value="deepseek"]').checked = true; } saveBrainProvider(provider); }
+        async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; statusId = 'statusGroq'; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; statusId = 'statusOpenRouter'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
+        function selectBrain(provider) { document.getElementById('brainOpenAI').classList.remove('selected'); document.getElementById('brainDeepSeek').classList.remove('selected'); document.getElementById('brainGroq').classList.remove('selected'); const br = document.getElementById('brainOpenRouter'); if (br) br.classList.remove('selected'); if (provider === 'openai') { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; } else if (provider === 'deepseek') { document.getElementById('brainDeepSeek').classList.add('selected'); document.querySelector('input[value="deepseek"]').checked = true; } else if (provider === 'groq') { document.getElementById('brainGroq').classList.add('selected'); document.querySelector('input[value="groq"]').checked = true; } else if (provider === 'openrouter') { const el = document.getElementById('brainOpenRouter'); if (el) el.classList.add('selected'); document.querySelector('input[value="openrouter"]').checked = true; } else { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; provider = 'openai'; } saveBrainProvider(provider); }
         async function saveBrainProvider(provider) { try { const response = await fetch('/api/super-admin/brain-provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert(data.message, 'success'); else showAlert('Failed to update brain provider', 'error'); } catch (error) { console.error('Error saving brain provider:', error); showAlert('Error saving brain provider', 'error'); } }
-        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); const appId = document.getElementById('inputVonageAppId').value.trim(); const privateKey = document.getElementById('inputVonagePrivateKey').value.trim(); if (!apiKey && !apiSecret && !appId && !privateKey) { showAlert('Please enter at least one Vonage credential', 'error'); return; } body = { updated_by: 'super-admin' }; if (apiKey) body.api_key = apiKey; if (apiSecret) body.api_secret = apiSecret; if (appId) body.application_id = appId; if (privateKey) body.private_key_pem = privateKey; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; document.getElementById('inputVonageAppId').value = ''; document.getElementById('inputVonagePrivateKey').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
+        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; inputId = 'inputGroq'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; inputId = 'inputOpenRouter'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); const appId = document.getElementById('inputVonageAppId').value.trim(); const privateKey = document.getElementById('inputVonagePrivateKey').value.trim(); if (!apiKey && !apiSecret && !appId && !privateKey) { showAlert('Please enter at least one Vonage credential', 'error'); return; } body = { updated_by: 'super-admin' }; if (apiKey) body.api_key = apiKey; if (apiSecret) body.api_secret = apiSecret; if (appId) body.application_id = appId; if (privateKey) body.private_key_pem = privateKey; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; document.getElementById('inputVonageAppId').value = ''; document.getElementById('inputVonagePrivateKey').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
         async function loadGlobalInstructions() { 
             try { 
                 const response = await fetch('/api/super-admin/global-instructions'); 
@@ -1990,6 +2170,7 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                             <td style="padding: 10px 8px; font-size: 12px; color: rgba(255,255,255,0.75);">${lastCall}</td>
                             <td style="padding: 10px 8px;">${fmtStatus(acc)}</td>
                             <td style="padding: 10px 8px; text-align: right; white-space: nowrap;">
+                                <button type="button" onclick="showAccountDetailsModal(${userId}, '${name.replace(/'/g, "\\'")}')" style="background: rgba(155, 89, 182, 0.22); border: 1px solid rgba(155, 89, 182, 0.55); color: #e8d4ff; padding: 7px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px; margin-right: 6px;">👤 View Details</button>
                                 ${showExtendTrial ? `<button type="button" onclick="extendTrial(${userId}, '${name.replace(/'/g, "\\'")}')" style="background: rgba(52, 152, 219, 0.22); border: 1px solid rgba(52, 152, 219, 0.55); color: #cde8ff; padding: 7px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px; margin-right: 6px;">⏰ +Trial</button>` : ''}
                                 <button type="button" class="credit-btn add" onclick="manageCredits(${userId}, '${name.replace(/'/g, "\\'")}', 'add')" title="Add Credits">➕ Add</button>
                                 <button type="button" class="credit-btn remove" onclick="manageCredits(${userId}, '${name.replace(/'/g, "\\'")}', 'remove')" title="Remove Credits" style="margin-left: 6px;">➖ Remove</button>
@@ -2152,46 +2333,6 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
         }
         
         async function saveFillerWords() { try { const fillerWords = document.getElementById('fillerWords').value.trim(); const response = await fetch('/api/super-admin/filler-words', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filler_words: fillerWords, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert('Filler words saved successfully', 'success'); else showAlert('Failed to save filler words', 'error'); } catch (error) { console.error('Error saving filler words:', error); showAlert('Error saving filler words', 'error'); } }
-
-        async function loadFillerSuppressionPhrases() {
-            try {
-                const status = document.getElementById('fillerSuppressionStatus');
-                if (status) status.textContent = 'Loading…';
-                const resp = await fetch('/api/super-admin/filler-suppression-phrases');
-                const data = await resp.json();
-                if (!data.success) throw new Error(data.error || 'Failed');
-                const el = document.getElementById('fillerSuppressionPhrases');
-                if (el) el.value = (data.phrases || '').trim();
-                if (status) status.textContent = data.last_updated ? `Loaded (${data.last_updated})` : 'Loaded';
-            } catch (e) {
-                console.error('Error loading filler suppression phrases:', e);
-                const status = document.getElementById('fillerSuppressionStatus');
-                if (status) status.textContent = 'Failed to load';
-            }
-        }
-
-        async function saveFillerSuppressionPhrases() {
-            try {
-                const el = document.getElementById('fillerSuppressionPhrases');
-                const phrases = (el?.value || '').trim();
-                const status = document.getElementById('fillerSuppressionStatus');
-                if (status) status.textContent = 'Saving…';
-                const resp = await fetch('/api/super-admin/filler-suppression-phrases', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phrases, updated_by: 'super-admin' })
-                });
-                const data = await resp.json();
-                if (!data.success) throw new Error(data.error || 'Failed');
-                if (status) status.textContent = 'Saved';
-                showAlert('No-filler-after phrases saved', 'success');
-            } catch (e) {
-                console.error('Error saving filler suppression phrases:', e);
-                const status = document.getElementById('fillerSuppressionStatus');
-                if (status) status.textContent = 'Failed to save';
-                showAlert('Error saving no-filler-after phrases', 'error');
-            }
-        }
         async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; const fillerText = (filler?.text || ''); card.innerHTML = `
                     <div class="filler-slot-header">
                         <div class="filler-slot-title">🎙️ Filler ${i}</div>
@@ -2290,7 +2431,7 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 showAlert('Error generating fillers', 'error', false); 
             } 
         }
-        function showAlert(message, type, scrollToTop = false) { 
+        function showAlert(message, type, scrollToTop = false, duration = 5000) { 
             const alertBox = document.getElementById('alertBox'); 
             if (!alertBox) {
                 console.error('Alert box not found');
@@ -2298,7 +2439,12 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 return;
             }
             
-            alertBox.textContent = message; 
+            // Use innerHTML if message contains HTML tags, otherwise textContent
+            if (message.includes('<')) {
+                alertBox.innerHTML = message;
+            } else {
+                alertBox.textContent = message;
+            }
             alertBox.className = `alert alert-${type}`; 
             alertBox.style.display = 'block'; 
             alertBox.style.animation = 'slideIn 0.3s ease-out';
@@ -2308,13 +2454,13 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
             
-            // Auto-hide after 5 seconds
+            // Auto-hide after specified duration
             setTimeout(() => { 
                 alertBox.style.animation = 'slideOut 0.3s ease-in';
                 setTimeout(() => {
                     alertBox.style.display = 'none'; 
                 }, 300);
-            }, 5000); 
+            }, duration); 
         }
         
         // Call Performance Analysis Functions
@@ -2367,20 +2513,130 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                 streamingStatusInterval = null;
             }
         }
+
+        // Live Brain Usage Polling (OpenAI vs DeepSeek vs Groq)
+        let brainUsageInterval = null;
+
+        async function updateLiveBrainUsage() {
+            try {
+                const resp = await fetch('/api/super-admin/live-brain-usage');
+                const data = await resp.json();
+
+                const callEl = document.getElementById('liveBrainUsageCall');
+                const textEl = document.getElementById('liveBrainUsageText');
+                const providersEl = document.getElementById('liveBrainUsageProviders');
+                const reasonsEl = document.getElementById('liveBrainUsageReasons');
+                if (!callEl || !textEl) return;
+
+                if (!data || !data.success) {
+                    callEl.textContent = 'Unavailable';
+                    textEl.textContent = 'OpenAI 0% | DeepSeek 0% | Groq 0% | OpenRouter 0%';
+                    if (providersEl) providersEl.textContent = '';
+                    if (reasonsEl) reasonsEl.textContent = '';
+                    return;
+                }
+
+                const active = (data.active_calls || []);
+                if (!active.length) {
+                    callEl.textContent = 'No active call';
+                    textEl.textContent = 'OpenAI 0% | DeepSeek 0% | Groq 0% | OpenRouter 0%';
+                    if (providersEl) providersEl.textContent = '';
+                    if (reasonsEl) reasonsEl.textContent = '';
+                    return;
+                }
+
+                const a = active[0];
+                const selected = (a.selected_provider || 'openai');
+                const effective = (a.effective_provider || 'openai');
+                const reasons = Array.isArray(a.gating_reasons) ? a.gating_reasons : [];
+                callEl.textContent = `Call UUID: ${a.call_uuid || 'unknown'}`;
+                if (providersEl) {
+                    providersEl.innerHTML = `<span style="font-weight: 700;">Selected:</span> ${selected} &nbsp; <span style="font-weight: 700;">Effective:</span> ${effective} &nbsp; <span style="opacity: 0.85;">(turns: ${a.openai_turns || 0} OpenAI / ${a.deepseek_turns || 0} DeepSeek / ${a.groq_turns || 0} Groq / ${a.openrouter_turns || 0} OpenRouter)</span>`;
+                }
+                if (reasonsEl) {
+                    reasonsEl.textContent = reasons.length ? `Why fallback happened: ${reasons.join(', ')}` : '';
+                }
+                textEl.textContent = `OpenAI ${a.openai_percent || 0}% | DeepSeek ${a.deepseek_percent || 0}% | Groq ${a.groq_percent || 0}% | OpenRouter ${a.openrouter_percent || 0}%`;
+            } catch (e) {
+                const callEl = document.getElementById('liveBrainUsageCall');
+                const textEl = document.getElementById('liveBrainUsageText');
+                const providersEl = document.getElementById('liveBrainUsageProviders');
+                const reasonsEl = document.getElementById('liveBrainUsageReasons');
+                if (callEl) callEl.textContent = 'Error loading';
+                if (textEl) textEl.textContent = 'OpenAI 0% | DeepSeek 0% | Groq 0% | OpenRouter 0%';
+                if (providersEl) providersEl.textContent = '';
+                if (reasonsEl) reasonsEl.textContent = '';
+                console.error('Error fetching live brain usage:', e);
+            }
+        }
+
+        function startBrainUsagePolling() {
+            updateLiveBrainUsage();
+            if (brainUsageInterval) clearInterval(brainUsageInterval);
+            brainUsageInterval = setInterval(updateLiveBrainUsage, 2000);
+        }
+
+        function stopBrainUsagePolling() {
+            if (brainUsageInterval) {
+                clearInterval(brainUsageInterval);
+                brainUsageInterval = null;
+            }
+        }
         
         async function loadRecentCalls() {
             try {
+                const container = document.getElementById('recentCallsList');
+                if (!container) {
+                    console.warn('recentCallsList container not found; skipping recent calls load');
+                    return;
+                }
+
+                container.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.75); padding: 20px;">Loading…</div>';
+
                 const response = await fetch('/api/super-admin/recent-calls');
-                const data = await response.json();
+
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const errJson = await response.json();
+                        detail = errJson?.error || errJson?.detail || '';
+                    } catch (_) {
+                        // ignore parse errors
+                    }
+                    if (response.status === 401) {
+                        container.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.75); padding: 20px;">Session expired — please log in again.</div>';
+                        return;
+                    }
+                    container.innerHTML = `<div style="text-align: center; color: #e74c3c; padding: 20px;">Error loading calls (HTTP ${response.status})${detail ? `: ${detail}` : ''}</div>`;
+                    return;
+                }
+
+                const data = await response.json().catch(() => ({}));
                 
                 if (data.success && data.calls.length > 0) {
-                    const container = document.getElementById('recentCallsList');
                     container.innerHTML = '';
                     
                     data.calls.forEach(call => {
                         const startTime = new Date(call.start_time);
                         const duration = call.duration || 0;
                         const avgResponse = call.average_response_time ? `${call.average_response_time.toFixed(0)}ms avg` : 'N/A';
+
+                        const selected = (call.selected_brain_provider || '').toString().trim();
+                        const effective = (call.effective_brain_provider || '').toString().trim();
+                        const callMode = (call.call_mode || '').toString().trim();
+                        let reasons = call.brain_gating_reasons;
+                        try {
+                            if (typeof reasons === 'string' && reasons.trim().startsWith('[')) {
+                                reasons = JSON.parse(reasons);
+                            }
+                        } catch (e) {
+                            // ignore parse errors
+                        }
+                        if (!Array.isArray(reasons)) reasons = [];
+                        const providerLine = (selected || effective)
+                            ? `🧠 ${selected ? `Selected: ${selected}` : ''}${selected && effective ? ' / ' : ''}${effective ? `Effective: ${effective}` : ''}${callMode ? ` (${callMode})` : ''}`
+                            : '';
+                        const reasonsLine = reasons.length ? `Why: ${reasons.join(', ')}` : '';
                         
                         const callItem = document.createElement('div');
                         callItem.className = 'call-item';
@@ -2389,17 +2645,20 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                             <div class="call-time">${startTime.toLocaleString()}</div>
                             <div class="call-from">📞 ${call.caller_number} → ${call.user_phone || 'Unknown'}</div>
                             <div class="call-duration">⏱️ ${duration}s | ${avgResponse} | ${call.business_name || 'No business'}</div>
+                            ${providerLine ? `<div class="call-duration" style="opacity: 0.9;">${providerLine}</div>` : ''}
+                            ${reasonsLine ? `<div class="call-duration" style="opacity: 0.8;">${reasonsLine}</div>` : ''}
                         `;
                         container.appendChild(callItem);
                     });
                 } else {
-                    document.getElementById('recentCallsList').innerHTML = 
-                        '<div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">No recent calls found</div>';
+                    container.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">No recent calls found</div>';
                 }
             } catch (error) {
                 console.error('Error loading recent calls:', error);
-                document.getElementById('recentCallsList').innerHTML = 
-                    '<div style="text-align: center; color: #e74c3c; padding: 20px;">Error loading calls</div>';
+                const container = document.getElementById('recentCallsList');
+                if (container) {
+                    container.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 20px;">Error loading calls</div>';
+                }
             }
         }
         
@@ -2410,11 +2669,11 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
             document.querySelectorAll('.call-item').forEach(item => item.classList.remove('selected'));
             element.classList.add('selected');
             
-            // Enable analyze button
-            document.getElementById('analyzeBtn').disabled = false;
-            
-            // Hide previous results
-            document.getElementById('analysisResults').style.display = 'none';
+            // Optional: if a call analysis UI exists in this build, enable it.
+            const analyzeBtn = document.getElementById('analyzeCallBtn');
+            if (analyzeBtn) analyzeBtn.disabled = false;
+            const results = document.getElementById('analysisResults');
+            if (results) results.style.display = 'none';
         }
         
         async function analyzeSelectedCall() {
@@ -2737,6 +2996,41 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
                         return { status: 'error', message: data.message || 'Not running' };
                     } catch (e) {
                         return { status: 'error', message: 'Check failed' };
+                    }
+                }
+            },
+            cloudflare: {
+                icon: '☁️',
+                name: 'Cloudflare Tunnel',
+                desc: 'Monitors Cloudflare tunnel status and public URL availability. If this is red, incoming calls from Vonage cannot reach your server. Double-click to start the tunnel.',
+                checkFn: async () => {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 3000);
+                        
+                        const resp = await fetch('/api/admin/ngrok-status', {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (!resp.ok) return { status: 'error', message: 'Not running' };
+                        const data = await resp.json();
+                        const cloudflareRunning = data.cloudflare_running || false;
+                        
+                        if (cloudflareRunning) {
+                            const url = data.cloudflare_url || '';
+                            if (url && url.includes('trycloudflare.com')) {
+                                const shortUrl = url.replace('https://', '').replace('http://', '').substring(0, 30);
+                                return { status: 'ok', message: shortUrl, details: data };
+                            }
+                            return { status: 'warning', message: 'Running (no URL yet)', details: data };
+                        }
+                        return { status: 'error', message: 'Offline - double-click to start' };
+                    } catch (e) {
+                        if (e.name === 'AbortError') {
+                            return { status: 'error', message: 'Offline' };
+                        }
+                        return { status: 'error', message: 'Offline' };
                     }
                 }
             },
@@ -3339,6 +3633,496 @@ that's all" style="width: 100%; min-height: 92px; padding: 10px 12px; border: 2p
             } catch (e) {
                 showAlert('❌ Auto-fix failed: ' + e.message, 'error');
             }
+        }
+
+        // ===== TUNNEL PROVIDER MANAGEMENT =====
+        
+        async function loadTunnelConfig() {
+            try {
+                const resp = await fetch('/api/super-admin/tunnel-config');
+                const data = await resp.json();
+                
+                if (data.success) {
+                    document.getElementById('tunnelProvider').value = data.provider || 'ngrok';
+                    document.getElementById('cloudflareDomain').value = data.cloudflare_domain || '';
+                    
+                    // Show/hide cloudflare options
+                    handleTunnelProviderChange();
+                    
+                    // Load current configured webhook URLs immediately
+                    await loadCurrentWebhookUrls();
+                    
+                    // Update status
+                    await updateTunnelStatus();
+                }
+            } catch (e) {
+                console.error('Failed to load tunnel config:', e);
+            }
+        }
+
+        async function loadCurrentWebhookUrls() {
+            try {
+                const resp = await fetch('/api/admin/ngrok-status');
+                const data = await resp.json();
+                
+                // Use the stored public URL (cloudflare_url or ngrok_url based on provider)
+                let publicUrl = '';
+                if (data.provider === 'cloudflare') {
+                    publicUrl = data.cloudflare_url;
+                } else {
+                    publicUrl = data.ngrok_url;
+                }
+                
+                // If no active URL, try to get from CONFIG/DB
+                if (!publicUrl) {
+                    try {
+                        const configResp = await fetch('/api/health');
+                        const configData = await configResp.json();
+                        publicUrl = configData.public_url || '';
+                    } catch (e) {
+                        console.debug('Could not fetch public URL from health endpoint');
+                    }
+                }
+                
+                if (publicUrl && publicUrl !== 'Unknown') {
+                    updateWebhookUrls(publicUrl, true); // Pass true to skip change detection on initial load
+                }
+            } catch (e) {
+                console.error('Failed to load current webhook URLs:', e);
+            }
+        }
+
+        function handleTunnelProviderChange() {
+            const provider = document.getElementById('tunnelProvider').value;
+            const cloudflareOptions = document.getElementById('cloudflareOptions');
+            
+            if (provider === 'cloudflare') {
+                cloudflareOptions.style.display = 'block';
+            } else {
+                cloudflareOptions.style.display = 'none';
+            }
+        }
+
+        async function saveTunnelConfig() {
+            const provider = document.getElementById('tunnelProvider').value;
+            const domain = document.getElementById('cloudflareDomain').value;
+            const token = document.getElementById('cloudflareTunnelToken').value;
+            
+            showAlert('💾 Saving tunnel configuration...', 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/tunnel-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, domain, token })
+                });
+                
+                const data = await resp.json();
+                
+                if (data.success) {
+                    showAlert('✅ Tunnel configuration saved', 'success');
+                } else {
+                    showAlert('❌ Failed to save: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Save failed: ' + e.message, 'error');
+            }
+        }
+
+        async function startCloudflare(event) {
+            if (event) event.stopPropagation(); // Prevent showHealthDetails from firing
+            
+            const currentStatus = healthData['cloudflare'];
+            if (currentStatus && currentStatus.status === 'ok') {
+                showAlert('ℹ️ Cloudflare tunnel is already running', 'info');
+                return;
+            }
+            
+            if (!confirm('Start Cloudflare tunnel? This will take a few seconds.')) return;
+            
+            showAlert('▶️ Starting Cloudflare tunnel...', 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/start-tunnel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: 'cloudflare' })
+                });
+                
+                const data = await resp.json();
+                
+                if (data.success) {
+                    const url = data.url || '';
+                    showAlert(`✅ Cloudflare tunnel started successfully! ${url ? 'URL: ' + url : 'Check logs for URL.'}`, 'success');
+                    
+                    // Wait a moment then refresh the health status
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await updateHealthStatus('cloudflare');
+                } else {
+                    showAlert(`❌ Failed to start Cloudflare tunnel: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error starting Cloudflare tunnel:', error);
+                showAlert(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function startTunnel() {
+            const provider = document.getElementById('tunnelProvider').value;
+            showAlert(`▶️ Starting ${provider} tunnel...`, 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/start-tunnel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                
+                const data = await resp.json();
+                
+                if (data.success) {
+                    const msg = data.message || (data.url ? `✅ ${provider} tunnel started: ${data.url}` : `✅ ${provider} tunnel started`);
+                    showAlert(msg, 'success');
+                    await updateTunnelStatus();
+                } else {
+                    showAlert('❌ Failed to start: ' + (data.message || data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Start failed: ' + e.message, 'error');
+            }
+        }
+
+        async function stopTunnel() {
+            const provider = document.getElementById('tunnelProvider').value;
+            
+            if (!confirm(`⚠️ Stop ${provider} tunnel? Incoming calls will not reach the server until you restart it.`)) return;
+            
+            showAlert(`⏹️ Stopping ${provider} tunnel...`, 'info');
+            
+            try {
+                const resp = await fetch('/api/super-admin/stop-tunnel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                
+                const data = await resp.json();
+                
+                if (data.success) {
+                    showAlert(data.message || `✅ ${provider} tunnel stopped`, 'success');
+                    await updateTunnelStatus();
+                } else {
+                    showAlert('❌ Failed to stop: ' + (data.message || data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Stop failed: ' + e.message, 'error');
+            }
+        }
+
+        async function fixEngagedTone() {
+            const provider = document.getElementById('tunnelProvider').value || 'cloudflare';
+            if (!confirm('🛠 This will restart the tunnel and clear active sessions. Continue?')) return;
+
+            showAlert('🛠 Fixing engaged tone (restarting tunnel)...', 'info');
+            try {
+                const resp = await fetch('/api/super-admin/fix-engaged', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showAlert(data.message || '✅ Engaged tone fix complete', 'success');
+                    await updateTunnelStatus();
+                } else {
+                    showAlert('❌ Fix failed: ' + (data.message || data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showAlert('❌ Fix failed: ' + e.message, 'error');
+            }
+        }
+
+        async function testOpenRouter() {
+            const btn = document.getElementById('testOpenRouterBtn');
+            const resultDiv = document.getElementById('openrouterTestResult');
+            const messageDiv = document.getElementById('openrouterTestMessage');
+            const detailsDiv = document.getElementById('openrouterTestDetails');
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Testing...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const resp = await fetch('/api/super-admin/test-openrouter', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await resp.json();
+                
+                resultDiv.style.display = 'block';
+                
+                if (data.success) {
+                    resultDiv.style.background = 'rgba(46, 204, 113, 0.2)';
+                    resultDiv.style.border = '2px solid #2ecc71';
+                    messageDiv.innerHTML = '✅ ' + data.message;
+                    
+                    if (data.details) {
+                        const details = data.details;
+                        detailsDiv.innerHTML = `
+                            Model: ${details.model || 'N/A'}<br>
+                            Latency: ${details.latency_ms || 'N/A'}ms<br>
+                            Response: "${details.response_preview || ''}"
+                        `;
+                    }
+                    
+                    showAlert('✅ OpenRouter API is working correctly', 'success');
+                } else {
+                    resultDiv.style.background = 'rgba(231, 76, 60, 0.2)';
+                    resultDiv.style.border = '2px solid #e74c3c';
+                    messageDiv.innerHTML = '❌ ' + data.message;
+                    
+                    if (data.details) {
+                        if (typeof data.details === 'string') {
+                            detailsDiv.textContent = data.details;
+                        } else {
+                            detailsDiv.textContent = JSON.stringify(data.details, null, 2);
+                        }
+                    }
+                    
+                    showAlert('❌ OpenRouter test failed: ' + data.message, 'error');
+                }
+            } catch (e) {
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = 'rgba(231, 76, 60, 0.2)';
+                resultDiv.style.border = '2px solid #e74c3c';
+                messageDiv.innerHTML = '❌ Test failed';
+                detailsDiv.textContent = e.message;
+                
+                showAlert('❌ Test failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔌 Test OpenRouter Connection';
+            }
+        }
+
+        function _setOpenRouterModelStatus(msg, ok=true) {
+            const el = document.getElementById('openrouterModelStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.style.color = ok ? 'rgba(120, 255, 160, 0.95)' : 'rgba(255, 140, 140, 0.95)';
+        }
+
+        async function loadOpenRouterModels() {
+            const refreshBtn = document.getElementById('refreshOpenRouterModelsBtn');
+            const selectEl = document.getElementById('openrouterModelSelect');
+            if (!selectEl) return;
+
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Loading...';
+            }
+            _setOpenRouterModelStatus('Loading models…', true);
+
+            try {
+                // Get current selected model
+                let selected = '';
+                try {
+                    const curResp = await fetch('/api/super-admin/openrouter-model');
+                    const curData = await curResp.json();
+                    if (curData && curData.success) selected = curData.model || '';
+                } catch (_) {}
+
+                const resp = await fetch('/api/super-admin/openrouter-models');
+                const data = await resp.json();
+
+                if (!data || !data.success) {
+                    const msg = data?.error || data?.message || `Failed to load models (HTTP ${resp.status})`;
+                    _setOpenRouterModelStatus(msg, false);
+                    return;
+                }
+
+                const models = Array.isArray(data.models) ? data.models : [];
+                const selectedModel = selected || data.selected_model || '';
+
+                selectEl.innerHTML = '';
+                if (!models.length) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No models returned from OpenRouter';
+                    selectEl.appendChild(opt);
+                    _setOpenRouterModelStatus('No models returned', false);
+                    return;
+                }
+
+                for (const m of models) {
+                    const id = m?.id || '';
+                    if (!id) continue;
+                    const score = m?.call_latency_score || 5;
+                    const priceLabel = m?.pricing_per_million?.label ? ` — ${m.pricing_per_million.label}` : '';
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = `★${score} ${id}${priceLabel}`;
+                    opt.style.background = '#34495e';
+                    opt.style.color = '#ecf0f1';
+                    selectEl.appendChild(opt);
+                }
+
+                if (selectedModel) {
+                    selectEl.value = selectedModel;
+                }
+
+                _setOpenRouterModelStatus('Loaded', true);
+            } catch (e) {
+                console.error('Error loading OpenRouter models:', e);
+                _setOpenRouterModelStatus(`Load failed: ${e.message || e}`, false);
+            } finally {
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = '🔄 Refresh Models';
+                }
+            }
+        }
+
+        async function saveOpenRouterModel() {
+            const btn = document.getElementById('saveOpenRouterModelBtn');
+            const selectEl = document.getElementById('openrouterModelSelect');
+            if (!selectEl) return;
+
+            const model = (selectEl.value || '').trim();
+            if (!model) {
+                _setOpenRouterModelStatus('Select a model first', false);
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '💾 Saving...';
+            }
+            _setOpenRouterModelStatus('Saving…', true);
+
+            try {
+                const resp = await fetch('/api/super-admin/openrouter-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model, updated_by: 'super-admin' })
+                });
+                const data = await resp.json();
+
+                if (resp.ok && data && data.success) {
+                    _setOpenRouterModelStatus(`Saved: ${data.model || model}`, true);
+                    showAlert(`✅ OpenRouter model saved: ${data.model || model}`, 'success');
+                } else {
+                    const err = data?.error || data?.message || `Save failed (HTTP ${resp.status})`;
+                    _setOpenRouterModelStatus(err, false);
+                    showAlert('❌ Failed to save model: ' + err, 'error');
+                }
+            } catch (e) {
+                _setOpenRouterModelStatus(`Save failed: ${e.message || e}`, false);
+                showAlert('❌ Failed to save model: ' + (e.message || e), 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Save Model';
+                }
+            }
+        }
+
+        // Track last known webhook URLs to detect changes
+        let lastKnownWebhookUrls = {
+            answer: null,
+            event: null
+        };
+
+        async function updateTunnelStatus() {
+            try {
+                const resp = await fetch('/api/admin/ngrok-status');
+                const data = await resp.json();
+                
+                const statusEl = document.getElementById('tunnelStatus');
+                const urlEl = document.getElementById('tunnelUrl');
+                const urlDisplay = document.getElementById('tunnelUrlDisplay');
+                const startBtn = document.getElementById('startTunnelBtn');
+                const stopBtn = document.getElementById('stopTunnelBtn');
+                
+                if (data.running) {
+                    statusEl.style.background = 'rgba(46, 204, 113, 0.2)';
+                    statusEl.style.color = '#2ecc71';
+                    statusEl.textContent = 'Running';
+                    
+                    urlEl.textContent = data.url || 'Unknown';
+                    urlDisplay.style.display = 'block';
+                    
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'block';
+                    
+                    // Update webhook URLs and check for changes
+                    updateWebhookUrls(data.url);
+                } else {
+                    statusEl.style.background = 'rgba(231, 76, 60, 0.2)';
+                    statusEl.style.color = '#e74c3c';
+                    statusEl.textContent = 'Not Running';
+                    
+                    urlDisplay.style.display = 'none';
+                    
+                    startBtn.style.display = 'block';
+                    stopBtn.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Failed to update tunnel status:', e);
+            }
+        }
+
+        function updateWebhookUrls(publicUrl, skipChangeDetection = false) {
+            if (!publicUrl || publicUrl === 'Unknown') return;
+            
+            const answerUrl = `${publicUrl}/webhooks/answer`;
+            const eventUrl = `${publicUrl}/webhooks/events`;
+            
+            // Update display
+            const answerEl = document.getElementById('vonageAnswerUrl');
+            const eventEl = document.getElementById('vonageEventUrl');
+            
+            if (answerEl) answerEl.textContent = answerUrl;
+            if (eventEl) eventEl.textContent = eventUrl;
+            
+            // Check if URLs have changed (only if not initial load)
+            const hasChanged = !skipChangeDetection && (
+                lastKnownWebhookUrls.answer !== null &&
+                (lastKnownWebhookUrls.answer !== answerUrl || lastKnownWebhookUrls.event !== eventUrl)
+            );
+            
+            if (hasChanged) {
+                showWebhookChangeAlert(answerUrl, eventUrl);
+            }
+            
+            // Update tracking
+            lastKnownWebhookUrls.answer = answerUrl;
+            lastKnownWebhookUrls.event = eventUrl;
+        }
+
+        function showWebhookChangeAlert(answerUrl, eventUrl) {
+            const alertHtml = `
+                <div style="background: linear-gradient(135deg, rgba(243, 156, 18, 0.95) 0%, rgba(230, 126, 34, 0.95) 100%); 
+                            color: white; padding: 20px; border-radius: 12px; max-width: 600px; 
+                            box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3);">
+                    <div style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">⚠️ Webhook URLs Changed!</div>
+                    <div style="font-size: 14px; margin-bottom: 15px; line-height: 1.5;">
+                        Your tunnel URL has changed. Update these URLs in your <strong>Vonage Dashboard</strong>:
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+                        <div style="font-size: 11px; opacity: 0.8; margin-bottom: 4px;">Answer URL (HTTP POST):</div>
+                        <code style="display: block; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace;">${answerUrl}</code>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                        <div style="font-size: 11px; opacity: 0.8; margin-bottom: 4px;">Event URL (HTTP POST):</div>
+                        <code style="display: block; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace;">${eventUrl}</code>
+                    </div>
+                    <div style="font-size: 13px; opacity: 0.9;">
+                        💡 Go to: <strong>Vonage Dashboard → Your Application → Edit Settings</strong>
+                    </div>
+                </div>
+            `;
+            showAlert(alertHtml, 'warning', 15000);  // Show for 15 seconds
         }
 
         async function viewServerLogs() {

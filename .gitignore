@@ -9,12 +9,12 @@
 server_log.txt
 server_log*.txt
 server_startup.log
+server_run.err
+server_run*.err
 
-# Audio artifacts
-*.wav
-
-# Static backups
-static/*_old.html
+# Audio artifacts (local tests)
+_speechmatics_test.wav
+*_test.wav
 
 # Google credentials
 google-credentials.json
@@ -23,6 +23,10 @@ google-credentials*.json
 # Python
 __pycache__/
 *.pyc
+
+# Static backups / scratch
+static/*.new
+static/*_old*.html
 
 # Scratch outputs
 test_results.txt
