@@ -23,7 +23,7 @@ import hashlib
 import time
 import hmac
 import base64 as _py_base64
-from typing import Dict, Optional, List, Tuple, Any
+from typing import Dict, Optional, List, Tuple, Any, TYPE_CHECKING
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import sqlite3
@@ -107,6 +107,9 @@ except Exception:
     Fernet = None  # type: ignore
     InvalidToken = Exception  # type: ignore
 
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet as FernetType  # type: ignore
+
 
 _SECRET_PREFIX = "enc:v1:"
 _KEYRING_SERVICE = "website33"
@@ -147,7 +150,7 @@ def _get_or_create_master_fernet_key() -> Optional[bytes]:
         return None
 
 
-def _get_fernet() -> Optional["Fernet"]:
+def _get_fernet() -> Optional[object]:
     if Fernet is None:
         return None
     master_key = _get_or_create_master_fernet_key()
@@ -305,13 +308,13 @@ CONFIG = {
 
     # OpenRouter (OpenAI-compatible) - router/aggregator (used only when OpenRouter brain is active)
     "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY", ""),
-    "OPENROUTER_MODEL": os.getenv("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant"),
-    "OPENROUTER_MAX_TOKENS": int(os.getenv("OPENROUTER_MAX_TOKENS", "100")),  # Shorter responses = faster
-    "OPENROUTER_HISTORY_PARTS": int(os.getenv("OPENROUTER_HISTORY_PARTS", "4")),  # Less context = faster
-    "OPENROUTER_MAX_MESSAGE_CHARS": int(os.getenv("OPENROUTER_MAX_MESSAGE_CHARS", "400")),  # Compact messages
-    "OPENROUTER_SYSTEM_MAX_CHARS": int(os.getenv("OPENROUTER_SYSTEM_MAX_CHARS", "5000")),  # Leaner system prompt
-    "OPENROUTER_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", "8000")),  # Smaller total
-    "OPENROUTER_REQUEST_TIMEOUT_SECONDS": float(os.getenv("OPENROUTER_REQUEST_TIMEOUT_SECONDS", "8")),  # Faster timeout
+    "OPENROUTER_MODEL": os.getenv("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant"),  # Fastest model for real-time calls
+    "OPENROUTER_MAX_TOKENS": int(os.getenv("OPENROUTER_MAX_TOKENS", "100")),  # Enough for complete responses
+    "OPENROUTER_HISTORY_PARTS": int(os.getenv("OPENROUTER_HISTORY_PARTS", "4")),  # Balanced context
+    "OPENROUTER_MAX_MESSAGE_CHARS": int(os.getenv("OPENROUTER_MAX_MESSAGE_CHARS", "300")),  # Compact messages
+    "OPENROUTER_SYSTEM_MAX_CHARS": int(os.getenv("OPENROUTER_SYSTEM_MAX_CHARS", "4000")),  # Full instructions
+    "OPENROUTER_TOTAL_PROMPT_MAX_CHARS": int(os.getenv("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", "6000")),  # Reasonable size
+    "OPENROUTER_REQUEST_TIMEOUT_SECONDS": float(os.getenv("OPENROUTER_REQUEST_TIMEOUT_SECONDS", "8")),  # Allow completion
     # Optional OpenRouter attribution headers
     "OPENROUTER_HTTP_REFERER": os.getenv("OPENROUTER_HTTP_REFERER", ""),
     "OPENROUTER_X_TITLE": os.getenv("OPENROUTER_X_TITLE", "website33"),
@@ -731,9 +734,10 @@ Respond ONLY with valid JSON in this exact format:
         if is_repeat_offender:
             system_prompt += "\n\nWARNING: This user has been previously suspended. Apply STRICTER standards and flag anything even remotely suspicious with lower confidence threshold (0.5 instead of 0.7)."
         
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=12)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(
-                'https://api.deepseek.com/v1/chat/completions',
+                'https://api.deepseek.com/chat/completions',
                 headers={
                     'Authorization': f'Bearer {deepseek_api_key}',
                     'Content-Type': 'application/json'
@@ -749,7 +753,11 @@ Respond ONLY with valid JSON in this exact format:
                 }
             ) as response:
                 if response.status != 200:
-                    logger.error(f"DeepSeek moderation API error: {response.status}")
+                    try:
+                        error_text = await response.text()
+                    except Exception:
+                        error_text = ""
+                    logger.error(f"DeepSeek moderation API error: {response.status} {error_text[:500]}")
                     return {"approved": True, "reason": ""}
                 
                 result = await response.json()
@@ -1048,7 +1056,7 @@ def load_global_api_keys():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, groq_api_key, grok_api_key, openrouter_api_key, openrouter_model, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider FROM global_settings WHERE id = 1')
+        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, groq_api_key, grok_api_key, openrouter_api_key, openrouter_model, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider, openrouter_history_parts, openrouter_max_tokens, openrouter_max_message_chars, openrouter_request_timeout, openrouter_system_max_chars, openrouter_total_prompt_max_chars FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
 
         if result:
@@ -1065,6 +1073,12 @@ def load_global_api_keys():
                 vonage_app_id_raw,
                 vonage_private_key_pem_raw,
                 brain_provider,
+                perf_history_parts,
+                perf_max_tokens,
+                perf_max_message_chars,
+                perf_request_timeout,
+                perf_system_max_chars,
+                perf_total_prompt_max_chars,
             ) = result
 
             speechmatics_key = _decrypt_secret(speechmatics_key_raw)
@@ -1198,6 +1212,31 @@ def load_global_api_keys():
             if brain_provider:
                 CONFIG["AI_BRAIN_PROVIDER"] = brain_provider
                 logger.info(f"✅ AI Brain Provider set to: {brain_provider}")
+
+            # Load performance tuning settings
+            if perf_history_parts is not None:
+                CONFIG["OPENROUTER_HISTORY_PARTS"] = int(perf_history_parts)
+                logger.info(f"✅ Performance: History parts = {perf_history_parts}")
+
+            if perf_max_tokens is not None:
+                CONFIG["OPENROUTER_MAX_TOKENS"] = int(perf_max_tokens)
+                logger.info(f"✅ Performance: Max tokens = {perf_max_tokens}")
+
+            if perf_max_message_chars is not None:
+                CONFIG["OPENROUTER_MAX_MESSAGE_CHARS"] = int(perf_max_message_chars)
+                logger.info(f"✅ Performance: Max message chars = {perf_max_message_chars}")
+
+            if perf_request_timeout is not None:
+                CONFIG["OPENROUTER_REQUEST_TIMEOUT_SECONDS"] = float(perf_request_timeout)
+                logger.info(f"✅ Performance: Request timeout = {perf_request_timeout}s")
+
+            if perf_system_max_chars is not None:
+                CONFIG["OPENROUTER_SYSTEM_MAX_CHARS"] = int(perf_system_max_chars)
+                logger.info(f"✅ Performance: System max chars = {perf_system_max_chars}")
+
+            if perf_total_prompt_max_chars is not None:
+                CONFIG["OPENROUTER_TOTAL_PROMPT_MAX_CHARS"] = int(perf_total_prompt_max_chars)
+                logger.info(f"✅ Performance: Total prompt max chars = {perf_total_prompt_max_chars}")
         else:
             logger.warning("⚠️ No global settings found in database")
 
@@ -1318,41 +1357,155 @@ def _update_vonage_application_webhooks(new_url: str) -> bool:
 def load_global_filler_words() -> List[str]:
     """Load global filler words/phrases from global_settings.
 
+    Backwards compatible:
+    - If the DB supports sized buckets (small/medium/large), returns the combined set.
+    - Otherwise falls back to the legacy `filler_words` column.
+
     Expected format: newline-separated phrases (commas are also accepted).
     """
+    buckets = load_global_filler_words_by_size()
+    combined: List[str] = []
+    for size in ("small", "medium", "large"):
+        for p in buckets.get(size, []):
+            if p and p not in combined:
+                combined.append(p)
+    return combined
+
+
+def _parse_filler_phrases_text(raw: str) -> List[str]:
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    parts: List[str] = []
+    for line in raw.splitlines():
+        if ',' in line:
+            parts.extend([p.strip() for p in line.split(',')])
+        else:
+            parts.append(line.strip())
+    return [p for p in parts if p]
+
+
+def default_filler_phrases_by_size() -> Dict[str, List[str]]:
+    """Default filler phrase buckets.
+
+    Includes the original 10 defaults plus 20 additional phrases.
+    """
+    return {
+        # Short "beats".
+        "small": [
+            "Um...",
+            "Let me see...",
+            "Okay...",
+            "Right...",
+            "So...",
+            "Hmm...",
+            "Well...",
+            "Ah...",
+            "Just a moment...",
+            "One second...",
+            # +8 new (small)
+            "One sec...",
+            "Just a sec...",
+            "Got it...",
+            "Sure...",
+            "Alright...",
+            "Hang on...",
+            "Checking...",
+            "Let’s see...",
+        ],
+        # Slightly longer, still quick.
+        "medium": [
+            # +6 new (medium)
+            "Give me a moment while I check that...",
+            "Okay, I’m just looking now...",
+            "One moment while I pull that up...",
+            "Alright, let me check that for you...",
+            "Just a second, I’m getting that info...",
+            "Okay — I’m on it...",
+        ],
+        # Longer reassurance for very poor latency.
+        "large": [
+            # +6 new (large)
+            "No problem — just give me a little moment to check the details so I can be accurate...",
+            "Alright, I’m going to look into that now; I’ll be right back with an answer...",
+            "Thanks — I’m just reviewing everything on my side so I can give you the right information...",
+            "Okay, I’m double‑checking a couple of things to make sure this is correct...",
+            "Just a moment — I’m pulling up the full details now, then I’ll confirm it with you...",
+            "Bear with me for a second — I’m checking the system and I’ll confirm what I find...",
+        ],
+    }
+
+
+def load_global_filler_words_by_size() -> Dict[str, List[str]]:
+    """Load sized filler phrase buckets from global_settings.
+
+    If the DB doesn't have the sized columns yet, falls back to legacy `filler_words`.
+    If nothing is configured, returns defaults.
+    """
+    defaults = default_filler_phrases_by_size()
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT filler_words FROM global_settings WHERE id = 1')
-        row = cursor.fetchone()
+        try:
+            cursor.execute(
+                "SELECT filler_words_small, filler_words_medium, filler_words_large, filler_words "
+                "FROM global_settings WHERE id = 1"
+            )
+            row = cursor.fetchone()
+        except Exception:
+            cursor.execute('SELECT filler_words FROM global_settings WHERE id = 1')
+            legacy = cursor.fetchone()
+            row = (None, None, None, legacy[0] if legacy else "")
         conn.close()
 
-        raw = (row[0] if row else "") or ""
-        parts: List[str] = []
-        for line in raw.splitlines():
-            if ',' in line:
-                parts.extend([p.strip() for p in line.split(',')])
-            else:
-                parts.append(line.strip())
-        return [p for p in parts if p]
+        small_raw, medium_raw, large_raw, legacy_raw = row if row else (None, None, None, "")
+        small = _parse_filler_phrases_text(small_raw or "")
+        medium = _parse_filler_phrases_text(medium_raw or "")
+        large = _parse_filler_phrases_text(large_raw or "")
+        legacy = _parse_filler_phrases_text(legacy_raw or "")
+
+        # If sized buckets are empty but legacy exists, treat legacy as a general pool (medium).
+        if not (small or medium or large) and legacy:
+            medium = list(legacy)
+
+        # If nothing configured, return defaults.
+        if not (small or medium or large):
+            return {
+                "small": list(defaults.get("small", [])),
+                "medium": list(defaults.get("medium", [])),
+                "large": list(defaults.get("large", [])),
+            }
+
+        # Otherwise, pad each bucket with defaults so the system always has options.
+        def _pad(bucket: List[str], default_bucket: List[str], min_count: int) -> List[str]:
+            out = list(bucket)
+            for p in default_bucket:
+                if len(out) >= min_count:
+                    break
+                if p not in out:
+                    out.append(p)
+            return out
+
+        return {
+            "small": _pad(small, defaults.get("small", []), 5),
+            "medium": _pad(medium, defaults.get("medium", []), 5),
+            "large": _pad(large, defaults.get("large", []), 5),
+        }
     except Exception as e:
-        logger.error(f"Failed to load global filler words: {e}")
-        return []
+        logger.error(f"Failed to load global filler words by size: {e}")
+        return {
+            "small": list(defaults.get("small", [])),
+            "medium": list(defaults.get("medium", [])),
+            "large": list(defaults.get("large", [])),
+        }
 
 
 def default_filler_phrases() -> List[str]:
-    return [
-        "Um...",
-        "Let me see...",
-        "Okay...",
-        "Right...",
-        "So...",
-        "Hmm...",
-        "Well...",
-        "Ah...",
-        "Just a moment...",
-        "One second...",
-    ]
+    buckets = default_filler_phrases_by_size()
+    combined: List[str] = []
+    for size in ("small", "medium", "large"):
+        combined.extend(buckets.get(size, []))
+    return combined
 
 
 def resolved_filler_phrases(min_count: int = 10) -> List[str]:
@@ -1374,6 +1527,45 @@ def resolved_filler_phrases(min_count: int = 10) -> List[str]:
     return padded
 
 
+def resolved_filler_phrases_by_size(size: str, min_count: int = 5) -> List[str]:
+    size = (size or "").strip().lower()
+    if size not in ("small", "medium", "large"):
+        size = "medium"
+    buckets = load_global_filler_words_by_size()
+    base = buckets.get(size, [])
+    if len(base) >= min_count:
+        return base[:min_count]
+    defaults = default_filler_phrases_by_size().get(size, [])
+    padded = list(base)
+    for phrase in defaults:
+        if len(padded) >= min_count:
+            break
+        if phrase not in padded:
+            padded.append(phrase)
+    while len(padded) < min_count and defaults:
+        padded.append(defaults[len(padded) % len(defaults)])
+    return padded
+
+
+def classify_filler_size(phrase: str) -> str:
+    """Best-effort classification of a phrase into small/medium/large."""
+    t = (phrase or "").strip()
+    if not t:
+        return "medium"
+    # Prefer explicit membership in configured buckets.
+    buckets = load_global_filler_words_by_size()
+    for s in ("small", "medium", "large"):
+        if t in buckets.get(s, []):
+            return s
+    # Fallback heuristic by word count.
+    wc = len([w for w in t.replace("—", " ").replace("-", " ").split() if w])
+    if wc <= 2:
+        return "small"
+    if wc <= 7:
+        return "medium"
+    return "large"
+
+
 def _safe_voice_id(voice_id: str) -> str:
     voice_id = (voice_id or "").strip().lower()
     safe = "".join([c for c in voice_id if c.isalnum() or c in ("_", "-")])
@@ -1390,6 +1582,18 @@ def _global_fillers_dir(voice_id: str) -> str:
     if safe_voice == "sarah":
         return base_dir
     return os.path.join(base_dir, safe_voice)
+
+
+def _global_filler_slot_count() -> int:
+    """Number of global filler audio slots.
+
+    Default is 30 so Super Admin can manage a larger pool.
+    """
+    try:
+        n = int(os.getenv("GLOBAL_FILLER_SLOTS", "30"))
+    except Exception:
+        n = 30
+    return max(1, min(50, n))
 
 
 def _global_filler_audio_path(filler_dir: str, filler_num: int, ext: str) -> str:
@@ -1440,7 +1644,7 @@ def load_backchannel_settings() -> None:
         "MIN_USER_TURN_SECONDS": 0.50,
         # Require sustained caller speech before cancelling the agent.
         # This prevents tiny noises / brief "ok" acknowledgements from interrupting.
-        "BARGE_IN_MIN_SPEECH_SECONDS": 0.60,
+        "BARGE_IN_MIN_SPEECH_SECONDS": 3.0,
     }
     try:
         conn = get_db_connection()
@@ -1555,6 +1759,16 @@ def _get_super_admin_db_config() -> Optional[Tuple[str, str]]:
         username = (row[0] or "").strip()
         password_hash = (row[1] or "").strip()
         if not username or not password_hash:
+            return None
+
+        # Guard against broken/corrupted values that would lock the user out.
+        # Treat these as "not configured" so bootstrap/reset flows can run.
+        ph_lower = password_hash.lower()
+        if ph_lower in {"pbkdf2_sha256", "pbkdf2-sha256", "pbkdf2", "sha256"}:
+            return None
+
+        # If it claims to be a PBKDF2 spec but doesn't parse, do NOT treat it as legacy plaintext.
+        if ph_lower.startswith("pbkdf2_sha256") and _parse_password_hash(password_hash) is None:
             return None
         return username, password_hash
     except Exception:
@@ -1723,6 +1937,113 @@ def _send_vonage_sms(to_e164: str, text: str) -> Tuple[bool, str]:
     remaining = first_msg.get("remaining-balance")
     logger.info(f"✅ SMS accepted by Vonage for {to_e164} (message-id={msg_id}, remaining-balance={remaining})")
     return True, "ok"
+
+
+def _send_vonage_whatsapp(to_e164: str, text: str) -> Tuple[bool, str]:
+    """Send WhatsApp message via Vonage Messages API."""
+    def _digits_e164(value: str) -> str:
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        raw = raw.replace(" ", "").replace("-", "")
+        if raw.startswith("00"):
+            raw = "+" + raw[2:]
+        if raw.startswith("+"):
+            raw = raw[1:]
+        # Best-effort UK local mobile normalization (07... -> 44...)
+        if raw.startswith("0") and len(raw) >= 10:
+            raw = "44" + raw[1:]
+        return "".join(ch for ch in raw if ch.isdigit())
+
+    whatsapp_from_raw = (
+        CONFIG.get("VONAGE_WHATSAPP_FROM")
+        or os.getenv("VONAGE_WHATSAPP_FROM")
+        or CONFIG.get("WHATSAPP_FROM")
+        or os.getenv("WHATSAPP_FROM")
+        or ""
+    ).strip()
+    whatsapp_from = _digits_e164(whatsapp_from_raw)
+    to_digits = _digits_e164(to_e164)
+
+    if not whatsapp_from:
+        # This must be a WhatsApp-enabled sender in your Vonage Messages setup.
+        return False, "WhatsApp sender not configured (set VONAGE_WHATSAPP_FROM to your Vonage WhatsApp number)"
+    if not to_digits:
+        return False, "Invalid destination mobile number"
+
+    # Vonage Messages API requires an application JWT (RS256)
+    import jwt
+    import time
+    import uuid as uuid_lib
+
+    app_id = (CONFIG.get("VONAGE_APPLICATION_ID") or os.getenv("VONAGE_APPLICATION_ID") or "").strip()
+    private_key_pem = (CONFIG.get("VONAGE_PRIVATE_KEY_PEM") or os.getenv("VONAGE_PRIVATE_KEY_PEM") or "").strip()
+    private_key_path = (CONFIG.get("VONAGE_PRIVATE_KEY_PATH") or os.getenv("VONAGE_PRIVATE_KEY_PATH") or "private.key").strip()
+
+    if not app_id:
+        return False, "WhatsApp not configured (missing VONAGE_APPLICATION_ID)"
+
+    if not private_key_pem:
+        if not os.path.isabs(private_key_path):
+            private_key_path = os.path.join(os.path.dirname(__file__), private_key_path)
+        if not os.path.exists(private_key_path):
+            return False, "WhatsApp not configured (missing private key PEM)"
+        try:
+            with open(private_key_path, "r", encoding="utf-8") as f:
+                private_key_pem = f.read().strip()
+        except Exception:
+            return False, "WhatsApp not configured (failed to read private key file)"
+
+    now = int(time.time())
+    jwt_payload = {"application_id": app_id, "iat": now, "exp": now + 900, "jti": str(uuid_lib.uuid4())}
+    try:
+        token = jwt.encode(jwt_payload, private_key_pem, algorithm="RS256")
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
+    except Exception as e:
+        logger.error(f"❌ WhatsApp JWT creation failed: {e}")
+        return False, "WhatsApp not configured (JWT signing failed)"
+
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {
+        "from": whatsapp_from,
+        "to": to_digits,
+        "message_type": "text",
+        "text": text,
+        "channel": "whatsapp",
+    }
+
+    logger.info(f"📱 Sending WhatsApp to +{to_digits} from +{whatsapp_from}")
+    try:
+        messages_base = (
+            CONFIG.get("VONAGE_MESSAGES_API_BASE")
+            or os.getenv("VONAGE_MESSAGES_API_BASE")
+            or os.getenv("VONAGE_MESSAGES_API_BASE_URL")
+            or "https://api.nexmo.com"
+        ).strip().rstrip("/")
+
+        resp = requests.post(
+            f"{messages_base}/v1/messages",
+            json=payload,
+            headers=headers,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ WhatsApp send failed (network error): {e}")
+        return False, "WhatsApp send failed (network error)"
+
+    if resp.status_code in (200, 202):
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        msg_id = data.get("message_uuid")
+        logger.info(f"✅ WhatsApp accepted by Vonage (message-id={msg_id})")
+        return True, "ok"
+
+    logger.error(f"❌ WhatsApp send failed: HTTP {resp.status_code} - {resp.text[:200]}")
+    # If you see "Invalid sender", your VONAGE_WHATSAPP_FROM isn't a WhatsApp-enabled sender in Vonage.
+    return False, "WhatsApp send failed (check VONAGE_WHATSAPP_FROM is WhatsApp-enabled in Vonage)"
 
 
 def _build_deepseek_client():
@@ -1902,6 +2223,33 @@ def _verify_super_admin_password(password: str) -> bool:
             iterations, salt, expected = db_parsed
             actual = _pbkdf2_sha256(password, salt, iterations)
             return hmac.compare_digest(actual, expected)
+
+        # Legacy fallback: some older local installs stored the plaintext password
+        # in `super_admin_config.password_hash`. If the provided password matches,
+        # upgrade in-place to a PBKDF2 spec so future logins use a hash.
+        if db_spec and secrets.compare_digest(password, db_spec):
+            try:
+                iterations = int(os.getenv("SUPER_ADMIN_PBKDF2_ITERATIONS", "310000"))
+            except Exception:
+                iterations = 310000
+            if iterations < 100_000:
+                iterations = 310000
+            try:
+                upgraded = _make_password_hash_spec(password, iterations)
+                if _parse_password_hash(upgraded) is not None:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE super_admin_config SET password_hash = ?, updated_at = ? WHERE id = 1",
+                        (upgraded, datetime.now().isoformat()),
+                    )
+                    conn.commit()
+                    conn.close()
+            except Exception:
+                # Do not block login if upgrade fails.
+                pass
+            return True
+
         return False
     return secrets.compare_digest(password, plain)
 
@@ -1994,6 +2342,7 @@ def _public_ws_url_from_request(request: Request, path: str) -> str:
 
 
 _super_admin_login_attempts: Dict[str, List[float]] = {}
+_super_admin_otp_codes: Dict[str, Tuple[str, float]] = {}  # ip -> (code, expiry_timestamp)
 
 
 def _rate_limit_super_admin_login(ip: str, max_attempts: int = 8, window_seconds: int = 900) -> bool:
@@ -2718,7 +3067,38 @@ class CallSession:
         self._caller_speaking: bool = False
         self._pending_barge_in_task: Optional[asyncio.Task] = None
         self._pending_barge_in_started_at: Optional[float] = None
-        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 0.35))  # Faster detection
+        self._barge_in_min_speech_seconds: float = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 3.0))  # Require sustained speech
+        logger.info(
+            f"[{call_uuid}] 🔴 BARGE-IN THRESHOLD SET TO: {self._barge_in_min_speech_seconds:.2f} seconds "
+            f"(CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']={CONFIG.get('BARGE_IN_MIN_SPEECH_SECONDS', 'NOT SET')}; "
+            f"effective_pre_transcript_floor={'0.90s' if bool(CONFIG.get('IGNORE_BACKCHANNELS_ALWAYS', True)) else 'disabled'})"
+        )
+
+        # Reliable caller speech detection (Vonage inbound-audio VAD).
+        # OpenAI `input_audio_buffer.speech_started/stopped` events can be delayed/missing in some modes.
+        self._caller_vad_speaking: bool = False
+        self._caller_vad_started_at: Optional[float] = None
+        self._caller_vad_last_voice_at: float = 0.0
+        self._caller_vad_energy_threshold: float = float(CONFIG.get("CALLER_VAD_ENERGY_THRESHOLD", 0.005))
+        self._caller_vad_hangover_seconds: float = float(CONFIG.get("CALLER_VAD_HANGOVER_SECONDS", 0.25))
+        self._last_vad_barge_in_at: float = 0.0
+        self._last_vad_debug_log_at: float = 0.0
+        self._recent_caller_transcript: str = ""  # Track recent words for backchannel detection
+        self._last_transcript_update_at: float = 0.0
+        self._block_outbound_audio: bool = False  # Hard stop: block all audio to caller when they interrupt
+
+        # HeyJodie-style behavior:
+        # - If caller speaks briefly (< barge-in threshold), pause agent audio and resume.
+        # - If caller speaks long enough (>= threshold), interrupt agent output and listen.
+        try:
+            from collections import deque
+            self._paused_agent_audio: "deque[bytes]" = deque()
+        except Exception:
+            self._paused_agent_audio = []
+        self._paused_agent_audio_bytes: int = 0
+        self._paused_agent_audio_max_bytes: int = int(float(CONFIG.get("PAUSED_AGENT_AUDIO_MAX_SECONDS", 6.0)) * (VONAGE_SAMPLE_RATE * 2))
+        self._agent_audio_pause_started_at: Optional[float] = None
+        self._flushing_paused_agent_audio: bool = False
 
         # Turn gating: avoid treating tiny utterances (e.g., "ok") as full turns.
         self._last_speech_started_at: Optional[float] = None
@@ -2760,12 +3140,15 @@ class CallSession:
         self._last_filler_phrase: Optional[str] = None
         self._used_fillers_this_call: set = set()  # Track which fillers we've used
         self._suppress_openai_output_until = 0.0
+        # Allows filler to cover dead-air even if transcript/brain trigger is delayed.
+        self._allow_filler_without_response_for_turn: bool = False
 
         # Transcript-aware gating (lets us ignore backchannels like "ok" and still respond fast to real requests)
         self._last_caller_transcript: str = ""
         self._turn_transcript_ready: asyncio.Event = asyncio.Event()
         # Per-turn guard: prevents double-triggering and enables a safe fallback when transcript arrives late.
         self._response_triggered_for_turn: bool = False
+        self._response_trigger_time: Optional[float] = None
 
         # Recent caller utterances (helps intent detection when the request spans multiple short chunks,
         # e.g. "I'm the doctors" + "can you transfer me" across two transcripts).
@@ -3137,6 +3520,11 @@ class CallSession:
         cleaned = (text or "").strip()
         if not cleaned or not self.is_active:
             return
+        
+        # Remove consecutive duplicate words (e.g., "ok ok" -> "ok", "yeah yeah" -> "yeah")
+        # This prevents repetitive speech without affecting content or transfer logic
+        import re
+        cleaned = re.sub(r'\b(\w+)\s+\1\b', r'\1', cleaned, flags=re.IGNORECASE)
 
         voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
 
@@ -3840,7 +4228,14 @@ class CallSession:
                             reason = "AI initiated transfer"
                         
                         logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION CALLED by AI: {reason}")
-                        logger.info(f"[{self.call_uuid}] 🔥 Transfer requested; asking caller for confirmation")
+                        
+                        # Check if transfer is allowed based on transfer_instructions
+                        allowed, deny_reason = self._is_transfer_allowed_now()
+                        if not allowed:
+                            logger.warning(f"[{self.call_uuid}] 🚫 Blocking function-based transfer - {deny_reason}")
+                            return "I can take a message. What's your name and the best number to call you back on?"
+                        
+                        logger.info(f"[{self.call_uuid}] ✅ Transfer allowed - {deny_reason}")
 
                         # Ask the caller for explicit confirmation before transferring.
                         # This avoids surprise transfers and reduces any last-second hallucinated phrasing.
@@ -4032,6 +4427,15 @@ class CallSession:
 
                             if transfer_number_local:
                                 logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION CALLED (streaming) by AI: {reason}")
+                                
+                                # Check if transfer is allowed based on transfer_instructions
+                                allowed, deny_reason = self._is_transfer_allowed_now()
+                                if not allowed:
+                                    logger.warning(f"[{self.call_uuid}] 🚫 Blocking streamed transfer - {deny_reason}")
+                                    # Don't set pending transfer; AI will continue conversation
+                                    return
+                                
+                                logger.info(f"[{self.call_uuid}] ✅ Transfer allowed - {deny_reason}")
                                 self._set_pending_transfer(transfer_number_local, reason)
                                 return
 
@@ -4203,6 +4607,31 @@ class CallSession:
                 await self._fallback_to_openai_for_turn(user_text, extra_system_instruction=extra_system_instruction, reason="openrouter_empty")
                 return
 
+            # Clean up instruction tokens and formatting artifacts from various models
+            import re
+            # Remove instruction tokens: [INST], [/INST], <s>, </s>, etc.
+            text = re.sub(r'\[/?INST\]|\[/?SYS\]|</?s>|<\|.*?\|>', '', text)
+            # Remove role markers that some models add
+            text = re.sub(r'^(Assistant|User|Human|AI):\s*', '', text, flags=re.IGNORECASE)
+            
+            # CRITICAL: Some models try to play both sides of the conversation
+            # Stop at common patterns that indicate the model is now playing the caller
+            # Look for question marks followed by answers, or transitions to caller speech
+            caller_roleplay_patterns = [
+                r'\?\s+(Well|No|Yes|I|Um|Uh|Yeah|Yep)\b',  # Question followed by caller answer
+                r'\?\s+[A-Z][a-z]+,\s+(no|yes|well|I)\b',  # "...industry? Well, no..."
+            ]
+            for pattern in caller_roleplay_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    # Cut off everything after the question mark
+                    text = text[:match.start() + 1].strip()
+                    logger.warning(f"[{self.call_uuid}] ⚠️ Cut off AI role-playing caller at: '{text[-50:]}'")
+                    break
+            
+            # Clean up extra whitespace
+            text = ' '.join(text.split()).strip()
+
             logger.info(f"[{self.call_uuid}] 🤖 {CONFIG['AGENT_NAME']} (OpenRouter): {text}")
             self.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {text}")
 
@@ -4211,43 +4640,91 @@ class CallSession:
             # Also detect narrative descriptions like "*uses transfer_call()*" (Claude does this)
             transfer_number = getattr(self, 'transfer_number', '')
             if transfer_number and text:
-                # Check for various ways AI might mention the function
+                # Check for various ways AI might mention the function or narrate a transfer
                 text_lower = text.lower()
+                transfer_narrative_detected = False
+                
+                # Check for explicit function mentions (e.g., *transfer_call()*)
                 if ('*transfer_call()' in text_lower or 
                     'transfer_call()' in text_lower or
                     '*uses transfer_call()' in text_lower or
                     'uses transfer_call()' in text_lower):
-                    logger.info(f"[{self.call_uuid}] 🔥 TRANSFER FUNCTION mentioned in text (model doesn't support tool calling): '{text}'")
-                    logger.info(f"[{self.call_uuid}] 🔥 Transfer requested; asking caller for confirmation")
+                    transfer_narrative_detected = True
+                
+                # Check for natural language transfer narration with asterisks
+                transfer_narratives_asterisk = ['*transferring', '*transfer you', '*connecting you', '*putting you through', '*patching you through']
+                if any(pattern in text_lower for pattern in transfer_narratives_asterisk):
+                    transfer_narrative_detected = True
+                
+                # Check for plain text transfer phrases (no asterisks) - AI often says these
+                import re
+                transfer_phrases = [
+                    r'\blet me transfer you\b',
+                    r'\btransfer you (?:to|over to)\b',
+                    r'\bconnect you (?:to|with)\b',
+                    r"\bi'll transfer you\b",
+                    r'\btransferring you\b',
+                    r'\bput you through\b',
+                ]
+                for phrase_pattern in transfer_phrases:
+                    if re.search(phrase_pattern, text_lower):
+                        transfer_narrative_detected = True
+                        break
+                
+                if transfer_narrative_detected:
+                    logger.info(f"[{self.call_uuid}] 🔥 TRANSFER NARRATIVE detected in AI text: '{text}'")
                     
-                    # Remove the function mention from the text before speaking
-                    import re
-                    clean_text = re.sub(r'\*[^*]*transfer_call\(\)[^*]*\*', '', text, flags=re.IGNORECASE)
-                    clean_text = re.sub(r'transfer_call\(\)', '', clean_text, flags=re.IGNORECASE)
-                    clean_text = re.sub(r'\*quietly processes.*?\*', '', clean_text, flags=re.IGNORECASE)
-                    clean_text = re.sub(r'\*uses.*?\*', '', clean_text, flags=re.IGNORECASE)
-                    clean_text = ' '.join(clean_text.split())  # Normalize whitespace
-                    clean_text = clean_text.strip()
+                    # Check if transfer is allowed based on transfer_instructions
+                    allowed, deny_reason = self._is_transfer_allowed_now()
+                    if not allowed:
+                        logger.warning(f"[{self.call_uuid}] 🚫 Blocking narrated transfer - {deny_reason}")
+                        if ("Missing required caller name" in str(deny_reason)) or ("doesn't match required" in str(deny_reason)):
+                            safe_text = "Before I transfer, can I confirm your name?"
+                        else:
+                            safe_text = "I can take a message. What's your name and the best number to call you back on?"
+                        # Update transcript to reflect what we actually say
+                        try:
+                            if self.transcript_parts and self.transcript_parts[-1].startswith(f"{CONFIG['AGENT_NAME']}: "):
+                                self.transcript_parts[-1] = f"{CONFIG['AGENT_NAME']}: {safe_text}"
+                        except Exception:
+                            pass
+                        text = safe_text
+                    else:
+                        logger.info(f"[{self.call_uuid}] ✅ Transfer allowed - caller name check passed")
+                        
+                        # Remove only the asterisk-marked narrations and function mentions from the text
+                        import re
+                        clean_text = re.sub(r'\*[^*]*transfer_call\(\)[^*]*\*', '', text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'transfer_call\(\)', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'\*quietly processes.*?\*', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'\*uses.*?\*', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'\*transferring[^*]*\*', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'\*transfer you[^*]*\*', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = re.sub(r'\*connecting you[^*]*\*', '', clean_text, flags=re.IGNORECASE)
+                        clean_text = ' '.join(clean_text.split())  # Normalize whitespace
+                        clean_text = clean_text.strip()
 
-                    # Ask for confirmation instead of transferring immediately.
-                    self._set_pending_transfer(transfer_number, "AI requested transfer")
-                    confirm_text = "I can transfer you now. Would you like me to transfer you?"
+                        # Set pending transfer so confirmation logic can handle it
+                        self._set_pending_transfer(transfer_number, "AI requested transfer")
+                        
+                        # Ask for explicit confirmation
+                        confirm_text = "I can transfer you now. Would you like me to transfer you? Please say yes or no."
 
-                    # If we already started streaming Speechmatics audio for this turn, stop it and
-                    # speak the confirmation prompt immediately (otherwise the caller may never hear it).
-                    try:
-                        if voice_provider == "speechmatics" and CONFIG.get("SPEECHMATICS_API_KEY"):
-                            self._barge_in_stop_speechmatics()
-                            self._speechmatics_pending_text = ""
-                            enqueued_any_speechmatics = True
-                            await self._enqueue_speechmatics_tts(confirm_text)
-                    except Exception:
-                        pass
+                        # If we already started streaming Speechmatics audio for this turn, stop it and
+                        # speak the confirmation prompt immediately (otherwise the caller may never hear it).
+                        try:
+                            if voice_provider == "speechmatics" and CONFIG.get("SPEECHMATICS_API_KEY"):
+                                self._barge_in_stop_speechmatics()
+                                self._speechmatics_pending_text = ""
+                                enqueued_any_speechmatics = True
+                                await self._enqueue_speechmatics_tts(confirm_text)
+                        except Exception:
+                            pass
 
-                    # Update transcript with what we will actually say (not the narrated tool usage).
-                    if self.transcript_parts and self.transcript_parts[-1].startswith(f"{CONFIG['AGENT_NAME']}: "):
-                        self.transcript_parts[-1] = f"{CONFIG['AGENT_NAME']}: {confirm_text}"
-                    text = confirm_text
+                        # Update transcript with what we will actually say (not the narrated tool usage).
+                        if self.transcript_parts and self.transcript_parts[-1].startswith(f"{CONFIG['AGENT_NAME']}: "):
+                            self.transcript_parts[-1] = f"{CONFIG['AGENT_NAME']}: {confirm_text}"
+                        text = confirm_text
 
             if turn_counted:
                 # We already counted the turn at the start of streaming; only add chars now.
@@ -4413,6 +4890,10 @@ class CallSession:
             self._cancel_pending_deepseek()
 
             self._response_triggered_for_turn = True
+            try:
+                self._response_trigger_time = asyncio.get_event_loop().time()
+            except Exception:
+                self._response_trigger_time = None
             self._brain_provider_for_turn = "deepseek"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._deepseek_task = asyncio.create_task(self._run_deepseek_turn(user_text, extra_system_instruction=extra_system_instruction))
@@ -4434,6 +4915,10 @@ class CallSession:
             self._cancel_pending_groq()
 
             self._response_triggered_for_turn = True
+            try:
+                self._response_trigger_time = asyncio.get_event_loop().time()
+            except Exception:
+                self._response_trigger_time = None
             self._brain_provider_for_turn = "groq"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._groq_task = asyncio.create_task(self._run_groq_turn(user_text, extra_system_instruction=extra_system_instruction))
@@ -4454,6 +4939,10 @@ class CallSession:
             self._cancel_pending_grok()
 
             self._response_triggered_for_turn = True
+            try:
+                self._response_trigger_time = asyncio.get_event_loop().time()
+            except Exception:
+                self._response_trigger_time = None
             self._brain_provider_for_turn = "grok"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._grok_task = asyncio.create_task(self._run_grok_turn(user_text, extra_system_instruction=extra_system_instruction))
@@ -4474,6 +4963,10 @@ class CallSession:
             self._cancel_pending_openrouter()
 
             self._response_triggered_for_turn = True
+            try:
+                self._response_trigger_time = asyncio.get_event_loop().time()
+            except Exception:
+                self._response_trigger_time = None
             self._brain_provider_for_turn = "openrouter"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._openrouter_task = asyncio.create_task(self._run_openrouter_turn(user_text, extra_system_instruction=extra_system_instruction))
@@ -4488,6 +4981,10 @@ class CallSession:
         try:
             await self.openai_ws.send(json.dumps({"type": "response.create"}))
             self._response_triggered_for_turn = True
+            try:
+                self._response_trigger_time = asyncio.get_event_loop().time()
+            except Exception:
+                self._response_trigger_time = None
             self._brain_provider_for_turn = "openai"
             self._last_speech_time = asyncio.get_event_loop().time()
             logger.info(f"[{self.call_uuid}] ✅ OpenAI brain triggered ({reason})")
@@ -4604,6 +5101,12 @@ class CallSession:
             "all right",
             "sure",
             "cool",
+            "great",
+            "nice",
+            "lovely",
+            "brilliant",
+            "perfect",
+            "excellent",
             "got it",
             "i see",
             "thanks",
@@ -4618,6 +5121,39 @@ class CallSession:
             return True
 
         return False
+
+    def _get_effective_barge_in_threshold_seconds(self, now: float) -> float:
+        """Return the barge-in duration threshold to use for *cancelling* agent output.
+
+        We intentionally apply a floor when we do not yet have a fresh transcript.
+        Otherwise a very low DB setting (e.g. 0.3s) can cancel the agent on short
+        acknowledgements ("ok", "right") before ASR produces text.
+        """
+        try:
+            raw = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds))
+        except Exception:
+            raw = float(self._barge_in_min_speech_seconds)
+        raw = max(0.1, min(2.0, raw))
+
+        ignore_backchannels_always = bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True))
+
+        # If we have a recent transcript, we can trust the backchannel classifier and
+        # use the configured threshold as-is.
+        have_recent_transcript = False
+        try:
+            if self._recent_caller_transcript and (now - float(self._last_transcript_update_at)) < 2.0:
+                have_recent_transcript = True
+        except Exception:
+            have_recent_transcript = False
+
+        if have_recent_transcript:
+            return raw
+
+        # No transcript yet: protect against premature cancels on backchannels.
+        if ignore_backchannels_always:
+            return max(raw, 0.9)
+
+        return raw
 
     async def _maybe_play_speechmatics_filler(self, generation: int, min_turn: float, delay_seconds: float = 0.25) -> None:
         """Latency-based filler playback for Speechmatics.
@@ -4657,8 +5193,10 @@ class CallSession:
             if self._filler_injecting or self._filler_played_for_turn or self._suppress_filler_for_turn:
                 return
 
-            # Only play filler if we actually triggered a response for this turn.
-            if not getattr(self, "_response_triggered_for_turn", False):
+            # Only play filler if we intend to respond for this turn.
+            # Normally we require that a response was triggered, but if ASR is delayed we allow
+            # filler to cover dead-air while we prepare in the background.
+            if not getattr(self, "_response_triggered_for_turn", False) and not getattr(self, "_allow_filler_without_response_for_turn", False):
                 return
 
             # Adaptive wait: if the model has started generating text, the response is likely imminent.
@@ -4705,18 +5243,20 @@ class CallSession:
                 if getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
                     return
 
-            # Wait for transcript to decide whether filler is appropriate.
+            # Wait briefly for transcript to suppress filler on backchannels/closings.
+            # Keep this short; we want filler to kick in quickly when latency is poor.
             last_transcript = (getattr(self, "_last_caller_transcript", "") or "").strip()
             if not last_transcript:
                 try:
-                    await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.60)
+                    await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.15)
                 except Exception:
                     pass
                 last_transcript = (getattr(self, "_last_caller_transcript", "") or "").strip()
 
             if not last_transcript:
-                # Treat as VAD noise.
-                return
+                # No transcript yet: rely on VAD duration to avoid fillers on tiny noises.
+                if min_turn and self._last_speech_duration_seconds < min_turn:
+                    return
 
             if self._is_backchannel_utterance(last_transcript):
                 return
@@ -4729,7 +5269,78 @@ class CallSession:
             if min_turn and self._last_speech_duration_seconds < min_turn and len(last_transcript.split()) < 3:
                 return
 
-            candidate = self._pick_random_global_filler("sarah")
+            # Latency-based bucket selection:
+            # - <0.5s: no filler
+            # - not bad: small
+            # - average: medium
+            # - very poor: large
+            try:
+                loop = asyncio.get_event_loop()
+                now = loop.time()
+                # Prefer speech-end anchor so filler timing is based on when the caller finished.
+                anchor_at = getattr(self, "_filler_latency_anchor_time", None)
+                if anchor_at is None:
+                    anchor_at = getattr(self, "_response_trigger_time", None)
+            except Exception:
+                anchor_at = None
+                now = None
+
+            if anchor_at is not None and now is not None:
+                elapsed = max(0.0, float(now - anchor_at))
+                no_filler_max = 0.50
+                if elapsed < no_filler_max:
+                    remaining = no_filler_max - elapsed
+                    wait_tasks = []
+                    try:
+                        wait_tasks.append(asyncio.create_task(self._assistant_audio_started_event.wait()))
+                    except Exception:
+                        pass
+                    try:
+                        wait_tasks.append(asyncio.create_task(self._speechmatics_audio_bytes_received_event.wait()))
+                    except Exception:
+                        pass
+                    if wait_tasks:
+                        try:
+                            done, pending = await asyncio.wait(
+                                wait_tasks,
+                                timeout=remaining,
+                                return_when=asyncio.FIRST_COMPLETED,
+                            )
+                            for p in pending:
+                                try:
+                                    p.cancel()
+                                except Exception:
+                                    pass
+                            if done:
+                                return
+                        except Exception:
+                            pass
+                    else:
+                        await asyncio.sleep(max(0.0, remaining))
+
+                    # Re-check after waiting up to the no-filler threshold.
+                    if getattr(self, "_assistant_audio_started_for_turn", False):
+                        return
+                    if getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
+                        return
+
+                try:
+                    elapsed = max(0.0, float(asyncio.get_event_loop().time() - triggered_at))
+                except Exception:
+                    elapsed = 0.0
+
+                # Default thresholds (seconds).
+                if elapsed < 1.00:
+                    size_bucket = "small"
+                elif elapsed < 1.80:
+                    size_bucket = "medium"
+                else:
+                    size_bucket = "large"
+            else:
+                # Fallback if we can't compute elapsed.
+                size_bucket = "medium"
+
+            candidate = self._pick_random_global_filler("sarah", size_preference=size_bucket)
             if not candidate or not self.vonage_ws:
                 return
 
@@ -4742,6 +5353,12 @@ class CallSession:
             logger.info(f"[{self.call_uuid}] 🎵 Playing filler: {phrase}")
             await self._stream_wav_to_vonage(audio_path)
             self._last_filler_phrase = phrase
+
+            # After we use a prep-filler, clear the flag so we don't treat subsequent turns as eligible.
+            try:
+                self._allow_filler_without_response_for_turn = False
+            except Exception:
+                pass
 
             if phrase:
                 await self._tell_openai_avoid_repeating_filler(phrase)
@@ -4758,32 +5375,42 @@ class CallSession:
     async def _maybe_barge_in_after_delay(self) -> None:
         """Only cancel agent output if caller speech persists long enough to be a real interruption."""
         try:
-            delay = CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", self._barge_in_min_speech_seconds)
-            try:
-                delay = float(delay)
-            except Exception:
-                delay = self._barge_in_min_speech_seconds
+            now = asyncio.get_event_loop().time()
+            delay = self._get_effective_barge_in_threshold_seconds(now)
 
-            # Speechmatics TTS can otherwise feel like the agent is talking over the caller.
-            # Keep barge-in highly responsive in that mode.
-            try:
-                voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
-                if voice_provider == "speechmatics" and str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
-                    try:
-                        cap = float(CONFIG.get("SPEECHMATICS_BARGE_IN_MAX_DELAY_SECONDS", 0.25) or 0.25)
-                    except Exception:
-                        cap = 0.25
-                    delay = min(delay, max(0.0, cap))
-            except Exception:
-                pass
-            await asyncio.sleep(delay)
+            # Note: Speechmatics special case removed - use consistent 3s threshold for all voice providers
+            # Wait for the minimum speech duration, checking periodically if caller is still speaking.
+            # If caller stops before the minimum duration, don't interrupt.
+            start_time = asyncio.get_event_loop().time()
+            check_interval = 0.1  # Check every 100ms
+            elapsed = 0.0
+            
+            while elapsed < delay:
+                await asyncio.sleep(min(check_interval, delay - elapsed))
+                elapsed = asyncio.get_event_loop().time() - start_time
+                
+                if not self.is_active or not self.openai_ws:
+                    logger.debug(f"[{self.call_uuid}] 🛑 Barge-in aborted: session inactive")
+                    return
+                if not self._agent_speaking:
+                    logger.debug(f"[{self.call_uuid}] 🛑 Barge-in aborted: agent not speaking anymore")
+                    return
+                    
+                # If caller stopped speaking before reaching minimum duration, don't interrupt
+                if not self._caller_speaking:
+                    logger.info(f"[{self.call_uuid}] 🛑 Barge-in aborted: caller stopped speaking after {elapsed:.2f}s (< {delay:.1f}s minimum) - keeping agent speaking")
+                    return
+                
+                # Log progress every 500ms
+                if int(elapsed * 10) % 5 == 0:
+                    logger.debug(f"[{self.call_uuid}] 🎤 Barge-in check: {elapsed:.2f}s / {delay:.1f}s (caller still speaking: {self._caller_speaking}, agent speaking: {self._agent_speaking})")
+            
+            # Caller has been speaking continuously for the full minimum duration - interrupt the agent
             if not self.is_active or not self.openai_ws:
-                return
-            # Be strict: only barge-in if the caller is STILL speaking after the delay.
-            # This avoids cancelling the agent on tiny noises or quick backchannels.
-            if not self._caller_speaking:
+                logger.debug(f"[{self.call_uuid}] 🛑 Barge-in cancelled: session became inactive")
                 return
             if not self._agent_speaking:
+                logger.debug(f"[{self.call_uuid}] 🛑 Barge-in cancelled: agent stopped speaking")
                 return
 
             # If we already have a transcript for this turn and it's just a backchannel, do not interrupt.
@@ -4792,9 +5419,10 @@ class CallSession:
             except Exception:
                 t = ""
             if t and self._is_backchannel_utterance(t):
+                logger.info(f"[{self.call_uuid}] 🛑 Barge-in skipped: backchannel detected ('{t}')")
                 return
 
-            logger.info(f"[{self.call_uuid}] Caller interrupted (sustained) - stopping agent output")
+            logger.info(f"[{self.call_uuid}] ✅✅✅ BARGE-IN TRIGGERED - Caller spoke continuously for {delay:.1f}s - STOPPING AGENT OUTPUT")
             await self._interrupt_agent_output("barge_in_sustained")
         except asyncio.CancelledError:
             return
@@ -4848,7 +5476,12 @@ class CallSession:
         except Exception:
             pass
 
-    async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
+    async def _send_vonage_audio_bytes_raw(self, pcm_bytes: bytes) -> None:
+        # HARD STOP: if caller has interrupted and we're blocking audio, drop this chunk silently.
+        if getattr(self, "_block_outbound_audio", False):
+            logger.debug(f"[{self.call_uuid}] ❌ BLOCKED {len(pcm_bytes)} bytes (caller interrupted)")
+            return
+        
         if not self.vonage_ws:
             logger.warning(f"[{self.call_uuid}] ⚠️ Cannot send audio: vonage_ws is None")
             return
@@ -4865,14 +5498,104 @@ class CallSession:
         except Exception:
             pass
 
-        logger.info(f"[{self.call_uuid}] 🔊 Sending {len(pcm_bytes)} bytes to Vonage (ws={bool(self.vonage_ws)}, active={self.is_active})")
+        logger.debug(f"[{self.call_uuid}] 🔊 Sending {len(pcm_bytes)} bytes to Vonage (ws={bool(self.vonage_ws)}, active={self.is_active})")
         
         if getattr(self, "_vonage_audio_mode", "bytes") == "json":
             await self.vonage_ws.send_text(json.dumps({"audio": base64.b64encode(pcm_bytes).decode()}))
-            logger.info(f"[{self.call_uuid}] ✅ Sent as JSON")
+            logger.debug(f"[{self.call_uuid}] ✅ Sent as JSON")
         else:
             await self.vonage_ws.send_bytes(pcm_bytes)
-            logger.info(f"[{self.call_uuid}] ✅ Sent as binary")
+            logger.debug(f"[{self.call_uuid}] ✅ Sent as binary")
+
+    async def _send_vonage_audio_bytes(self, pcm_bytes: bytes) -> None:
+        """Send audio to Vonage with HeyJodie-style pause/resume and hard barge-in.
+
+        - If caller speaks briefly while the agent is talking: pause output and resume.
+        - If caller keeps speaking >= threshold: interrupt agent output and listen.
+        """
+        if not self.vonage_ws or not self.is_active or not pcm_bytes:
+            return
+
+        # While sending any assistant audio, treat the agent as speaking.
+        was_speaking = getattr(self, "_agent_speaking", False)
+        self._agent_speaking = True
+        if not was_speaking:
+            logger.info(f"[{self.call_uuid}] 🎙️ Agent started speaking")
+
+        # If we're flushing paused audio, bypass pause/interrupt checks.
+        if not getattr(self, "_flushing_paused_agent_audio", False):
+            now = asyncio.get_event_loop().time()
+
+            if getattr(self, "_caller_vad_speaking", False):
+                # Check if this is a backchannel - don't pause for backchannels
+                is_backchannel = False
+                try:
+                    if self._recent_caller_transcript and (now - self._last_transcript_update_at) < 2.0:
+                        is_backchannel = self._is_backchannel_utterance(self._recent_caller_transcript)
+                        if is_backchannel:
+                            logger.debug(f"[{self.call_uuid}] 👂 Backchannel '{self._recent_caller_transcript}' detected - NOT pausing audio")
+                except Exception as e:
+                    logger.debug(f"[{self.call_uuid}] Backchannel check in pause logic error: {e}")
+
+                # If we previously paused due to VAD, but we now know the utterance was only a
+                # backchannel, immediately resume by flushing buffered audio. This prevents the
+                # "paused then never continues" failure mode when VAD stays true due to line noise.
+                if is_backchannel:
+                    if getattr(self, "_block_outbound_audio", False):
+                        # A backchannel should not permanently block audio.
+                        self._block_outbound_audio = False
+                        logger.info(f"[{self.call_uuid}] 🔓 Unblocking outbound audio (backchannel detected)")
+                    if self._agent_audio_pause_started_at is not None:
+                        self._agent_audio_pause_started_at = None
+                    if getattr(self, "_paused_agent_audio_bytes", 0) > 0:
+                        await self._flush_paused_agent_audio()
+                    # Proceed to send the current chunk normally.
+                    await self._send_vonage_audio_bytes_raw(pcm_bytes)
+                    return
+                
+                # Only pause if it's NOT a backchannel
+                if not is_backchannel:
+                    if self._agent_audio_pause_started_at is None:
+                        self._agent_audio_pause_started_at = now
+
+                    threshold = self._get_effective_barge_in_threshold_seconds(now)
+
+                    elapsed = now - float(self._agent_audio_pause_started_at)
+                    if elapsed >= threshold:
+                        logger.info(f"[{self.call_uuid}] ✅✅✅ VAD BARGE-IN TRIGGERED (caller spoke {elapsed:.2f}s >= {threshold:.2f}s) - stopping agent output")
+                        self._clear_paused_agent_audio()
+                        self._agent_audio_pause_started_at = None
+                        await self._interrupt_agent_output("barge_in_vad")
+                        return
+
+                    # Short interruption: buffer and pause output.
+                    try:
+                        self._paused_agent_audio.append(pcm_bytes)
+                    except Exception:
+                        self._paused_agent_audio = (self._paused_agent_audio or []) + [pcm_bytes]
+                    self._paused_agent_audio_bytes += len(pcm_bytes)
+
+                    # Bound memory.
+                    while self._paused_agent_audio_bytes > self._paused_agent_audio_max_bytes:
+                        try:
+                            dropped = self._paused_agent_audio.popleft()
+                        except Exception:
+                            try:
+                                dropped = self._paused_agent_audio.pop(0)
+                            except Exception:
+                                break
+                        try:
+                            self._paused_agent_audio_bytes = max(0, self._paused_agent_audio_bytes - len(dropped))
+                        except Exception:
+                            pass
+                    return
+
+            # Caller not speaking: if we were paused, resume by flushing buffered audio.
+            if self._agent_audio_pause_started_at is not None:
+                self._agent_audio_pause_started_at = None
+                await self._flush_paused_agent_audio()
+
+        await self._send_vonage_audio_bytes_raw(pcm_bytes)
 
     def _barge_in_stop_speechmatics(self) -> None:
         """Immediately stop any Speechmatics output and drop queued sentences."""
@@ -4883,25 +5606,47 @@ class CallSession:
         except asyncio.QueueEmpty:
             pass
 
-    def _pick_random_global_filler(self, voice_id: str = "sarah") -> Optional[tuple]:
-        """Pick a random existing global filler WAV, preferring ones not used yet this call."""
+    def _pick_random_global_filler(self, voice_id: str = "sarah", size_preference: Optional[str] = None) -> Optional[tuple]:
+        """Pick a random existing global filler WAV.
+
+        If `size_preference` is provided, we filter to fillers whose sidecar metadata contains
+        `size` matching one of: small, medium, large. If none match, we fall back to any.
+        Prefers fillers not used yet this call.
+        """
         try:
             import random
             import os
+
+            want_size = (size_preference or "").strip().lower() or None
+            if want_size not in {"small", "medium", "large"}:
+                want_size = None
 
             filler_dir = _global_fillers_dir(voice_id)
             all_candidates = []
             unused_candidates = []
             
-            for i in range(1, 11):
+            for i in range(1, _global_filler_slot_count() + 1):
                 p = os.path.join(filler_dir, f"filler_{i}.wav")
-                if os.path.exists(p):
-                    all_candidates.append((i, p))
-                    # Track which ones haven't been used yet
-                    if i not in self._used_fillers_this_call:
-                        unused_candidates.append((i, p))
+                if not os.path.exists(p):
+                    continue
+
+                meta = _load_global_filler_meta(filler_dir, i)
+                m_size = (meta.get("size") or "").strip().lower()
+                if want_size:
+                    if not m_size:
+                        phrase_guess = (meta.get("phrase") or meta.get("text") or "").strip()
+                        m_size = classify_filler_size(phrase_guess)
+                    if m_size and m_size != want_size:
+                        continue
+
+                all_candidates.append((i, p))
+                if i not in self._used_fillers_this_call:
+                    unused_candidates.append((i, p))
             
             if not all_candidates:
+                # If we were filtering by size and found none, fall back to any size.
+                if want_size:
+                    return self._pick_random_global_filler(voice_id=voice_id, size_preference=None)
                 return None
 
             # Prefer unused fillers (80% chance), but allow reuse if all have been used
@@ -5047,7 +5792,7 @@ Note: Pay attention to how the caller responded to questions about their purpose
             import httpx
             
             response = await httpx.AsyncClient().post(
-                "https://api.deepseek.com/v1/chat/completions",
+                "https://api.deepseek.com/chat/completions",
                 headers={
                     "Authorization": f"Bearer {CONFIG['DEEPSEEK_API_KEY']}",
                     "Content-Type": "application/json"
@@ -5201,7 +5946,7 @@ Provide your analysis."""
         if _matches(t_norm, yes_phrases):
             self._clear_pending_transfer()
             try:
-                await self._speak_text_via_voice_provider("Okay — transferring you now.")
+                await self._speak_text_via_voice_provider("Okay — I'll try to transfer you now.")
             except Exception:
                 pass
             asyncio.create_task(self._execute_auto_transfer(transfer_number, reason))
@@ -5210,10 +5955,10 @@ Provide your analysis."""
         if _matches(t_norm, no_phrases):
             self._clear_pending_transfer()
             try:
-                await self._speak_text_via_voice_provider("Okay — I won’t transfer you.")
+                await self._speak_text_via_voice_provider("No problem. How else can I help you today?")
             except Exception:
                 pass
-            return True
+            return False
 
         # Unclear response: ask for an explicit yes/no and keep pending.
         try:
@@ -5420,11 +6165,20 @@ Provide your analysis."""
             transfer_params = {"to": transfer_number, "uuid": self.call_uuid}
             if self.called:
                 transfer_params["from"] = self.called
-            
-            transfer_ncco_url = (
-                f"{CONFIG['PUBLIC_URL']}/webhooks/transfer-ncco?"
-                + urllib.parse.urlencode(transfer_params)
-            )
+
+            base_url = (getattr(self, "public_base_url", "") or "").rstrip("/")
+            if not base_url:
+                base_url = _normalize_public_url(str(CONFIG.get("PUBLIC_URL") or ""))
+
+            if not base_url:
+                logger.error(f"[{self.call_uuid}] 🚫 Transfer aborted - PUBLIC_URL is not set and no request-derived base URL is available")
+                try:
+                    asyncio.create_task(self._handle_failed_transfer(reason_text="(missing PUBLIC_URL)", person_name=person_name))
+                except Exception:
+                    pass
+                return
+
+            transfer_ncco_url = f"{base_url}/webhooks/transfer-ncco?" + urllib.parse.urlencode(transfer_params)
 
             transfer_data = {
                 "action": "transfer",
@@ -5445,6 +6199,49 @@ Provide your analysis."""
                 async with session.put(transfer_url, json=transfer_data, headers=headers) as resp:
                     if resp.status in (200, 204):
                         logger.info(f"[{self.call_uuid}] ✅ Transfer initiated - keeping session alive for potential reconnect")
+                        
+                        # VERIFICATION: Check if transfer actually started
+                        await asyncio.sleep(1)  # Wait a moment for transfer to begin
+                        
+                        # Check if we're still in the call (if not, transfer succeeded)
+                        if self.is_active and not getattr(self, '_transfer_verified', False):
+                            logger.warning(f"[{self.call_uuid}] ⚠️ Transfer may not have executed - verifying...")
+                            
+                            # Verify by checking call status
+                            try:
+                                status_url = f"https://api.nexmo.com/v1/calls/{self.call_uuid}"
+                                async with session.get(status_url, headers=headers) as status_resp:
+                                    if status_resp.status == 200:
+                                        call_data = await status_resp.json()
+                                        call_status = call_data.get('status', '')
+                                        logger.info(f"[{self.call_uuid}] 📊 Call status after transfer: {call_status}")
+                                        
+                                        # If still "in-progress" and not transferring, retry
+                                        if call_status == 'in-progress' and not getattr(self, '_transfer_retry_attempted', False):
+                                            logger.warning(f"[{self.call_uuid}] 🔄 Transfer verification failed - retrying...")
+                                            self._transfer_retry_attempted = True
+                                            
+                                            # Inform caller we're retrying
+                                            try:
+                                                await self._speak_text_via_voice_provider("One moment please, connecting you now.")
+                                                await asyncio.sleep(1)
+                                            except Exception:
+                                                pass
+                                            
+                                            # Retry the transfer
+                                            async with session.put(transfer_url, json=transfer_data, headers=headers) as retry_resp:
+                                                if retry_resp.status in (200, 204):
+                                                    logger.info(f"[{self.call_uuid}] ✅ Transfer retry successful")
+                                                    self._transfer_verified = True
+                                                else:
+                                                    retry_error = await retry_resp.text()
+                                                    logger.error(f"[{self.call_uuid}] ❌ Transfer retry failed: {retry_error}")
+                                        else:
+                                            self._transfer_verified = True
+                            except Exception as verify_error:
+                                logger.error(f"[{self.call_uuid}] Verification error: {verify_error}")
+                                self._transfer_verified = True  # Assume success to avoid infinite loops
+                        
                         # Mark transfer as initiated in DB immediately (best-effort).
                         try:
                             import sqlite3
@@ -5530,6 +6327,154 @@ Provide your analysis."""
         except Exception:
             pass
         return out
+
+    def _required_transfer_caller_first_name(self) -> str:
+        """Extract required caller name/identifier from transfer_instructions if specified.
+        
+        Example: "Only transfer if caller is called Ben" -> returns "Ben"
+        Example: "they are called Mr Roberts" -> returns "Mr Roberts"
+        Returns empty string if no name requirement found.
+        """
+        try:
+            transfer_instructions = str(getattr(self, 'transfer_instructions', '') or '').strip()
+            if not transfer_instructions:
+                return ""
+            
+            import re
+            # Match patterns for required caller identification
+            # Simpler patterns that capture just the name after "called" or "named"
+            # Stop words prevent matching "Ben the" when text is "Ben the offer"
+            stop_words = r"(?:\s+(?:the|then|and|or|to|offer|will|should|must|can)\b)"
+            patterns = [
+                r"\b(?:caller|they)\s+(?:is|are)\s+called\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:" + stop_words + r"|[,.\s]|$)",
+                r"\b(?:caller|they)\s+(?:is|are)\s+named\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:" + stop_words + r"|[,.\s]|$)",
+                r"\bcaller(?:'s)?\s+name\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:" + stop_words + r"|[,.\s]|$)",
+                r"\bonly\s+if\s+caller\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:" + stop_words + r"|[,.\s]|$)",
+                r"\b(?:caller|they)\s+(?:is|are)\s+called\s+((?:Mr|Mrs|Ms|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:" + stop_words + r"|[,.\s]|$)",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, transfer_instructions, re.IGNORECASE)
+                if match:
+                    name = (match.group(1) or "").strip()
+                    # Extra validation: remove trailing stop words that might have been captured
+                    name = re.sub(r"\s+(?:the|then|and|or|to|offer|will|should|must|can)$", "", name, flags=re.IGNORECASE)
+                    if name:
+                        return name
+            return ""
+        except Exception:
+            return ""
+
+    def _detected_caller_first_name(self) -> str:
+        """Extract caller's self-identified name/identifier from transcript.
+        
+        Looks for patterns like: "I'm Ben", "My name is Mr Roberts", "This is John Smith"
+        Also handles spelled-out names like "B-E-N" or "P-E-N"
+        Returns empty string if no name detected.
+        """
+        try:
+            # Prefer caller-only lines to avoid accidentally matching the agent's speech.
+            try:
+                caller_lines = [
+                    str(p or "")
+                    for p in (self.transcript_parts or [])[-50:]
+                    if str(p or "").lower().startswith("caller:")
+                ]
+            except Exception:
+                caller_lines = []
+
+            transcript = " ".join(caller_lines) if caller_lines else " ".join(self.transcript_parts)
+            if not transcript:
+                return ""
+            
+            import re
+
+            # Normalize common apostrophe variants to improve matching (e.g., it’s -> it's).
+            transcript = transcript.replace("’", "'")
+            
+            # First check for spelled-out names like "B-E-N" or "P E N"
+            # Common pattern: single letters separated by hyphens, spaces, or dots
+            spelled_match = re.search(r"\b([A-Z])[\s\-\.]+([A-Z])[\s\-\.]+([A-Z])(?:[\s\-\.]+([A-Z]))?(?:[\s\-\.]+([A-Z]))?\b", transcript)
+            if spelled_match:
+                letters = [g for g in spelled_match.groups() if g]
+                spelled_name = "".join(letters)
+                # Only return if it's 3-5 letters (typical first name)
+                if 3 <= len(spelled_name) <= 5:
+                    return spelled_name.capitalize()
+            
+            # Match patterns where caller identifies themselves
+            # Use case-insensitive matching to handle transcription errors
+            patterns = [
+                r"\b(?:I'm|I am|it's|its|t's|this is)\s+([A-Za-z][a-z]{1,15})(?:\s+[A-Z][a-z]+)?\b",  # "I'm Ben" / "it's Ben" / "t's Ben"
+                r"\b(?:my name is|name's|name is)\s+([A-Za-z][a-z]{1,15}(?:\s+[A-Z][a-z]+)?)\b",  # "my name is Ben"
+                r"\b(?:I'm|I am|it's|its|t's|this is)\s+((?:Mr|Mrs|Ms|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b",  # "I'm Mr Roberts"
+                r"rydw\s+i'?n\s+([A-Za-z][a-z]{1,15})",  # Welsh "I am"
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, transcript, re.IGNORECASE)
+                if match:
+                    # Extract the first captured group (the name)
+                    name = (match.group(1) or "").strip()
+                    # Capitalize properly
+                    if name and not name[0].isupper():
+                        name = name.capitalize()
+                    # Only return if it looks like a real name (not business name)
+                    name_lower = name.lower()
+                    # Filter out business names or common false positives
+                    if any(x in name_lower for x in ['gardening', 'cakes', 'hello', 'judie', 'andy', 'eric', 'banned']):
+                        continue
+                    if name and len(name) >= 2:
+                        return name
+            return ""
+        except Exception:
+            return ""
+
+    def _is_transfer_allowed_now(self) -> tuple:
+        """Check if transfer is allowed based on transfer_instructions requirements.
+        
+        NEW APPROACH: Trust the AI to follow instructions. The AI has been explicitly instructed:
+        - To ONLY offer transfer when caller meets requirements
+        - To check if caller has identified themselves with the required name
+        - To offer message-taking instead when requirements aren't met
+        
+        Since AI now handles the logic, we only do basic validation here.
+        
+        Returns: (allowed: bool, reason: str)
+        """
+        try:
+            required_name = (self._required_transfer_caller_first_name() or "").strip()
+            if required_name:
+                detected_name = (self._detected_caller_first_name() or "").strip()
+
+                if not detected_name:
+                    logger.warning(f"[{self.call_uuid}] ❌ BLOCKING transfer - missing required caller name '{required_name}'")
+                    return (False, f"Missing required caller name '{required_name}'")
+
+                # Compare normalized first token for first-name requirements (e.g. 'Ben').
+                import re
+
+                def _norm_first(s: str) -> str:
+                    s = (s or "").replace("’", "'")
+                    s = re.sub(r"[^a-z0-9\s']+", " ", s.lower()).strip()
+                    s = " ".join(s.split())
+                    return (s.split()[0] if s else "")
+
+                req_first = _norm_first(required_name)
+                det_first = _norm_first(detected_name)
+
+                if req_first and det_first and req_first == det_first:
+                    logger.info(f"[{self.call_uuid}] ✅ Transfer allowed - caller '{detected_name}' matches requirement '{required_name}'")
+                    return (True, f"Caller name matches: {detected_name}")
+
+                logger.warning(f"[{self.call_uuid}] ❌ BLOCKING transfer - caller '{detected_name}' does NOT match required '{required_name}'")
+                return (False, f"Caller name '{detected_name}' doesn't match required '{required_name}'")
+
+            logger.info(f"[{self.call_uuid}] ✅ Transfer allowed - no caller-name requirement")
+            return (True, "No caller-name requirement")
+            
+        except Exception as e:
+            # On error, allow transfer (fail open to avoid blocking legitimate transfers)
+            logger.error(f"[{self.call_uuid}] Transfer guard error: {e}", exc_info=True)
+            return (True, f"Transfer guard error (allowing): {e}")
 
     def _infer_transfer_target_name(self) -> str:
         """Best-effort: infer a human-friendly transfer recipient name from business/agent instructions.
@@ -6030,33 +6975,49 @@ Provide your analysis."""
                 instructions_parts.append("- If you can't transfer a call, say you'll take a message and have them call back")
                 
                 # Natural engagement for context gathering (helps sales detection)
-                instructions_parts.append("\nCONVERSATIONAL ENGAGEMENT & SCREENING:")
-                instructions_parts.append("- ALWAYS ask callers what their call is regarding if they don't immediately state it")
-                instructions_parts.append("- Ask 'Have we spoken before?' or 'Are you an existing client?' to establish relationship")
-                instructions_parts.append("- If caller is evasive or won't explain their purpose, politely press for clarity")
-                instructions_parts.append("- For new callers: 'How did you hear about us?' helps identify referrals vs cold calls")
-                instructions_parts.append("- Be genuinely helpful and conversational - gather context naturally")
-                instructions_parts.append("- If someone won't explain what they're calling about, it's likely a sales call")
-                instructions_parts.append("- Don't be pushy, but do ask clarifying questions to understand who's calling and why")
-                instructions_parts.append("\nSALES CALLS:")
-                instructions_parts.append("- If it becomes clear someone is cold-calling to sell something, politely decline without offering to take a message")
-                instructions_parts.append("- For sales calls, be brief: 'Thank you, but we're not interested. Have a great day!'")
-                instructions_parts.append("- Do NOT offer to pass on details or have someone call back sales callers")
+                instructions_parts.append("\nCONVERSATIONAL APPROACH:")
+                instructions_parts.append("- ASSUME CALLERS ARE GENUINE CLIENTS OR CONTACTS - be helpful and welcoming first")
+                instructions_parts.append("- If unclear what they need, politely ask: 'What can I help you with today?' or 'Who would you like to speak with?'")
+                instructions_parts.append("- If you can't hear clearly, ask them to repeat: 'I'm sorry, I didn't quite catch that. Could you say that again?'")
+                instructions_parts.append("- For people asking to speak to someone specific, ask their name: 'May I ask who's calling?'")
+                instructions_parts.append("- Be patient with poor connections or accents - don't jump to conclusions")
+                instructions_parts.append("\nSALES CALL SCREENING (Only when obvious):")
+                instructions_parts.append("- ONLY treat as sales if clearly trying to sell products/services (not if just unclear or asking questions)")
+                instructions_parts.append("- If CLEARLY a cold sales call: 'Thank you, but we're not interested. Have a great day!'")
+                instructions_parts.append("- Do NOT screen aggressively - when in doubt, be helpful")
                 
                 # Add transfer capability instructions if transfer number is configured
                 transfer_number_configured = getattr(self, 'transfer_number', '')
                 transfer_people_configured = getattr(self, 'transfer_people', []) or []
+                transfer_instructions_text = getattr(self, 'transfer_instructions', '')
                 if transfer_number_configured:
                     instructions_parts.append("\n📞 CALL TRANSFER CAPABILITY:")
                     instructions_parts.append("- You have the ability to transfer calls when appropriate")
                     if transfer_people_configured:
                         people_list = ", ".join(transfer_people_configured[:5])
                         instructions_parts.append(f"- You can transfer calls for: {people_list}")
-                    instructions_parts.append("- IMPORTANT: Check the BUSINESS INFORMATION section above for specific transfer rules and guidelines")
-                    instructions_parts.append("- Follow any transfer instructions in the business context exactly as written")
-                    instructions_parts.append("- If the business context says to transfer for certain situations (e.g., 'if caller is the doctor', 'if they are the vet'), follow those rules")
-                    instructions_parts.append("- When you need to transfer, say something like: 'Let me transfer you now' or 'I'll put you through'")
-                    instructions_parts.append("- The system will detect your transfer intent and execute it automatically")
+                    
+                    # Add explicit transfer guard instructions
+                    if transfer_instructions_text:
+                        instructions_parts.append(f"\n⚠️ TRANSFER RULES:")
+                        instructions_parts.append(f"Instructions: {transfer_instructions_text}")
+                        instructions_parts.append("\n🎯 HOW TO HANDLE TRANSFER REQUESTS:")
+                        instructions_parts.append("1. When someone asks for a person, FIRST get their name: 'May I ask who's calling?'")
+                        instructions_parts.append("2. REMEMBER the name they give you - even if transcription is unclear, use your best judgment")
+                        instructions_parts.append("3. CHECK if their name matches any requirements in the transfer instructions above")
+                        instructions_parts.append("4. If they match OR no specific name required → Say: 'Let me transfer you to [person]' or 'I'll connect you now'")
+                        instructions_parts.append("5. If they DON'T match the required name → Say: 'I can take a message for [person]'")
+                        instructions_parts.append("\n💡 IMPORTANT:")
+                        instructions_parts.append("- If you're unsure about the caller's name due to poor audio, ask: 'I'm sorry, could you repeat your name?'")
+                        instructions_parts.append("- Spelled names (B-E-N, J-O-H-N) are valid - spell them back to confirm if needed")
+                        instructions_parts.append("- Be helpful, not suspicious - assume genuine callers unless clearly obvious sales")
+                        instructions_parts.append("- When you offer to transfer, the system will automatically execute it")
+                    else:
+                        instructions_parts.append("- IMPORTANT: Check the BUSINESS INFORMATION section above for specific transfer rules and guidelines")
+                        instructions_parts.append("- Follow any transfer instructions in the business context exactly as written")
+                        instructions_parts.append("- If the business context says to transfer for certain situations (e.g., 'if caller is the doctor', 'if they are the vet'), follow those rules")
+                        instructions_parts.append("- When you need to transfer, say something like: 'Let me transfer you now' or 'I'll put you through'")
+                        instructions_parts.append("- The system will detect your transfer intent and execute it automatically")
                 
                 # Only mention booking if calendar bundle is enabled
                 if getattr(self, 'calendar_booking_enabled', True):
@@ -6302,6 +7263,13 @@ You must use ONLY this information when answering questions about services, area
             return
             
         try:
+            # Update caller VAD from raw inbound telephony audio.
+            # This drives barge-in + pause/resume reliably even when OpenAI VAD events are absent.
+            try:
+                self._update_caller_vad_from_vonage_audio(audio_data)
+            except Exception:
+                pass
+
             # Convert bytes to numpy array (16-bit PCM from Vonage)
             audio_16k = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32767.0
             
@@ -6319,6 +7287,128 @@ You must use ONLY this information when answering questions about services, area
             
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Error sending audio to OpenAI: {e}")
+
+    def _update_caller_vad_from_vonage_audio(self, audio_data: bytes) -> None:
+        """Very lightweight VAD using inbound Vonage PCM16 (16kHz mono).
+
+        This is deliberately simple and fast. It’s used for barge-in and for
+        short-interruption pause/resume.
+        """
+        if not audio_data:
+            return
+        try:
+            samples = np.frombuffer(audio_data, dtype=np.int16)
+        except Exception:
+            return
+        if samples.size == 0:
+            return
+
+        now = asyncio.get_event_loop().time()
+        
+        # Calculate energy and get sample statistics
+        abs_samples = np.abs(samples)
+        energy = float(np.mean(abs_samples)) / 32767.0
+        max_sample = int(np.max(abs_samples)) if abs_samples.size > 0 else 0
+
+        speaking_now = energy >= float(self._caller_vad_energy_threshold)
+
+        # Throttled diagnostics so we can tune thresholds in real calls without flooding logs.
+        try:
+            if self._agent_speaking and (now - float(getattr(self, "_last_vad_debug_log_at", 0.0))) >= 0.5:
+                self._last_vad_debug_log_at = now
+                barge_in_threshold = self._get_effective_barge_in_threshold_seconds(now)
+                logger.info(
+                    f"[{self.call_uuid}] VAD dbg: energy={energy:.4f} max_sample={max_sample} vad_thr={float(self._caller_vad_energy_threshold):.4f} "
+                    f"speaking_now={speaking_now} vad_speaking={self._caller_vad_speaking} agent_speaking={self._agent_speaking} "
+                    f"barge_in_min={barge_in_threshold:.2f}s audio_bytes={len(audio_data)}"
+                )
+        except Exception:
+            pass
+        if speaking_now:
+            self._caller_vad_last_voice_at = now
+            if not self._caller_vad_speaking:
+                self._caller_vad_speaking = True
+                self._caller_vad_started_at = now
+                # Mirror to legacy flag so existing gating paths behave consistently.
+                self._caller_speaking = True
+                if self._agent_speaking:
+                    logger.info(f"[{self.call_uuid}] 🗣️ VAD: caller started speaking during agent audio (energy={energy:.3f})")
+
+            # If the agent is speaking and the caller has sustained speech >= threshold, barge in even
+            # if there is no outbound chunk being sent at this exact moment.
+            if self._agent_speaking and self._caller_vad_started_at is not None:
+                threshold = self._get_effective_barge_in_threshold_seconds(now)
+                elapsed = now - float(self._caller_vad_started_at)
+                if elapsed >= threshold:
+                    # Check if recent transcript is just a backchannel ("ok", "great", etc.)
+                    is_backchannel = False
+                    try:
+                        if self._recent_caller_transcript and (now - self._last_transcript_update_at) < 2.0:
+                            is_backchannel = self._is_backchannel_utterance(self._recent_caller_transcript)
+                            if is_backchannel:
+                                logger.info(f"[{self.call_uuid}] 👂 Ignoring backchannel '{self._recent_caller_transcript}' - not interrupting agent")
+                    except Exception as e:
+                        logger.debug(f"[{self.call_uuid}] Backchannel check error: {e}")
+                    
+                    if not is_backchannel:
+                        # Throttle to avoid repeated interrupts in noisy conditions.
+                        if (now - float(self._last_vad_barge_in_at)) >= 1.0:
+                            self._last_vad_barge_in_at = now
+                            try:
+                                logger.info(f"[{self.call_uuid}] 🛑🛑🛑 VAD BARGE-IN: caller spoke {elapsed:.2f}s >= threshold {threshold:.2f}s - BLOCKING ALL OUTBOUND AUDIO")
+                                logger.info(f"[{self.call_uuid}] 🔍 Debug: _barge_in_min_speech_seconds={self._barge_in_min_speech_seconds:.2f}, CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']={CONFIG.get('BARGE_IN_MIN_SPEECH_SECONDS', 'NOT SET')}")
+                            except Exception as ex:
+                                logger.error(f"[{self.call_uuid}] Log error: {ex}")
+                            # HARD STOP: block all outbound audio immediately.
+                            self._block_outbound_audio = True
+                            try:
+                                self._clear_paused_agent_audio()
+                            except Exception:
+                                pass
+                            # Fire-and-forget; VAD update is sync.
+                            try:
+                                asyncio.create_task(self._interrupt_agent_output("barge_in_vad"))
+                            except Exception:
+                                pass
+            return
+
+        # Not speaking in this chunk; apply hangover so brief dips don't flap.
+        if self._caller_vad_speaking:
+            if (now - float(self._caller_vad_last_voice_at)) >= float(self._caller_vad_hangover_seconds):
+                self._caller_vad_speaking = False
+                self._caller_vad_started_at = None
+                self._caller_speaking = False
+                # Clear the audio block so the agent can speak again when it has a response.
+                if self._block_outbound_audio:
+                    logger.info(f"[{self.call_uuid}] 🔓 VAD: caller stopped - unblocking outbound audio for next response")
+                    self._block_outbound_audio = False
+                elif self._agent_speaking:
+                    logger.info(f"[{self.call_uuid}] 🔇 VAD: caller stopped speaking (energy={energy:.3f})")
+
+    def _clear_paused_agent_audio(self) -> None:
+        try:
+            self._paused_agent_audio.clear()
+        except Exception:
+            self._paused_agent_audio = []
+        self._paused_agent_audio_bytes = 0
+
+    async def _flush_paused_agent_audio(self) -> None:
+        if not self._paused_agent_audio_bytes:
+            return
+        self._flushing_paused_agent_audio = True
+        try:
+            while True:
+                try:
+                    chunk = self._paused_agent_audio.popleft()
+                except Exception:
+                    break
+                try:
+                    self._paused_agent_audio_bytes = max(0, self._paused_agent_audio_bytes - len(chunk))
+                except Exception:
+                    pass
+                await self._send_vonage_audio_bytes_raw(chunk)
+        finally:
+            self._flushing_paused_agent_audio = False
     
     async def receive_from_openai(self):
         """Receive responses from OpenAI and forward to Vonage"""
@@ -6345,10 +7435,16 @@ You must use ONLY this information when answering questions about services, area
                     self._timeout_task = asyncio.create_task(self._monitor_timeout())
                     
                 elif event_type == "input_audio_buffer.speech_started":
-                    logger.debug(f"[{self.call_uuid}] Caller speaking...")
+                    logger.info(f"[{self.call_uuid}] 🗣️ CALLER STARTED SPEAKING (agent_speaking={self._agent_speaking})")
                     self._caller_speaking = True
                     self._last_speech_time = asyncio.get_event_loop().time()
                     self._last_speech_started_at = asyncio.get_event_loop().time()
+
+                    # Anchor latency filler timing to speech end; reset for the new turn.
+                    try:
+                        self._filler_latency_anchor_time = None
+                    except Exception:
+                        pass
 
                     voice_provider = getattr(self, 'voice_provider', 'openai')
                     # Only stop Speechmatics output immediately if we're currently injecting filler.
@@ -6361,13 +7457,19 @@ You must use ONLY this information when answering questions about services, area
                     self._last_filler_phrase = None
                     # Reset per-turn suppression; we only suppress filler if this becomes a barge-in.
                     self._suppress_filler_for_turn = False
+                    self._allow_filler_without_response_for_turn = False
                     # Reset transcript gating for this turn
                     self._last_caller_transcript = ""
+                    # Clear "recent transcript" used for VAD backchannel gating so we
+                    # don't accidentally treat the previous utterance as current.
+                    self._recent_caller_transcript = ""
+                    self._last_transcript_update_at = 0.0
                     try:
                         self._turn_transcript_ready.clear()
                     except Exception:
                         pass
                     self._response_triggered_for_turn = False
+                    self._response_trigger_time = None
 
                     # Track which brain we intend to use for this user turn.
                     # Used for provider-specific filler tuning (e.g., OpenRouter can be slower)
@@ -6418,12 +7520,36 @@ You must use ONLY this information when answering questions about services, area
                         # If they keep talking past the threshold, we cancel in _maybe_barge_in_after_delay().
                         if self._pending_barge_in_task is None or self._pending_barge_in_task.done():
                             self._pending_barge_in_started_at = asyncio.get_event_loop().time()
+                            try:
+                                effective_thr = self._get_effective_barge_in_threshold_seconds(asyncio.get_event_loop().time())
+                            except Exception:
+                                effective_thr = CONFIG.get('BARGE_IN_MIN_SPEECH_SECONDS', 2.0)
+                            logger.info(
+                                f"[{self.call_uuid}] 🎤 BARGE-IN TRACKING STARTED - caller speaking during agent turn "
+                                f"(configured={CONFIG.get('BARGE_IN_MIN_SPEECH_SECONDS', 'NA')}s effective={effective_thr:.2f}s)"
+                            )
                             self._pending_barge_in_task = asyncio.create_task(self._maybe_barge_in_after_delay())
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
-                    logger.debug(f"[{self.call_uuid}] Caller stopped speaking")
+                    logger.info(f"[{self.call_uuid}] 🔇 CALLER STOPPED SPEAKING (agent_speaking={self._agent_speaking})")
                     self._caller_speaking = False
                     self._last_speech_time = asyncio.get_event_loop().time()
+
+                    # Anchor latency filler timing to the moment the caller stopped speaking.
+                    # This makes filler kick in quickly (>=0.5s after speech end) even if ASR/triggering is delayed.
+                    try:
+                        self._filler_latency_anchor_time = asyncio.get_event_loop().time()
+                    except Exception:
+                        pass
+
+                    # First turn quick acknowledgment - say "Thank you for calling today" after caller finishes speaking
+                    # but before AI generates the full response for a professional, responsive feel
+                    if len(self.transcript_parts) <= 2:  # Just greeting and first caller input
+                        try:
+                            asyncio.create_task(self._speak_text_via_voice_provider("Thank you for calling today."))
+                            logger.info(f"[{self.call_uuid}] ⚡ Quick acknowledgment: 'Thank you for calling today' (after caller finished speaking)")
+                        except Exception:
+                            pass
 
                     # Estimate how long the caller spoke using VAD timing. This lets us ignore tiny
                     # one-word/backchannel bursts before we even have a transcript.
@@ -6509,12 +7635,12 @@ You must use ONLY this information when answering questions about services, area
                             # Provider-specific filler timing: OpenRouter often needs earlier filler.
                             if str(effective_provider or "").strip().lower() == "openrouter":
                                 try:
-                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "500"))
+                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
                                 except Exception:
                                     latency_ms = 500.0
                             else:
                                 try:
-                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
                                 except Exception:
                                     latency_ms = 650.0
                             try:
@@ -6548,6 +7674,53 @@ You must use ONLY this information when answering questions about services, area
 
                     # If transcript is still empty, treat as VAD noise and do nothing.
                     if (voice_provider == 'speechmatics' or manual_brain_mode) and not self._agent_speaking and not last_transcript:
+                        # If ASR is slow/late but the caller spoke for a meaningful duration, play a
+                        # latency-cover filler while we wait (preparing in the background).
+                        if (
+                            self._last_speech_duration_seconds >= min_turn
+                            and not self._filler_played_for_turn
+                            and not self._suppress_filler_for_turn
+                        ):
+                            try:
+                                self._allow_filler_without_response_for_turn = True
+                            except Exception:
+                                pass
+                            # Anchor "latency" measurement from speech end if response hasn't been triggered yet.
+                            try:
+                                if getattr(self, "_response_trigger_time", None) is None:
+                                    self._response_trigger_time = asyncio.get_event_loop().time()
+                            except Exception:
+                                pass
+                            try:
+                                effective_provider = self._effective_brain_provider()
+                                if str(effective_provider or "").strip().lower() == "openrouter":
+                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
+                                else:
+                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
+                            except Exception:
+                                latency_ms = 300.0
+                            delay_seconds = max(0.0, float(latency_ms) / 1000.0)
+                            logger.info(
+                                f"[{self.call_uuid}] ⏳ Transcript pending; scheduling filler to cover latency (delay={delay_seconds:.2f}s)"
+                            )
+                            await self._schedule_latency_filler_for_trigger(min_turn=min_turn, delay_seconds=delay_seconds)
+                            
+                            # CRITICAL: Also schedule a delayed response trigger so the AI actually speaks
+                            # after the filler. The transcript fallback handler will trigger when it arrives.
+                            async def _delayed_transcript_check():
+                                try:
+                                    # Give transcript extra time to arrive (up to 1.5s total from speech end)
+                                    await asyncio.sleep(1.0)
+                                    if not self.is_active or self._response_triggered_for_turn:
+                                        return
+                                    t = (getattr(self, "_last_caller_transcript", "") or "").strip()
+                                    if t and not self._is_backchannel_utterance(t):
+                                        logger.info(f"[{self.call_uuid}] 🔄 Delayed transcript arrived: triggering response now")
+                                        await self._trigger_brain_response("delayed_transcript_after_filler")
+                                except Exception as e:
+                                    logger.warning(f"[{self.call_uuid}] Delayed transcript check failed: {e}")
+                            
+                            asyncio.create_task(_delayed_transcript_check())
                         continue
 
                     # Filler is now latency-based and is only scheduled when we actually trigger a response.
@@ -6558,6 +7731,9 @@ You must use ONLY this information when answering questions about services, area
 
                     # Store latest transcript for turn gating + backchannel decisions.
                     self._last_caller_transcript = transcript or ""
+                    # Also update for VAD backchannel detection
+                    self._recent_caller_transcript = transcript or ""
+                    self._last_transcript_update_at = asyncio.get_event_loop().time()
                     try:
                         self._turn_transcript_ready.set()
                     except Exception:
@@ -6590,6 +7766,10 @@ You must use ONLY this information when answering questions about services, area
                         and not self._response_triggered_for_turn
                     ):
                         t_norm = (transcript or "").strip()
+                        logger.debug(
+                            f"[{self.call_uuid}] 📝 Transcript fallback check: transcript='{t_norm[:50]}', "
+                            f"agent_speaking={self._agent_speaking}, response_triggered={self._response_triggered_for_turn}"
+                        )
                         if t_norm and (not self._is_backchannel_utterance(t_norm)):
                             digits_count = sum(1 for ch in t_norm if ch.isdigit())
                             is_number_like = digits_count >= 5
@@ -6625,12 +7805,12 @@ You must use ONLY this information when answering questions about services, area
                                     effective_provider = self._effective_brain_provider()
                                     if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "420"))
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
                                         except Exception:
                                             latency_ms = 420.0
                                     else:
                                         try:
-                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
                                         except Exception:
                                             latency_ms = 650.0
                                     try:
@@ -6640,16 +7820,36 @@ You must use ONLY this information when answering questions about services, area
                                     await self._schedule_latency_filler_for_trigger(min_turn=0.0, delay_seconds=delay_seconds)
 
                     # If the caller is saying something substantive while the agent is speaking,
-                    # stop the agent output immediately. We only skip this for short backchannels like "ok" / "yeah".
+                    # stop the agent output only if they've been speaking long enough (3+ seconds).
+                    # Short fragments and incomplete thoughts should be ignored.
                     interrupted_agent = False
                     if (
                         transcript
                         and self._agent_speaking
                         and not self._is_backchannel_utterance(transcript)
                     ):
-                        logger.info(f"[{self.call_uuid}] 🛑 Barge-in (caller interrupting) - stopping agent: {transcript!r}")
-                        await self._interrupt_agent_output("barge_in_transcript")
-                        interrupted_agent = True
+                        # Check if caller has been speaking for at least the minimum threshold
+                        try:
+                            barge_in_started = self._pending_barge_in_started_at
+                            if barge_in_started is not None:
+                                elapsed = asyncio.get_event_loop().time() - barge_in_started
+                                try:
+                                    min_duration = float(CONFIG.get("BARGE_IN_MIN_SPEECH_SECONDS", 3.0))
+                                except Exception:
+                                    min_duration = 3.0
+                                if elapsed < min_duration:
+                                    logger.debug(f"[{self.call_uuid}] Transcript-based barge-in skipped: caller only spoke for {elapsed:.2f}s (< {min_duration:.1f}s)")
+                                else:
+                                    logger.info(f"[{self.call_uuid}] 🛑 Barge-in (caller interrupting) - stopping agent: {transcript!r}")
+                                    await self._interrupt_agent_output("barge_in_transcript")
+                                    interrupted_agent = True
+                            else:
+                                # No barge-in tracking - this shouldn't happen, but allow interrupt for safety
+                                logger.info(f"[{self.call_uuid}] 🛑 Barge-in (caller interrupting) - stopping agent: {transcript!r}")
+                                await self._interrupt_agent_output("barge_in_transcript")
+                                interrupted_agent = True
+                        except Exception as e:
+                            logger.warning(f"[{self.call_uuid}] Error checking barge-in duration: {e}")
 
                     # CRITICAL: if the transcript arrived while the agent was speaking, the normal
                     # Speechmatics gating paths can miss triggering `response.create` (because they
@@ -6687,12 +7887,12 @@ You must use ONLY this information when answering questions about services, area
                                     effective_provider = self._effective_brain_provider()
                                     if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "420"))
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
                                         except Exception:
                                             latency_ms = 420.0
                                     else:
                                         try:
-                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "650"))
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
                                         except Exception:
                                             latency_ms = 650.0
                                     try:
@@ -6708,6 +7908,8 @@ You must use ONLY this information when answering questions about services, area
                     ignore_always = bool(CONFIG.get("IGNORE_BACKCHANNELS_ALWAYS", True))
                     if self._is_backchannel_utterance(transcript) and (ignore_always or self._agent_speaking or self._caller_speaking):
                         logger.info(f"[{self.call_uuid}] 💤 Ignoring backchannel: {transcript!r}")
+                        if self._agent_speaking:
+                            logger.info(f"[{self.call_uuid}] ✅ Backchannel during agent speech; not cancelling active response")
 
                         # Cancel any pending DeepSeek generation that might have been queued.
                         self._cancel_pending_deepseek()
@@ -6730,13 +7932,16 @@ You must use ONLY this information when answering questions about services, area
                                 pass
 
                         # Best-effort cancel any response OpenAI started for this utterance.
-                        try:
-                            if self.openai_ws:
-                                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
-                        except Exception:
-                            pass
-                        # Drop any trailing audio/text deltas that might already be in flight.
-                        self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.5
+                        # IMPORTANT: do not cancel/suppress if the agent is currently speaking.
+                        # A caller saying "ok/right" mid-response should not kill the in-flight output.
+                        if not self._agent_speaking:
+                            try:
+                                if self.openai_ws:
+                                    await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+                            except Exception:
+                                pass
+                            # Drop any trailing audio/text deltas that might already be in flight.
+                            self._suppress_openai_output_until = asyncio.get_event_loop().time() + 1.5
                         continue
 
                     logger.info(f"[{self.call_uuid}] 📞 Caller: {transcript}")
@@ -7253,6 +8458,7 @@ You must use ONLY this information when answering questions about services, area
 
                     # Agent is speaking
                     self._agent_speaking = True
+                    logger.info(f"[{self.call_uuid}] 🔊 AGENT STARTED SPEAKING (OpenAI audio delta)")
                     
                     # Track response latency if we have a speech_stopped timestamp
                     if self._speech_stopped_time is not None:
@@ -8655,9 +9861,10 @@ class SessionManager:
                     session.agent_instructions = row[13] if len(row) > 13 and row[13] else "Answer questions about the business. Take messages if needed."
                     session.agent_name = row[14] if len(row) > 14 and row[14] else CONFIG['AGENT_NAME']
                     session.call_greeting = row[15] if len(row) > 15 and row[15] else ""
-                    session.transfer_number = row[16] if len(row) > 16 and row[16] else ""
+                    transfer_number_from_db = row[16] if len(row) > 16 and row[16] else ""
+                    session.transfer_number = transfer_number_from_db
                     if session.transfer_number:
-                        logger.info(f"[{call_uuid}] ⚡ Transfer number configured: {session.transfer_number}")
+                        logger.info(f"[{call_uuid}] ⚡ Transfer number configured: {session.transfer_number} (row[16]={repr(transfer_number_from_db)})")
 
                     # Transfer-by-name offering list
                     session.transfer_people = []
@@ -8946,8 +10153,8 @@ async def super_admin_security_middleware(request: Request, call_next):
             if request.method.upper() == "OPTIONS":
                 return await call_next(request)
 
-            # Allow bootstrap/status/login without an existing session
-            if path in ("/api/super-admin/login", "/api/super-admin/status", "/api/super-admin/bootstrap"):
+            # Allow bootstrap/status/login/request-otp without an existing session
+            if path in ("/api/super-admin/login", "/api/super-admin/status", "/api/super-admin/bootstrap", "/api/super-admin/request-otp"):
                 return await call_next(request)
 
             if not _super_admin_password_configured():
@@ -9048,12 +10255,27 @@ async def super_admin_login(request: Request):
         data = {}
 
     password = (data.get("password") or "").strip()
+    otp_code = (data.get("otp_code") or "").strip()
     configured_user = _get_configured_super_admin_username()
     username = (data.get("username") or configured_user).strip()
     if configured_user and username != configured_user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not _verify_super_admin_password(password):
+    # Allow either password OR OTP code
+    auth_valid = False
+    if password:
+        auth_valid = _verify_super_admin_password(password)
+    elif otp_code:
+        # Verify OTP code
+        stored = _super_admin_otp_codes.get(ip)
+        if stored:
+            stored_code, expiry = stored
+            if time.time() < expiry and otp_code == stored_code:
+                auth_valid = True
+                # Clear the used OTP
+                _super_admin_otp_codes.pop(ip, None)
+    
+    if not auth_valid:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     try:
@@ -9083,6 +10305,40 @@ async def super_admin_login(request: Request):
     )
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+@app.post("/api/super-admin/request-otp")
+async def super_admin_request_otp(request: Request):
+    """Send OTP code via WhatsApp to the configured super admin mobile number."""
+    if not _super_admin_password_configured():
+        raise HTTPException(status_code=503, detail="Super admin is not configured")
+    
+    ip = _request_ip(request)
+    if not _rate_limit_super_admin_login(ip):
+        raise HTTPException(status_code=429, detail="Too many attempts")
+    
+    # Get super admin mobile from env
+    mobile = os.getenv("SUPER_ADMIN_MOBILE", "+447595289669").strip()
+    if not mobile:
+        raise HTTPException(status_code=503, detail="Super admin mobile not configured")
+    
+    # Generate 6-digit OTP
+    import random
+    otp_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    # Store OTP with 5-minute expiry
+    expiry = time.time() + 300  # 5 minutes
+    _super_admin_otp_codes[ip] = (otp_code, expiry)
+    
+    # Send via WhatsApp
+    ok, err = _send_vonage_whatsapp(mobile, f"Your Super Admin login code is: {otp_code}")
+    if not ok:
+        logger.error(f"Failed to send Super Admin OTP via WhatsApp: {err}")
+        raise HTTPException(status_code=503, detail=err)
+
+    logger.info(f"📱 Sent Super Admin OTP via WhatsApp to {mobile} (IP: {ip})")
+    return {"success": True, "message": "Code sent to your WhatsApp"}
+    return {"success": True, "message": "Code sent to your mobile"}
 
 
 @app.get("/api/super-admin/status")
@@ -9402,6 +10658,43 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
         
         # Update all configuration fields in database
         if "AGENT_NAME" in data:
+            # Moderate agent name field
+            agent_name = data["AGENT_NAME"]
+            
+            cursor.execute('SELECT COALESCE(agent_name, "") FROM account_settings WHERE user_id = ?', (user_id,))
+            existing_row = cursor.fetchone()
+            existing_name = existing_row[0] if existing_row else ""
+
+            if str(existing_name).strip() != str(agent_name).strip():
+                cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                previous_suspensions = result[0] if result and result[0] else 0
+
+                moderation_result = await moderate_business_content(agent_name, user_id, previous_suspensions > 0)
+
+                if not moderation_result["approved"]:
+                    from datetime import datetime
+                    suspension_reason = moderation_result["reason"]
+                    flag_details = moderation_result.get("details", "")
+
+                    cursor.execute('''UPDATE account_settings 
+                                     SET is_suspended = 1, 
+                                         suspension_reason = ?, 
+                                         suspended_at = ?, 
+                                         suspension_count = suspension_count + 1,
+                                         last_flag_details = ?
+                                     WHERE user_id = ?''',
+                                 (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                    conn.commit()
+                    conn.close()
+
+                    logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Account suspended: {suspension_reason}. Please contact support."
+                    )
+
             CONFIG["AGENT_NAME"] = data["AGENT_NAME"]
             cursor.execute('UPDATE account_settings SET agent_name = ? WHERE user_id = ?', 
                          (data["AGENT_NAME"], user_id))
@@ -9455,18 +10748,129 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
                 logger.info(f"Business info updated for user {user_id}")
         
         if "AGENT_PERSONALITY" in data:
+            # Moderate personality field
+            agent_personality = data["AGENT_PERSONALITY"]
+            
+            cursor.execute('SELECT COALESCE(agent_personality, "") FROM account_settings WHERE user_id = ?', (user_id,))
+            existing_row = cursor.fetchone()
+            existing_personality = existing_row[0] if existing_row else ""
+
+            if str(existing_personality).strip() != str(agent_personality).strip():
+                cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                previous_suspensions = result[0] if result and result[0] else 0
+
+                moderation_result = await moderate_business_content(agent_personality, user_id, previous_suspensions > 0)
+
+                if not moderation_result["approved"]:
+                    from datetime import datetime
+                    suspension_reason = moderation_result["reason"]
+                    flag_details = moderation_result.get("details", "")
+
+                    cursor.execute('''UPDATE account_settings 
+                                     SET is_suspended = 1, 
+                                         suspension_reason = ?, 
+                                         suspended_at = ?, 
+                                         suspension_count = suspension_count + 1,
+                                         last_flag_details = ?
+                                     WHERE user_id = ?''',
+                                 (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                    conn.commit()
+                    conn.close()
+
+                    logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Account suspended: {suspension_reason}. Please contact support."
+                    )
+
             CONFIG["AGENT_PERSONALITY"] = data["AGENT_PERSONALITY"]
             cursor.execute('UPDATE account_settings SET agent_personality = ? WHERE user_id = ?', 
                          (data["AGENT_PERSONALITY"], user_id))
             logger.info(f"Agent personality updated for user {user_id}")
         
         if "AGENT_INSTRUCTIONS" in data:
+            # Moderate instructions field
+            agent_instructions = data["AGENT_INSTRUCTIONS"]
+            
+            cursor.execute('SELECT COALESCE(agent_instructions, "") FROM account_settings WHERE user_id = ?', (user_id,))
+            existing_row = cursor.fetchone()
+            existing_instructions = existing_row[0] if existing_row else ""
+
+            if str(existing_instructions).strip() != str(agent_instructions).strip():
+                cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                previous_suspensions = result[0] if result and result[0] else 0
+
+                moderation_result = await moderate_business_content(agent_instructions, user_id, previous_suspensions > 0)
+
+                if not moderation_result["approved"]:
+                    from datetime import datetime
+                    suspension_reason = moderation_result["reason"]
+                    flag_details = moderation_result.get("details", "")
+
+                    cursor.execute('''UPDATE account_settings 
+                                     SET is_suspended = 1, 
+                                         suspension_reason = ?, 
+                                         suspended_at = ?, 
+                                         suspension_count = suspension_count + 1,
+                                         last_flag_details = ?
+                                     WHERE user_id = ?''',
+                                 (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                    conn.commit()
+                    conn.close()
+
+                    logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Account suspended: {suspension_reason}. Please contact support."
+                    )
+
             CONFIG["AGENT_INSTRUCTIONS"] = data["AGENT_INSTRUCTIONS"]
             cursor.execute('UPDATE account_settings SET agent_instructions = ? WHERE user_id = ?', 
                          (data["AGENT_INSTRUCTIONS"], user_id))
             logger.info(f"Agent instructions updated for user {user_id}")
 
         if "CALL_GREETING" in data:
+            # Moderate greeting field
+            call_greeting = data["CALL_GREETING"]
+            
+            cursor.execute('SELECT COALESCE(call_greeting, "") FROM account_settings WHERE user_id = ?', (user_id,))
+            existing_row = cursor.fetchone()
+            existing_greeting = existing_row[0] if existing_row else ""
+
+            if str(existing_greeting).strip() != str(call_greeting).strip():
+                cursor.execute('SELECT suspension_count FROM account_settings WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                previous_suspensions = result[0] if result and result[0] else 0
+
+                moderation_result = await moderate_business_content(call_greeting, user_id, previous_suspensions > 0)
+
+                if not moderation_result["approved"]:
+                    from datetime import datetime
+                    suspension_reason = moderation_result["reason"]
+                    flag_details = moderation_result.get("details", "")
+
+                    cursor.execute('''UPDATE account_settings 
+                                     SET is_suspended = 1, 
+                                         suspension_reason = ?, 
+                                         suspended_at = ?, 
+                                         suspension_count = suspension_count + 1,
+                                         last_flag_details = ?
+                                     WHERE user_id = ?''',
+                                 (suspension_reason, datetime.now().isoformat(), flag_details, user_id))
+                    conn.commit()
+                    conn.close()
+
+                    logger.warning(f"🚨 ACCOUNT SUSPENDED - User {user_id}: {suspension_reason}")
+
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Account suspended: {suspension_reason}. Please contact support."
+                    )
+
             cursor.execute('UPDATE account_settings SET call_greeting = ? WHERE user_id = ?',
                          (data["CALL_GREETING"], user_id))
             logger.info(f"Call greeting updated for user {user_id}")
@@ -11152,6 +12556,47 @@ async def sync_vonage_numbers():
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/user/status")
+async def get_user_status(authorization: Optional[str] = Header(None)):
+    """Get current user's account status including suspension status"""
+    user_id = await get_current_user(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT 
+                u.status,
+                COALESCE(a.is_suspended, 0) as is_suspended,
+                a.suspension_reason,
+                a.suspended_at,
+                a.suspension_count
+            FROM users u
+            LEFT JOIN account_settings a ON u.id = a.user_id
+            WHERE u.id = ?
+        ''', (user_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return {"status": "active", "is_suspended": False}
+        
+        return {
+            "status": row[0] or "active",
+            "is_suspended": bool(row[1]),
+            "suspension_reason": row[2],
+            "suspended_at": row[3],
+            "suspension_count": row[4] or 0
+        }
+    except Exception as e:
+        logger.error(f"Failed to get user status: {e}")
+        return {"status": "active", "is_suspended": False}
+
+
 @app.get("/api/user/owned-numbers")
 async def get_owned_numbers_user(authorization: Optional[str] = Header(None)):
     """Admin UI alias for owned numbers.
@@ -12533,7 +13978,25 @@ async def generate_speechmatics_fillers(request: Request, authorization: Optiona
                 status_code=400,
             )
 
-        filler_phrases = resolved_filler_phrases(min_count=10)
+        # Generate a balanced set across small/medium/large so latency-based selection has options.
+        import random
+        buckets = load_global_filler_words_by_size()
+        plan = [("small", 4), ("medium", 3), ("large", 3)]
+        filler_phrases: List[str] = []
+        for size, n in plan:
+            pool = list(buckets.get(size, []))
+            if not pool:
+                continue
+            if len(pool) >= n:
+                filler_phrases.extend(random.sample(pool, k=n))
+            else:
+                filler_phrases.extend(pool)
+                while len([p for p in filler_phrases if p in pool]) < n:
+                    filler_phrases.append(random.choice(pool))
+        # Safety: ensure we have exactly 10.
+        while len(filler_phrases) < 10:
+            filler_phrases.append(random.choice(resolved_filler_phrases(min_count=18)))
+        filler_phrases = filler_phrases[:10]
         
         async def _speechmatics_tts_wav_16000(text: str, voice: str) -> bytes:
             url = f"https://preview.tts.speechmatics.com/generate/{voice}"
@@ -12571,6 +14034,7 @@ async def generate_speechmatics_fillers(request: Request, authorization: Optiona
                     i,
                     {
                         "text": phrase,
+                        "size": classify_filler_size(phrase),
                         "voice_id": voice_id,
                         "updated_at": datetime.utcnow().isoformat() + "Z",
                         "source": "user_generate_to_global",
@@ -12597,12 +14061,13 @@ async def generate_speechmatics_fillers(request: Request, authorization: Optiona
 
 @app.post("/api/super-admin/generate-speechmatics-fillers")
 async def generate_global_speechmatics_fillers(request: Request):
-    """Generate 10 global filler audio clips using Speechmatics TTS (WAV 16kHz)."""
+    """Generate global filler audio clips using Speechmatics TTS (WAV 16kHz)."""
     try:
         body = await request.json()
         voice_id = body.get('voice_id', 'sarah')
         
-        logger.info(f"🎙️ Generating 10 global filler clips (Speechmatics TTS voice_id={voice_id})")
+        slot_count = _global_filler_slot_count()
+        logger.info(f"🎙️ Generating {slot_count} global filler clips (Speechmatics TTS voice_id={voice_id})")
 
         speechmatics_api_key = CONFIG.get("SPEECHMATICS_API_KEY")
         if not speechmatics_api_key:
@@ -12611,7 +14076,28 @@ async def generate_global_speechmatics_fillers(request: Request):
                 status_code=400,
             )
 
-        filler_phrases = resolved_filler_phrases(min_count=10)
+        # Generate a balanced set across small/medium/large so latency-based selection has options.
+        import random
+        buckets = load_global_filler_words_by_size()
+        # Roughly 40/30/30 split.
+        small_n = int(round(slot_count * 0.40))
+        medium_n = int(round(slot_count * 0.30))
+        large_n = max(0, slot_count - small_n - medium_n)
+        plan = [("small", small_n), ("medium", medium_n), ("large", large_n)]
+        filler_phrases: List[str] = []
+        for size, n in plan:
+            pool = list(buckets.get(size, []))
+            if not pool:
+                continue
+            if len(pool) >= n:
+                filler_phrases.extend(random.sample(pool, k=n))
+            else:
+                filler_phrases.extend(pool)
+                while len([p for p in filler_phrases if p in pool]) < n:
+                    filler_phrases.append(random.choice(pool))
+        while len(filler_phrases) < slot_count:
+            filler_phrases.append(random.choice(resolved_filler_phrases(min_count=18)))
+        filler_phrases = filler_phrases[:slot_count]
         
         async def _speechmatics_tts_wav_16000(text: str, voice: str) -> bytes:
             url = f"https://preview.tts.speechmatics.com/generate/{voice}"
@@ -12649,6 +14135,7 @@ async def generate_global_speechmatics_fillers(request: Request):
                     i,
                     {
                         "text": phrase,
+                        "size": classify_filler_size(phrase),
                         "voice_id": voice_id,
                         "updated_at": datetime.utcnow().isoformat() + "Z",
                         "source": "generate_10",
@@ -12656,7 +14143,7 @@ async def generate_global_speechmatics_fillers(request: Request):
                 )
 
                 generated_count += 1
-                logger.info(f"✅ Generated global filler {i}/10: {phrase}")
+                logger.info(f"✅ Generated global filler {i}/{slot_count}: {phrase}")
                         
             except Exception as e:
                 logger.error(f"Error generating filler {i}: {e}")
@@ -12684,6 +14171,7 @@ async def regenerate_global_filler(filler_num: int, request: Request):
         use_ai = body.get('use_ai', True)
         voice_id = body.get('voice_id', 'sarah')
         custom_text = (body.get('text') or '').strip()
+        requested_size = (body.get('size') or '').strip().lower()
         
         logger.info(f"🔁 Regenerating global filler {filler_num}")
         
@@ -12733,11 +14221,14 @@ async def regenerate_global_filler(filler_num: int, request: Request):
         with open(filler_path, 'wb') as f:
             f.write(audio_data)
 
+        effective_size = requested_size if requested_size in {"small", "medium", "large"} else classify_filler_size(phrase)
+
         _save_global_filler_meta(
             filler_dir,
             filler_num,
             {
                 "text": phrase,
+                "size": effective_size,
                 "voice_id": voice_id,
                 "updated_at": datetime.utcnow().isoformat() + "Z",
                 "source": "custom_text" if custom_text else "regenerate",
@@ -12759,34 +14250,76 @@ async def regenerate_global_filler(filler_num: int, request: Request):
 
 @app.get("/api/super-admin/list-fillers")
 async def super_admin_list_global_fillers(voice_id: str = Query("sarah")):
-    """List the 1-10 global filler slots for a given voice_id."""
+    """List the global filler slots for a given voice_id."""
     try:
         filler_dir = _global_fillers_dir(voice_id)
         fillers: List[Dict] = []
-        for i in range(1, 11):
+        slot_count = _global_filler_slot_count()
+        for i in range(1, slot_count + 1):
             audio_path = _global_filler_existing_path(filler_dir, i)
-            if not audio_path:
-                continue
             meta = _load_global_filler_meta(filler_dir, i)
+            text = (meta.get("text") or "")
+            size = (meta.get("size") or "").strip().lower()
+            if size not in {"small", "medium", "large"}:
+                try:
+                    size = classify_filler_size(text) if text else "small"
+                except Exception:
+                    size = "small"
             fillers.append(
                 {
                     "number": i,
-                    "filename": os.path.basename(audio_path),
-                    "text": (meta.get("text") or ""),
+                    "has_audio": bool(audio_path),
+                    "filename": os.path.basename(audio_path) if audio_path else "",
+                    "text": text,
+                    "size": size,
                     "updated_at": (meta.get("updated_at") or ""),
                 }
             )
-        return {"success": True, "voice_id": voice_id, "fillers": fillers}
+        return {"success": True, "voice_id": voice_id, "slot_count": slot_count, "fillers": fillers}
     except Exception as e:
         logger.error(f"Failed to list global fillers: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/set-filler-size/{filler_num}")
+async def super_admin_set_global_filler_size(filler_num: int, request: Request):
+    """Set the size bucket for a filler slot without regenerating audio."""
+    slot_count = _global_filler_slot_count()
+    if filler_num < 1 or filler_num > slot_count:
+        raise HTTPException(status_code=400, detail=f"filler_num must be 1-{slot_count}")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    voice_id = (body.get("voice_id") or "sarah")
+    size = (body.get("size") or "").strip().lower()
+    if size not in {"small", "medium", "large"}:
+        return JSONResponse({"success": False, "error": "size must be one of: small, medium, large"}, status_code=400)
+
+    try:
+        filler_dir = _global_fillers_dir(voice_id)
+        os.makedirs(filler_dir, exist_ok=True)
+        meta = _load_global_filler_meta(filler_dir, filler_num)
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["size"] = size
+        meta["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        meta["source"] = "manual_size"
+        meta["voice_id"] = voice_id
+        _save_global_filler_meta(filler_dir, filler_num, meta)
+        return {"success": True, "number": filler_num, "size": size}
+    except Exception as e:
+        logger.error(f"Failed to set filler size: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 @app.get("/api/super-admin/get-filler/{filler_num}")
 async def super_admin_get_global_filler(filler_num: int, voice_id: str = Query("sarah")):
     """Fetch a filler audio file for playback."""
-    if filler_num < 1 or filler_num > 10:
-        raise HTTPException(status_code=400, detail="filler_num must be 1-10")
+    slot_count = _global_filler_slot_count()
+    if filler_num < 1 or filler_num > slot_count:
+        raise HTTPException(status_code=400, detail=f"filler_num must be 1-{slot_count}")
     filler_dir = _global_fillers_dir(voice_id)
     audio_path = _global_filler_existing_path(filler_dir, filler_num)
     if not audio_path:
@@ -12798,8 +14331,9 @@ async def super_admin_get_global_filler(filler_num: int, voice_id: str = Query("
 @app.delete("/api/super-admin/delete-filler/{filler_num}")
 async def super_admin_delete_global_filler(filler_num: int, voice_id: str = Query("sarah")):
     """Delete a filler slot (audio + sidecar meta)."""
-    if filler_num < 1 or filler_num > 10:
-        raise HTTPException(status_code=400, detail="filler_num must be 1-10")
+    slot_count = _global_filler_slot_count()
+    if filler_num < 1 or filler_num > slot_count:
+        raise HTTPException(status_code=400, detail=f"filler_num must be 1-{slot_count}")
     try:
         filler_dir = _global_fillers_dir(voice_id)
         audio_path = _global_filler_existing_path(filler_dir, filler_num)
@@ -12816,14 +14350,14 @@ async def super_admin_delete_global_filler(filler_num: int, voice_id: str = Quer
 
 @app.post("/api/super-admin/upload-fillers")
 async def super_admin_upload_global_fillers(request: Request, voice_id: str = Query("sarah")):
-    """Upload one or more filler slots as multipart/form-data with keys filler1..filler10."""
+    """Upload one or more filler slots as multipart/form-data with keys filler1..fillerN."""
     try:
         form = await request.form()
         filler_dir = _global_fillers_dir(voice_id)
         os.makedirs(filler_dir, exist_ok=True)
 
         uploaded_count = 0
-        for i in range(1, 11):
+        for i in range(1, _global_filler_slot_count() + 1):
             key = f"filler{i}"
             file = form.get(key)
             if not isinstance(file, UploadFile):
@@ -13726,6 +15260,519 @@ async def save_openrouter_model(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/performance-settings")
+async def get_performance_settings():
+    """Get current AI performance tuning settings."""
+    try:
+        return {
+            "success": True,
+            "settings": {
+                "history_parts": int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 4)),
+                "max_tokens": int(CONFIG.get("OPENROUTER_MAX_TOKENS", 100)),
+                "max_message_chars": int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 300)),
+                "request_timeout": float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 8)),
+                "system_max_chars": int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 4000)),
+                "total_prompt_max_chars": int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 6000))
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get performance settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/performance-settings")
+async def save_performance_settings(request: Request):
+    """Save AI performance tuning settings to database and update runtime config."""
+    try:
+        body = await request.json()
+        
+        # Validate and extract settings with bounds checking
+        history_parts = max(1, min(10, int(body.get('history_parts', 4))))
+        max_tokens = max(40, min(200, int(body.get('max_tokens', 100))))
+        max_message_chars = max(100, min(600, int(body.get('max_message_chars', 300))))
+        request_timeout = max(3.0, min(15.0, float(body.get('request_timeout', 8))))
+        system_max_chars = max(1000, min(8000, int(body.get('system_max_chars', 4000))))
+        total_prompt_max_chars = max(2000, min(15000, int(body.get('total_prompt_max_chars', 6000))))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Ensure columns exist
+        _ensure_column(cursor, "global_settings", "openrouter_history_parts", "INTEGER")
+        _ensure_column(cursor, "global_settings", "openrouter_max_tokens", "INTEGER")
+        _ensure_column(cursor, "global_settings", "openrouter_max_message_chars", "INTEGER")
+        _ensure_column(cursor, "global_settings", "openrouter_request_timeout", "REAL")
+        _ensure_column(cursor, "global_settings", "openrouter_system_max_chars", "INTEGER")
+        _ensure_column(cursor, "global_settings", "openrouter_total_prompt_max_chars", "INTEGER")
+        
+        # Update database
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET openrouter_history_parts = ?,
+                openrouter_max_tokens = ?,
+                openrouter_max_message_chars = ?,
+                openrouter_request_timeout = ?,
+                openrouter_system_max_chars = ?,
+                openrouter_total_prompt_max_chars = ?,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ''',
+            (history_parts, max_tokens, max_message_chars, request_timeout, 
+             system_max_chars, total_prompt_max_chars),
+        )
+        conn.commit()
+        conn.close()
+
+        # Update runtime CONFIG
+        CONFIG["OPENROUTER_HISTORY_PARTS"] = history_parts
+        CONFIG["OPENROUTER_MAX_TOKENS"] = max_tokens
+        CONFIG["OPENROUTER_MAX_MESSAGE_CHARS"] = max_message_chars
+        CONFIG["OPENROUTER_REQUEST_TIMEOUT_SECONDS"] = request_timeout
+        CONFIG["OPENROUTER_SYSTEM_MAX_CHARS"] = system_max_chars
+        CONFIG["OPENROUTER_TOTAL_PROMPT_MAX_CHARS"] = total_prompt_max_chars
+
+        logger.info(
+            f"✅ Performance settings updated: history={history_parts}, "
+            f"tokens={max_tokens}, msg_chars={max_message_chars}, "
+            f"timeout={request_timeout}s, sys_chars={system_max_chars}, "
+            f"total_chars={total_prompt_max_chars}"
+        )
+
+        return {
+            "success": True,
+            "message": "Performance settings saved and applied",
+            "settings": {
+                "history_parts": history_parts,
+                "max_tokens": max_tokens,
+                "max_message_chars": max_message_chars,
+                "request_timeout": request_timeout,
+                "system_max_chars": system_max_chars,
+                "total_prompt_max_chars": total_prompt_max_chars
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to save performance settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+def _normalize_bool(value: Any) -> Optional[bool]:
+    if value is True or value is False:
+        return bool(value)
+    if value is None:
+        return None
+    s = str(value).strip().lower()
+    if s in {"1", "true", "yes", "y", "on"}:
+        return True
+    if s in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _apply_user_feedback_to_analysis(
+    user_feedback: Dict[str, Any],
+    issues: List[Dict[str, Any]],
+    current_history: int,
+    current_tokens: int,
+    current_msg_chars: int,
+    current_timeout: float,
+    current_system_chars: int,
+    current_total_chars: int,
+) -> None:
+    """Fold user feedback into the analysis as additional issues/settings suggestions."""
+    fb = user_feedback or {}
+    talked_over = _normalize_bool(fb.get("talked_over"))
+    fast_enough = _normalize_bool(fb.get("response_fast_enough"))
+    gibberish = _normalize_bool(fb.get("gibberish"))
+    disconnected = _normalize_bool(fb.get("disconnected"))
+    transfer_problem = _normalize_bool(fb.get("transfer_problem"))
+    instruction_noncompliance = _normalize_bool(fb.get("instruction_noncompliance"))
+
+    # If the user says response time was NOT fast enough, prioritize speed tuning.
+    if fast_enough is False:
+        issues.append(
+            {
+                "severity": "critical",
+                "icon": "🐢",
+                "title": "User reported slow responses",
+                "description": "You reported the responses were not fast enough. Recommendations below prioritize speed even if logs look acceptable.",
+                "settings": {
+                    "historyParts": max(2, current_history - 2),
+                    "maxTokens": max(60, current_tokens - 20),
+                    "maxMessageChars": max(200, current_msg_chars - 50),
+                    "systemMaxChars": 2500,
+                    "totalPromptMaxChars": 4000,
+                },
+            }
+        )
+
+    if talked_over is True:
+        issues.append(
+            {
+                "severity": "high",
+                "icon": "🔊",
+                "title": "User reported talking over",
+                "description": "You reported the AI talked over you. Shorter utterances and slightly lower generation length can reduce overlap.",
+                "settings": {
+                    "maxTokens": max(60, current_tokens - 15),
+                    "maxMessageChars": max(200, current_msg_chars - 40),
+                },
+            }
+        )
+
+    if gibberish is True:
+        issues.append(
+            {
+                "severity": "high",
+                "icon": "🌀",
+                "title": "User reported gibberish/nonsense",
+                "description": "You reported the AI spoke gibberish. This often improves with a bit more context and clearer system instructions.",
+                "settings": {
+                    "historyParts": min(6, max(current_history, 4) + 1),
+                    "maxTokens": min(150, current_tokens + 25),
+                    "systemMaxChars": min(6500, current_system_chars + 1000),
+                    "totalPromptMaxChars": min(12000, current_total_chars + 1500),
+                },
+            }
+        )
+
+    if disconnected is True:
+        issues.append(
+            {
+                "severity": "medium",
+                "icon": "📵",
+                "title": "User reported unexpected disconnect",
+                "description": "You reported the call disconnected unexpectedly. Increasing request timeout can help if the AI or network is stalling.",
+                "settings": {
+                    "requestTimeout": min(15.0, current_timeout + 3),
+                    "maxTokens": max(60, current_tokens - 10),
+                },
+            }
+        )
+
+    if transfer_problem is True:
+        issues.append(
+            {
+                "severity": "high",
+                "icon": "📞",
+                "title": "User reported transfer issues",
+                "description": "You reported transfer issues on the last call. Review transfer guard, routing, and Vonage application credentials.",
+                "settings": {},
+            }
+        )
+
+    if instruction_noncompliance is True:
+        issues.append(
+            {
+                "severity": "high",
+                "icon": "📋",
+                "title": "User reported instruction non-compliance",
+                "description": "You reported the AI failed to follow instructions. Keeping more system context available can help.",
+                "settings": {
+                    "historyParts": min(6, max(current_history, 4)),
+                    "systemMaxChars": min(6500, current_system_chars + 1000),
+                    "totalPromptMaxChars": min(12000, current_total_chars + 1500),
+                },
+            }
+        )
+
+
+def _analyze_last_call_performance_impl(user_feedback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Shared implementation for GET/POST analyze-last-call-performance."""
+    # Get the last call from database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+            SELECT call_uuid, caller_number, start_time, duration, transcript, status,
+                   selected_brain_provider, effective_brain_provider, transfer_initiated
+            FROM calls
+            ORDER BY start_time DESC
+            LIMIT 1
+        '''
+    )
+    call = cursor.fetchone()
+
+    if not call:
+        conn.close()
+        return {"success": False, "error": "No calls found in database"}
+
+    call_uuid, caller_number, start_time, duration, transcript, status, selected_brain, effective_brain, transfer_initiated = call
+    conn.close()
+
+    # Determine which brain provider was used
+    brain_provider = effective_brain or selected_brain or "unknown"
+
+    issues: List[Dict[str, Any]] = []
+    suggestions: Dict[str, Any] = {}
+    call_info: Dict[str, Any] = {
+        "duration": f"{duration}s" if duration else "Unknown",
+        "model": brain_provider,
+        "avg_response_time": "Unknown",
+    }
+
+    # Get current settings
+    current_history = int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 4))
+    current_tokens = int(CONFIG.get("OPENROUTER_MAX_TOKENS", 100))
+    current_msg_chars = int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 300))
+    current_timeout = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 8))
+    current_system_chars = int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 5000))
+    current_total_chars = int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 10000))
+
+    log_file = "server_log_new.txt"
+
+    # === 1. RESPONSE TIME ANALYSIS ===
+    try:
+        latencies: List[float] = []
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                log_content = f.read()
+            call_logs = [line for line in log_content.split('\n') if call_uuid in line]
+
+            if 'openrouter' in brain_provider.lower():
+                for line in call_logs:
+                    if 'OpenRouter stream start latency=' in line:
+                        try:
+                            latency_str = line.split('latency=')[1].split('s')[0]
+                            latencies.append(float(latency_str))
+                        except Exception:
+                            pass
+
+            # Estimate from call duration if no logs
+            if not latencies and transcript and duration:
+                turns = transcript.count('Caller:') + transcript.count('Judie:')
+                if turns > 2:
+                    estimated_latency = duration / (turns / 2)
+                    if 0.5 < estimated_latency < 10:
+                        latencies.append(estimated_latency)
+                        call_info["avg_response_time"] = f"{estimated_latency:.2f}s (estimated)"
+
+            if latencies:
+                avg_latency = sum(latencies) / len(latencies)
+                call_info["avg_response_time"] = f"{avg_latency:.2f}s"
+
+                if avg_latency > 2.0:
+                    issues.append(
+                        {
+                            "severity": "critical",
+                            "icon": "🐢",
+                            "title": "Slow Response Time",
+                            "description": f"Average response time of {avg_latency:.2f}s is very slow. Users expect responses under 1.5s.",
+                            "settings": {
+                                "historyParts": max(2, current_history - 2),
+                                "maxTokens": max(60, current_tokens - 20),
+                                "maxMessageChars": max(200, current_msg_chars - 50),
+                                "systemMaxChars": 2500,
+                                "totalPromptMaxChars": 4000,
+                            },
+                        }
+                    )
+                elif avg_latency > 1.5:
+                    issues.append(
+                        {
+                            "severity": "high",
+                            "icon": "⏱️",
+                            "title": "Moderate Response Delay",
+                            "description": f"Average response time of {avg_latency:.2f}s could be faster. Target is under 1.2s.",
+                            "settings": {
+                                "historyParts": max(2, current_history - 1),
+                                "maxTokens": max(70, current_tokens - 10),
+                                "maxMessageChars": max(250, current_msg_chars - 30),
+                            },
+                        }
+                    )
+    except Exception as e:
+        logger.error(f"Error analyzing response times: {e}")
+
+    # === 2. HALLUCINATION DETECTION ===
+    if transcript:
+        transcript_lower = transcript.lower()
+        hallucination_indicators: List[str] = []
+        if "i don't have access to" in transcript_lower or "i cannot access" in transcript_lower:
+            hallucination_indicators.append("AI claiming it can't access info it should have")
+        if transcript.count("Judie: I") > 10 and len(transcript) < 1000:
+            hallucination_indicators.append("Excessive self-referential statements")
+        if "as an ai" in transcript_lower or "as a language model" in transcript_lower:
+            hallucination_indicators.append("Breaking character by mentioning AI nature")
+
+        if hallucination_indicators:
+            issues.append(
+                {
+                    "severity": "high",
+                    "icon": "🌀",
+                    "title": "Possible Hallucination/Off-Topic",
+                    "description": "AI may be hallucinating or going off-topic: " + ", ".join(hallucination_indicators),
+                    "settings": {
+                        "historyParts": min(5, current_history + 1),
+                        "systemMaxChars": min(6000, current_system_chars + 1000),
+                    },
+                }
+            )
+
+    # === 3. INTERRUPTION/BARGE-IN DETECTION ===
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                log_content = f.read()
+            call_logs = [line for line in log_content.split('\n') if call_uuid in line]
+            interruptions = sum(1 for line in call_logs if 'speech_started' in line.lower() or 'barge' in line.lower())
+            if interruptions > 5:
+                issues.append(
+                    {
+                        "severity": "medium",
+                        "icon": "🔊",
+                        "title": "Frequent Barge-In/Talking Over",
+                        "description": f"Detected {interruptions} interruption events. AI may be talking over the caller.",
+                        "settings": {"maxTokens": max(60, current_tokens - 15)},
+                    }
+                )
+    except Exception as e:
+        logger.error(f"Error detecting interruptions: {e}")
+
+    # === 4. MID-SENTENCE CUTOFF DETECTION ===
+    if transcript:
+        judie_responses = [line.strip() for line in transcript.split('\n') if line.startswith('Judie:')]
+        incomplete_count = 0
+        for response in judie_responses:
+            if len(response) > 50 and not any(response.endswith(p) for p in ['.', '!', '?', '"']):
+                incomplete_count += 1
+        if incomplete_count > 2:
+            issues.append(
+                {
+                    "severity": "medium",
+                    "icon": "✂️",
+                    "title": "Mid-Sentence Cutoffs",
+                    "description": f"Detected {incomplete_count} incomplete AI responses. AI may be cutting off mid-sentence.",
+                    "settings": {
+                        "maxTokens": min(150, current_tokens + 30),
+                        "requestTimeout": min(12.0, current_timeout + 2),
+                    },
+                }
+            )
+
+    # === 5. TRANSFER DETECTION ===
+    if transcript:
+        import re
+
+        caller_lines: List[str] = []
+        for ln in str(transcript).split("\n"):
+            ln = (ln or "").strip()
+            if ln.lower().startswith("caller:"):
+                caller_lines.append(ln[len("Caller:"):].strip().lower())
+        caller_text = " \n".join([t for t in caller_lines if t])
+
+        transfer_patterns = [
+            r"\btransfer\b.*\b(me|us)\b",
+            r"\bcan you\s+(transfer|connect)\b",
+            r"\bput me through\b",
+            r"\bconnect me\b",
+            r"\bcan i\s+(speak|talk)\s+to\b",
+            r"\bi\s+(want|need)\s+to\s+(speak|talk)\s+to\b",
+            r"\b(speak|talk)\s+to\s+(a\s+person|someone|the\s+manager|support|sales|billing|reception)\b",
+        ]
+
+        transfer_requested_by_caller = any(re.search(p, caller_text) for p in transfer_patterns)
+        if transfer_requested_by_caller and not transfer_initiated:
+            issues.append(
+                {
+                    "severity": "critical",
+                    "icon": "📞",
+                    "title": "Transfer Not Executed",
+                    "description": "Caller likely requested a transfer, but it wasn't executed. Check transfer guard settings and transfer routing.",
+                    "settings": {},
+                }
+            )
+
+    # === 6. MESSAGE LENGTH ANALYSIS ===
+    if transcript:
+        judie_responses = [line.strip() for line in transcript.split('\n') if line.startswith('Judie:')]
+        avg_response_length = sum(len(r) for r in judie_responses) / len(judie_responses) if judie_responses else 0
+
+        if avg_response_length > 400:
+            issues.append(
+                {
+                    "severity": "low",
+                    "icon": "📝",
+                    "title": "Responses Too Verbose",
+                    "description": f"Average response length ({int(avg_response_length)} chars) is quite long. Shorter is better for phone calls.",
+                    "settings": {
+                        "maxTokens": max(60, current_tokens - 20),
+                        "maxMessageChars": max(200, int(avg_response_length * 0.7)),
+                    },
+                }
+            )
+        elif avg_response_length < 80 and len(judie_responses) > 3:
+            issues.append(
+                {
+                    "severity": "low",
+                    "icon": "💬",
+                    "title": "Responses Too Brief",
+                    "description": f"Average response length ({int(avg_response_length)} chars) seems very short. AI might not be providing enough info.",
+                    "settings": {
+                        "maxTokens": min(120, current_tokens + 20),
+                        "maxMessageChars": min(400, int(avg_response_length * 1.5)),
+                    },
+                }
+            )
+
+    # === 6b. USER FEEDBACK (if provided) ===
+    if user_feedback:
+        _apply_user_feedback_to_analysis(
+            user_feedback,
+            issues,
+            current_history,
+            current_tokens,
+            current_msg_chars,
+            current_timeout,
+            current_system_chars,
+            current_total_chars,
+        )
+
+    # === 7. GENERAL OPTIMIZATION SUGGESTIONS ===
+    if not any(issue.get('severity') in ['critical', 'high'] for issue in issues):
+        if current_history > 4 or current_tokens > 100 or current_msg_chars > 300:
+            suggestions["historyParts"] = 3
+            suggestions["maxTokens"] = 80
+            suggestions["maxMessageChars"] = 250
+
+    return {
+        "success": True,
+        "call_info": call_info,
+        "issues": issues,
+        "suggestions": suggestions,
+        "user_feedback": user_feedback or None,
+    }
+
+
+@app.api_route("/api/super-admin/analyze-last-call-performance", methods=["GET", "POST"])
+async def analyze_last_call_performance(request: Request):
+    """Analyze last call performance.
+
+    Supports both:
+    - GET: legacy analysis without user feedback
+    - POST: analysis incorporating user feedback from the UI questionnaire
+
+    Note: we intentionally register a single route for both methods because some
+    Starlette versions can return 405 when two separate routes share the same path.
+    """
+    try:
+        feedback: Optional[Dict[str, Any]] = None
+        if request.method.upper() == "POST":
+            try:
+                payload = await request.json()
+            except Exception:
+                payload = {}
+
+            fb = payload.get("feedback") if isinstance(payload, dict) else None
+            if isinstance(fb, dict):
+                feedback = fb
+
+        return _analyze_last_call_performance_impl(user_feedback=feedback)
+    except Exception as e:
+        logger.error(f"Failed to analyze last call performance: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/openrouter-models")
 async def list_openrouter_models():
     """List OpenRouter models (heuristically sorted fastest-first) with rough $/1M token pricing."""
@@ -13920,12 +15967,25 @@ async def analyze_website(request: Request):
         from bs4 import BeautifulSoup
         
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as response:
+            fetch_timeout = aiohttp.ClientTimeout(total=15)
+            # Some sites reject requests without a browser-like User-Agent.
+            fetch_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            async with aiohttp.ClientSession(timeout=fetch_timeout, headers=fetch_headers) as session:
+                async with session.get(url, allow_redirects=True) as response:
                     if response.status != 200:
-                        raise HTTPException(status_code=400, detail=f"Failed to fetch website (HTTP {response.status})")
+                        try:
+                            body_preview = (await response.text(errors="ignore"))[:500]
+                        except Exception:
+                            body_preview = ""
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to fetch website (HTTP {response.status}). {body_preview}".strip(),
+                        )
                     
-                    html_content = await response.text()
+                    html_content = await response.text(errors="ignore")
                     
                     # Parse HTML with BeautifulSoup
                     soup = BeautifulSoup(html_content, 'html.parser')
@@ -13936,6 +15996,9 @@ async def analyze_website(request: Request):
                     
                     # Extract text content
                     text_content = soup.get_text(separator=' ', strip=True)
+
+                    if not text_content:
+                        raise HTTPException(status_code=400, detail="Website returned no extractable text")
                     
                     # Limit content length to avoid token limits
                     max_chars = 8000
@@ -13961,7 +16024,7 @@ async def analyze_website(request: Request):
             deepseek_timeout = aiohttp.ClientTimeout(total=25)
             async with aiohttp.ClientSession(timeout=deepseek_timeout) as session:
                 async with session.post(
-                    'https://api.deepseek.com/v1/chat/completions',
+                    'https://api.deepseek.com/chat/completions',
                     headers={
                         'Authorization': f'Bearer {deepseek_api_key}',
                         'Content-Type': 'application/json'
@@ -13989,8 +16052,11 @@ Write in first person as the business (we/our/us). Keep it organized and convers
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        logger.error(f"DeepSeek API error: {error_text}")
-                        raise HTTPException(status_code=500, detail="DeepSeek API request failed")
+                        logger.error(f"DeepSeek API error ({response.status}): {error_text}")
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"DeepSeek API request failed (HTTP {response.status}): {error_text[:900]}".strip(),
+                        )
 
                     result = await response.json()
                     business_info = (result.get('choices', [{}])[0].get('message', {}) or {}).get('content', '')
@@ -14399,7 +16465,14 @@ async def answer_call(request: Request):
     # Create session. Do NOT block this webhook on connecting to OpenAI.
     # Vonage expects a fast response; slow/failed OpenAI connection should be handled
     # after the websocket connects.
-    await sessions.create_session(call_uuid, caller, called, assigned_user_id)
+    session = await sessions.create_session(call_uuid, caller, called, assigned_user_id)
+
+    # Cache the externally-reachable base URL for this call so transfers can reliably
+    # reference our own webhooks even if CONFIG['PUBLIC_URL'] is stale.
+    try:
+        session.public_base_url = _public_base_url_from_request(request)
+    except Exception:
+        pass
     
     # Build WebSocket URL from the incoming webhook host.
     # This avoids mismatches when switching tunnels (ngrok <-> Cloudflare).
@@ -14533,7 +16606,7 @@ async def transfer_event_webhook(request: Request):
             except Exception as e:
                 logger.error(f"❌ Error calculating transfer credits: {e}")
                 
-        elif direction == "outbound" and status in ["unanswered", "failed", "rejected", "busy", "timeout"]:
+        elif direction == "outbound" and status in ["unanswered", "failed", "rejected", "busy", "timeout", "cancelled"]:
             # Log full payload so we can see Vonage's failure reason/codes.
             logger.warning(f"⚠️ Transfer failed for call {original_uuid}: {status} payload={body}")
 
@@ -14709,6 +16782,10 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
                 if not session._vonage_audio_mode_logged:
                     session._vonage_audio_mode_logged = True
                     logger.info(f"[{call_uuid}] Vonage audio mode: bytes")
+                try:
+                    session._update_caller_vad_from_vonage_audio(data["bytes"])
+                except Exception as vad_err:
+                    logger.error(f"[{call_uuid}] VAD ERROR: {vad_err}")
                 await session.send_audio_to_openai(data["bytes"])
             elif "text" in data:
                 # Could be metadata or base64 audio depending on integration.
@@ -14743,6 +16820,10 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
                     if not session._vonage_audio_mode_logged:
                         session._vonage_audio_mode_logged = True
                         logger.info(f"[{call_uuid}] Vonage audio mode: json")
+                    try:
+                        session._update_caller_vad_from_vonage_audio(pcm)
+                    except Exception:
+                        pass
                     await session.send_audio_to_openai(pcm)
                 else:
                     logger.debug(f"[{call_uuid}] Received JSON text: {msg}")
@@ -15666,22 +17747,74 @@ async def get_filler_words():
         result = cursor.fetchone()
         conn.close()
 
+        buckets = load_global_filler_words_by_size()
+        combined_text = "\n".join(load_global_filler_words())
+
         if result:
             return {
                 "success": True,
+                # Legacy field
                 "filler_words": result[0] or "",
+                # Helpful extras (UI can use these without needing a new endpoint)
+                "filler_words_combined": combined_text,
+                "filler_words_small": "\n".join(buckets.get("small", [])),
+                "filler_words_medium": "\n".join(buckets.get("medium", [])),
+                "filler_words_large": "\n".join(buckets.get("large", [])),
                 "last_updated": result[1],
-                "updated_by": result[2]
+                "updated_by": result[2],
             }
-        else:
-            return {
-                "success": True,
-                "filler_words": "",
-                "last_updated": None,
-                "updated_by": None
-            }
+        return {
+            "success": True,
+            "filler_words": "",
+            "filler_words_combined": combined_text,
+            "filler_words_small": "\n".join(buckets.get("small", [])),
+            "filler_words_medium": "\n".join(buckets.get("medium", [])),
+            "filler_words_large": "\n".join(buckets.get("large", [])),
+            "last_updated": None,
+            "updated_by": None,
+        }
     except Exception as e:
         logger.error(f"Failed to get filler words: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/filler-words-sized")
+async def get_filler_words_sized():
+    """Get global filler words/phrases split into small/medium/large buckets."""
+    try:
+        buckets = load_global_filler_words_by_size()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                'SELECT filler_words_small, filler_words_medium, filler_words_large, last_updated, updated_by '
+                'FROM global_settings WHERE id = 1'
+            )
+            row = cursor.fetchone()
+        except Exception:
+            row = None
+        conn.close()
+
+        last_updated = row[3] if row else None
+        updated_by = row[4] if row else None
+
+        return {
+            "success": True,
+            "filler_words_small": "\n".join(buckets.get("small", [])),
+            "filler_words_medium": "\n".join(buckets.get("medium", [])),
+            "filler_words_large": "\n".join(buckets.get("large", [])),
+            "last_updated": last_updated,
+            "updated_by": updated_by,
+            # Document the latency policy used by the server.
+            "latency_policy": {
+                "no_filler_under_seconds": 0.50,
+                "small_under_seconds": 1.00,
+                "medium_under_seconds": 1.80,
+                "large_at_or_over_seconds": 1.80,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to get sized filler words: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -15712,6 +17845,89 @@ async def update_filler_words(request: Request):
         }
     except Exception as e:
         logger.error(f"Failed to update filler words: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/filler-words-sized")
+async def update_filler_words_sized(request: Request):
+    """Update global filler words/phrases split into small/medium/large buckets."""
+    try:
+        body = await request.json()
+        updated_by = body.get('updated_by', 'admin')
+
+        small_raw = body.get('filler_words_small', '')
+        medium_raw = body.get('filler_words_medium', '')
+        large_raw = body.get('filler_words_large', '')
+
+        # Normalize to newline-separated storage.
+        small_text = "\n".join(_parse_filler_phrases_text(small_raw))
+        medium_text = "\n".join(_parse_filler_phrases_text(medium_raw))
+        large_text = "\n".join(_parse_filler_phrases_text(large_raw))
+
+        # Also maintain the legacy combined column for compatibility.
+        combined = []
+        for t in (small_text, medium_text, large_text):
+            for p in _parse_filler_phrases_text(t):
+                if p not in combined:
+                    combined.append(p)
+        legacy_text = "\n".join(combined)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                '''
+                UPDATE global_settings
+                SET filler_words_small = ?,
+                    filler_words_medium = ?,
+                    filler_words_large = ?,
+                    filler_words = ?,
+                    last_updated = CURRENT_TIMESTAMP,
+                    updated_by = ?
+                WHERE id = 1
+                ''',
+                (small_text, medium_text, large_text, legacy_text, updated_by),
+            )
+        except Exception:
+            # DB hasn't been migrated yet; attempt to add columns, then retry.
+            try:
+                for col in ("filler_words_small", "filler_words_medium", "filler_words_large"):
+                    try:
+                        cursor.execute(f"ALTER TABLE global_settings ADD COLUMN {col} TEXT DEFAULT ''")
+                    except Exception:
+                        pass
+                cursor.execute(
+                    '''
+                    UPDATE global_settings
+                    SET filler_words_small = ?,
+                        filler_words_medium = ?,
+                        filler_words_large = ?,
+                        filler_words = ?,
+                        last_updated = CURRENT_TIMESTAMP,
+                        updated_by = ?
+                    WHERE id = 1
+                    ''',
+                    (small_text, medium_text, large_text, legacy_text, updated_by),
+                )
+            except Exception:
+                # Final fallback: save to legacy column only.
+                cursor.execute(
+                    '''
+                    UPDATE global_settings
+                    SET filler_words = ?,
+                        last_updated = CURRENT_TIMESTAMP,
+                        updated_by = ?
+                    WHERE id = 1
+                    ''',
+                    (legacy_text, updated_by),
+                )
+        conn.commit()
+        conn.close()
+
+        logger.info(f"✅ Sized filler words updated by {updated_by}")
+        return {"success": True, "message": "Sized filler words updated successfully"}
+    except Exception as e:
+        logger.error(f"Failed to update sized filler words: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
