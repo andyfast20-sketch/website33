@@ -7,17 +7,24 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .login-container { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); border-radius: 24px; padding: 50px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); text-align: center; max-width: 450px; width: 100%; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .login-container h1 { color: white; font-size: 32px; margin-bottom: 10px; font-weight: 700; }
-        .login-container p { color: rgba(255, 255, 255, 0.8); margin-bottom: 40px; font-size: 16px; }
-        .input-group { margin-bottom: 30px; }
-        .input-group input { width: 100%; padding: 18px 24px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 18px; text-align: center; letter-spacing: 4px; transition: all 0.3s; }
-        .input-group input::placeholder { color: rgba(255, 255, 255, 0.5); letter-spacing: normal; }
-        .input-group input:focus { outline: none; border-color: white; background: rgba(255, 255, 255, 0.2); box-shadow: 0 0 20px rgba(255, 255, 255, 0.3); }
-        .btn-login { width: 100%; padding: 18px; border: none; border-radius: 12px; background: white; color: #667eea; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; }
-        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
-        .error-message { color: #ff6b6b; background: rgba(255, 107, 107, 0.2); padding: 12px; border-radius: 8px; margin-top: 20px; display: none; font-weight: 600; }
+        .login-container { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); border-radius: 24px; padding: 30px 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); display: flex; align-items: center; justify-content: space-between; gap: 30px; max-width: 600px; width: 100%; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .login-left { flex: 1; }
+        .login-container h1 { color: white; font-size: 48px; margin: 0; font-weight: 900; line-height: 1.1; }
+        .login-container p { color: rgba(255, 255, 255, 0.8); margin: 5px 0 0 0; font-size: 13px; }
+        .login-left { flex: 1; }
+        .login-container h1 { color: white; font-size: 48px; margin: 0; font-weight: 900; line-height: 1.1; }
+        .login-container p { color: rgba(255, 255, 255, 0.8); margin: 5px 0 0 0; font-size: 13px; }
+        .lock-icon { font-size: 36px; margin-bottom: 10px; }
+        .login-right { flex: 1; }
+        .input-group { margin-bottom: 0; }
+        .input-group input { width: 100%; padding: 14px 18px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 10px; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 16px; transition: all 0.3s; }
+        .input-group input::placeholder { color: rgba(0, 0, 0, 0.4); letter-spacing: normal; }
+        .input-group input:focus { outline: none; border-color: white; background: white; box-shadow: 0 0 15px rgba(255, 255, 255, 0.4); }
+        .btn-login { width: 100%; padding: 14px; border: none; border-radius: 10px; background: white; color: #667eea; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; margin-top: 12px; }
+        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); }
+        .error-message { color: #ff6b6b; background: transparent; padding: 0; border-radius: 0; margin-top: 8px; display: none; font-weight: 600; font-size: 13px; text-align: right; }
         .main-container { display: none; max-width: 1400px; width: 100%; }
+        .super-admin-name { color: white; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; padding: 10px 20px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; display: inline-block; }
         .header { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 16px; padding: 20px 30px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { color: white; font-size: 28px; font-weight: 700; }
         .btn-logout { padding: 12px 24px; border: none; border-radius: 8px; background: rgba(255, 255, 255, 0.2); color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
@@ -45,26 +52,37 @@
         .brain-option input[type="radio"] { display: none; }
         .brain-option-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: white; }
         .brain-option-desc { font-size: 13px; color: rgba(255, 255, 255, 0.7); }
-        .alert { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: min(980px, calc(100vw - 40px)); width: calc(100vw - 40px); padding: 15px 20px; border-radius: 8px; font-weight: 600; display: none; font-size: 15px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+        .alert { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10001; max-width: min(980px, calc(100vw - 40px)); width: calc(100vw - 40px); padding: 15px 20px; border-radius: 8px; font-weight: 600; display: none; font-size: 15px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
         .alert-success { background: rgba(46, 204, 113, 0.3); color: #2ecc71; border: 2px solid #2ecc71; }
         .alert-error { background: rgba(231, 76, 60, 0.3); color: #e74c3c; border: 2px solid #e74c3c; }
         .alert-warning { background: rgba(243, 156, 18, 0.95); color: white; border: 2px solid rgba(255, 255, 255, 0.3); }
         .alert-info { background: rgba(52, 152, 219, 0.3); color: #3498db; border: 2px solid #3498db; }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes slideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-20px); opacity: 0; } }
+        .test-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 10000; align-items: center; justify-content: center; }
+        .test-modal.show { display: flex; }
+        .test-modal-content { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+        .test-modal h3 { color: #667eea; margin-bottom: 20px; font-size: 24px; }
+        .test-result { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; font-size: 13px; color: #2c3e50; }
+        .test-result.success { border-left: 4px solid #2ecc71; }
+        .test-result.error { border-left: 4px solid #e74c3c; }
+        .test-result.warning { border-left: 4px solid #f39c12; }
+        .test-result strong { display: block; margin-bottom: 8px; color: #34495e; font-size: 14px; }
+        .btn-close-modal { background: #667eea; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 20px; }
+        .btn-close-modal:hover { background: #5568d3; }
         .filler-section { background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 25px; margin-bottom: 20px; }
         .filler-section h3 { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; }
         .filler-section textarea { width: 100%; min-height: 150px; padding: 14px 18px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-family: inherit; resize: vertical; }
         .filler-section textarea:focus { outline: none; border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.15); }
         .hint { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-top: 8px; font-style: italic; }
-        .filler-slot { background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 20px; border: 2px solid rgba(255, 255, 255, 0.2); transition: all 0.3s; }
+        .filler-slot { background: rgba(0, 0, 0, 0.3); border-radius: 10px; padding: 14px; border: 2px solid rgba(255, 255, 255, 0.2); transition: all 0.3s; }
         .filler-slot.has-audio { border-color: rgba(46, 204, 113, 0.5); background: rgba(46, 204, 113, 0.1); }
         .filler-slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .filler-slot-title { font-size: 16px; font-weight: 700; color: white; }
+        .filler-slot-title { font-size: 14px; font-weight: 800; color: white; }
         .filler-slot-status { font-size: 12px; padding: 4px 10px; border-radius: 6px; font-weight: 600; }
         .filler-slot-status.filled { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
         .filler-slot-status.empty { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
-        .filler-slot-controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .filler-slot-controls { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
         .btn-slot { padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
         .btn-slot.play { background: rgba(52, 152, 219, 0.8); color: white; }
         .btn-slot.regenerate { background: rgba(155, 89, 182, 0.8); color: white; }
@@ -673,17 +691,73 @@
             background: rgba(243, 156, 18, 0.3);
             color: #f39c12;
         }
+        
+        /* Spectacular Animations */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 6px 30px rgba(102, 126, 234, 0.5); }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Navigation Menu Styles */
+        .nav-menu { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%); backdrop-filter: blur(10px); padding: 12px 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; animation: fadeInUp 0.6s ease-out; }
+        .nav-item { padding: 10px 18px; border-radius: 8px; background: rgba(255, 255, 255, 0.15); color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 2px solid transparent; display: flex; align-items: center; gap: 6px; white-space: nowrap; position: relative; overflow: hidden; }
+        .nav-item::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent); transition: left 0.5s; }
+        .nav-item:hover::before { left: 100%; }
+        .nav-item span { font-size: 16px; transition: transform 0.3s; }
+        .nav-item:hover span { transform: scale(1.15); }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .nav-item.active { background: rgba(46, 204, 113, 0.5); border-color: rgba(46, 204, 113, 0.8); box-shadow: 0 4px 16px rgba(46, 204, 113, 0.4); }
+        .nav-item.active span { animation: float 3s ease-in-out infinite; }
+        .section-blurred { filter: blur(3px); opacity: 0.3; pointer-events: none; transition: all 0.3s; }
+        .section-focused { filter: blur(0); opacity: 1; transition: all 0.3s; }
+        .back-to-menu { position: absolute; top: 15px; right: 15px; padding: 8px 16px; background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 20px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; z-index: 10; }
+        .back-to-menu:hover { background: rgba(255, 255, 255, 0.3); transform: translateY(-2px); }
+        .panel { position: relative; }
+        .main-container { padding-top: 100px; }
+        
+        /* Menu Control Handles */
+        .menu-resize-handle { position: absolute; bottom: 5px; right: 5px; width: 20px; height: 20px; cursor: nwse-resize; color: rgba(255, 255, 255, 0.5); font-size: 16px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.3s; z-index: 10; user-select: none; }
+        .menu-resize-handle:hover { background: rgba(255, 255, 255, 0.2); color: white; transform: scale(1.2); }
+        .menu-move-handle { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); padding: 4px 12px; cursor: grab; color: rgba(255, 255, 255, 0.5); font-size: 14px; border-radius: 8px; transition: all 0.3s; z-index: 10; user-select: none; letter-spacing: 2px; }
+        .menu-move-handle:hover { background: rgba(255, 255, 255, 0.2); color: white; }
+        .menu-move-handle:active { cursor: grabbing; }
+        .nav-menu::-webkit-scrollbar { width: 8px; height: 8px; }
+        .nav-menu::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
+        .nav-menu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
+        .nav-menu::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
     </style>
 </head>
 <body>
     <div class="login-container" id="loginScreen">
-        <h1>🔐 Super Admin</h1>
-        <p>Secure Access Required</p>
-        <div class="input-group">
-            <input type="password" id="passwordInput" placeholder="Enter Password" autocomplete="off">
+        <div class="login-left">
+            <div class="lock-icon">🔐</div>
+            <h1>Super<br>Admin</h1>
+            <p>Secure Access Required</p>
         </div>
-        <button class="btn-login" onclick="attemptLogin()">Unlock</button>
-        <div class="error-message" id="errorMessage">Incorrect password. Access denied.</div>
+        <div class="login-right">
+            <div class="input-group">
+                <input type="password" id="passwordInput" placeholder="Password" autocomplete="off">
+            </div>
+            <button class="btn-login" onclick="attemptLogin()">Unlock</button>
+            <div style="text-align: center; margin: 10px 0; color: rgba(255,255,255,0.7); font-size: 13px;">or</div>
+            <div class="input-group" id="otpInputGroup" style="display:none;">
+                <input type="text" id="otpInput" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" style="text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: 700;">
+            </div>
+            <button class="btn-login" onclick="requestOTP()" id="otpBtn" style="background: rgba(255,255,255,0.2); color: white;">📱 Send Code to Mobile</button>
+            <div class="error-message" id="errorMessage">Login failed</div>
+        </div>
 
         <!-- First-time setup (local installs). Requires SUPER_ADMIN_SETUP_TOKEN on the server. -->
         <div id="setupBox" style="display:none; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.18); width: 100%;">
@@ -706,6 +780,24 @@
     </div>
 
     <div class="main-container" id="mainDashboard">
+        <!-- Navigation Menu -->
+        <div class="nav-menu" id="navMenu">
+            <div class="nav-item active" onclick="navigateToSection('overview')"><span>🏠</span> Overview</div>
+            <div class="nav-item" onclick="navigateToSection('brain')"><span>🧠</span> AI Brain</div>
+            <div class="nav-item" onclick="navigateToSection('openrouter')"><span>🔌</span> OpenRouter</div>
+            <div class="nav-item" onclick="navigateToSection('performance')"><span>⚡</span> Performance</div>
+            <div class="nav-item" onclick="navigateToSection('vonage')"><span>📞</span> Phone Numbers</div>
+            <div class="nav-item" onclick="navigateToSection('api-keys')"><span>🔑</span> API Keys</div>
+            <div class="nav-item" onclick="navigateToSection('testing')"><span>🧪</span> Testing</div>
+            <div class="nav-item" onclick="navigateToSection('instructions')"><span>📝</span> Instructions</div>
+            <div class="nav-item" onclick="navigateToSection('backchannel')"><span>🎛️</span> Turn-Taking</div>
+            <div class="nav-item" onclick="navigateToSection('vapi')"><span>🎙️</span> Vapi Assistants</div>
+            <div class="nav-item" onclick="navigateToSection('filler')"><span>💬</span> Filler Words</div>
+            <div class="nav-item" onclick="window.open('/latency-dashboard.html', '_blank')"><span>📊</span> Latency</div>
+        </div>
+        
+        <div class="super-admin-name">Andy</div>
+        
         <!-- Floating Speechmatics Streaming Status -->
         <div class="streaming-status" id="streamingStatus" style="display: none;">
             <div class="streaming-indicator" id="streamingIndicator"></div>
@@ -716,7 +808,8 @@
         </div>
 
         <!-- Live Brain Usage (OpenAI vs DeepSeek vs Groq) -->
-        <div class="panel" style="margin-bottom: 25px;">
+        <div id="section-overview" class="panel section-focused" style="margin-bottom: 25px;">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <div class="panel-header">
                 <h2>🧠 Live Brain Usage</h2>
                 <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Shows what % of assistant turns were produced by OpenAI vs DeepSeek vs Groq in the current active call</p>
@@ -896,7 +989,7 @@
         </div>
 
         <!-- Recent Calls (for Brain Provider audit) -->
-        <div class="panel" style="margin-bottom: 25px;">
+        <div class="panel" style="margin-bottom: 25px; display: none;">
             <div class="panel-header">
                 <h2>📞 Recent Calls</h2>
                 <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Shows the last 5 completed calls and which brain was selected vs actually used</p>
@@ -932,8 +1025,14 @@
                     <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">Custom Domain (Optional):</label>
                     <input type="text" id="cloudflareDomain" placeholder="example.yourdomain.com" style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; margin-bottom: 10px;">
                     
-                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">Tunnel Token (Optional):</label>
-                    <input type="password" id="cloudflareTunnelToken" placeholder="eyJhIjoixxxx..." style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-family: 'Courier New', monospace;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px;">
+                        Tunnel Token (Optional):
+                        <span id="tokenSavedIndicator" style="display: none; margin-left: 10px; padding: 4px 8px; background: rgba(46, 204, 113, 0.2); color: #2ecc71; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ SAVED</span>
+                    </label>
+                    <div style="position: relative;">
+                        <input type="password" id="cloudflareTunnelToken" placeholder="eyJhIjoixxxx..." style="width: 100%; padding: 12px; padding-right: 100px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-family: 'Courier New', monospace;">
+                        <button id="toggleTokenEdit" onclick="toggleTokenEdit()" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(102, 126, 234, 0.2); border: 1px solid rgba(102, 126, 234, 0.4); padding: 6px 12px; border-radius: 6px; color: white; font-size: 12px; font-weight: 600; cursor: pointer;">Edit</button>
+                    </div>
                     
                     <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 8px;">
                         Leave blank for temporary .trycloudflare.com URLs (no setup required)
@@ -988,7 +1087,8 @@
         </div>
 
         <!-- OpenRouter Test Panel -->
-        <div class="panel">
+        <div id="section-openrouter" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🧪 OpenRouter API Test</h2>
             <p style="margin-bottom: 15px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
                 Test OpenRouter connectivity and verify your API key is working. This will make a minimal API call (uses ~10 tokens).
@@ -1001,9 +1101,51 @@
                 </select>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
                     <button class="btn" id="refreshOpenRouterModelsBtn" style="background: linear-gradient(135deg, #34495e, #2c3e50); flex: 1; min-width: 160px;" onclick="loadOpenRouterModels()">🔄 Refresh Models</button>
+                    <button class="btn" id="useFastestModelsBtn" style="background: linear-gradient(135deg, #27ae60, #229954); flex: 1; min-width: 160px;" onclick="useFastestModels()">⚡ Use Fastest Models</button>
                     <button class="btn" id="saveOpenRouterModelBtn" style="background: linear-gradient(135deg, #3498db, #2980b9); flex: 1; min-width: 160px;" onclick="saveOpenRouterModel()">💾 Save Model</button>
                 </div>
                 <div id="openrouterModelStatus" style="margin-top: 10px; font-size: 13px; opacity: 0.85;"></div>
+            </div>
+            
+            <!-- Racing Mode Panel -->
+            <div style="background: rgba(255, 193, 7, 0.15); border: 2px solid rgba(255, 193, 7, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <span style="font-size: 20px;">🏁</span>
+                    <div style="font-size: 14px; font-weight: 700;">Racing Mode</div>
+                </div>
+                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 12px;">
+                    Race multiple models simultaneously. Whichever responds first wins. Guarantees fastest response + reliability.
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <input type="checkbox" id="racingEnabledCheckbox" style="width: 20px; height: 20px; cursor: pointer;" onchange="toggleRacingInputs()">
+                    <label for="racingEnabledCheckbox" style="font-size: 14px; cursor: pointer; user-select: none;">
+                        Enable Racing Mode
+                    </label>
+                </div>
+                
+                <div id="racingModelInputs" style="display: none;">
+                    <div style="font-size: 13px; opacity: 0.8; margin-bottom: 10px;">
+                        Select 2-3 models to race. Model 1 (above) is always included.
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 12px; opacity: 0.7; display: block; margin-bottom: 4px;">Model 2 (optional)</label>
+                        <select id="racingModel2Select" style="width: 100%; padding: 10px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 13px; font-family: 'Courier New', monospace;">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 12px; opacity: 0.7; display: block; margin-bottom: 4px;">Model 3 (optional)</label>
+                        <select id="racingModel3Select" style="width: 100%; padding: 10px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 13px; font-family: 'Courier New', monospace;">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn" id="saveRacingSettingsBtn" style="background: linear-gradient(135deg, #f39c12, #e67e22); width: 100%; margin-top: 10px;" onclick="saveRacingSettings()">💾 Save Racing Settings</button>
+                <div id="racingStatus" style="margin-top: 10px; font-size: 13px; opacity: 0.85;"></div>
             </div>
             
             <button class="btn" id="testOpenRouterBtn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); width: 100%; max-width: 300px;" onclick="testOpenRouter()">
@@ -1013,6 +1155,235 @@
             <div id="openrouterTestResult" style="margin-top: 15px; padding: 15px; border-radius: 8px; display: none;">
                 <div id="openrouterTestMessage" style="font-weight: 600; margin-bottom: 8px;"></div>
                 <div id="openrouterTestDetails" style="font-size: 13px; opacity: 0.9; font-family: 'Courier New', monospace;"></div>
+            </div>
+        </div>
+
+        <!-- AI Performance Tuning Panel -->
+        <div id="section-performance" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <h2>⚡ AI Performance Tuning</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">
+                Adjust these settings to optimize AI response speed. Lower values = faster responses but less context/quality. Changes apply to all new calls immediately after saving.
+            </p>
+
+            <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                
+                <!-- Performance Presets -->
+                <div style="margin-bottom: 25px;">
+                    <div style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #3498db;">🎯 Quick Presets</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                        <button class="btn" style="background: linear-gradient(135deg, #27ae60, #229954); padding: 10px;" onclick="applyPerformancePreset('maximum_speed')">
+                            <div style="font-size: 16px;">🚀</div>
+                            <div style="font-size: 11px; margin-top: 4px;">Maximum Speed</div>
+                            <div style="font-size: 10px; opacity: 0.7;">~300ms responses</div>
+                        </button>
+                        <button class="btn" style="background: linear-gradient(135deg, #3498db, #2980b9); padding: 10px;" onclick="applyPerformancePreset('balanced')">
+                            <div style="font-size: 16px;">⚖️</div>
+                            <div style="font-size: 11px; margin-top: 4px;">Balanced</div>
+                            <div style="font-size: 10px; opacity: 0.7;">~800ms responses</div>
+                        </button>
+                        <button class="btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); padding: 10px;" onclick="applyPerformancePreset('maximum_quality')">
+                            <div style="font-size: 16px;">💎</div>
+                            <div style="font-size: 11px; margin-top: 4px;">Maximum Quality</div>
+                            <div style="font-size: 10px; opacity: 0.7;">~1.5s responses</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Conversation History -->
+                <div class="filler-section" style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        💬 Conversation History Messages
+                    </label>
+                    <input type="number" id="perfHistoryParts" min="1" max="10" step="1" value="4" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">How many previous message pairs (caller + AI) to remember. Lower = faster but less context. Default: 4</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>1-2:</strong> Very fast, minimal memory (~200ms faster)</div>
+                        <div>• <strong>3-4:</strong> Balanced, good context (recommended)</div>
+                        <div>• <strong>5-10:</strong> Slower, excellent memory for complex calls</div>
+                    </div>
+                </div>
+
+                <!-- Max Tokens -->
+                <div class="filler-section" style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        🎤 Maximum Response Length (tokens)
+                    </label>
+                    <input type="number" id="perfMaxTokens" min="40" max="200" step="10" value="100" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">Shorter responses stream faster and complete quicker. Default: 100</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>40-60:</strong> Very fast, brief answers (~50% faster)</div>
+                        <div>• <strong>80-100:</strong> Balanced, complete thoughts (recommended)</div>
+                        <div>• <strong>120-200:</strong> Slower, detailed explanations</div>
+                    </div>
+                </div>
+
+                <!-- Message Character Limit -->
+                <div class="filler-section" style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        ✂️ Message Character Limit
+                    </label>
+                    <input type="number" id="perfMaxMessageChars" min="100" max="600" step="50" value="300" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">Truncates long messages to reduce processing time. Default: 300</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>100-200:</strong> Very fast, handles brief conversations</div>
+                        <div>• <strong>250-350:</strong> Balanced, normal conversations (recommended)</div>
+                        <div>• <strong>400-600:</strong> Slower, allows detailed explanations</div>
+                    </div>
+                </div>
+
+                <!-- Request Timeout -->
+                <div class="filler-section" style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        ⏱️ AI Request Timeout (seconds)
+                    </label>
+                    <input type="number" id="perfRequestTimeout" min="3" max="15" step="0.5" value="8" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">How long to wait for AI before giving up. Lower = faster cutoff. Default: 8</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>3-5:</strong> Very aggressive, may cut off responses</div>
+                        <div>• <strong>6-8:</strong> Balanced, allows complete responses (recommended)</div>
+                        <div>• <strong>10-15:</strong> Patient, waits for slow models</div>
+                    </div>
+                </div>
+
+                <!-- System Instructions Character Limit -->
+                <div class="filler-section" style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        📋 System Instructions Character Limit
+                    </label>
+                    <input type="number" id="perfSystemMaxChars" min="1000" max="8000" step="500" value="4000" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">Limits system prompt length. Shorter = faster first response. Default: 4000</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>1000-2000:</strong> Fast setup, basic instructions only</div>
+                        <div>• <strong>3000-4000:</strong> Balanced, full instructions (recommended)</div>
+                        <div>• <strong>5000-8000:</strong> Slower, very detailed instructions</div>
+                    </div>
+                </div>
+
+                <!-- Total Prompt Character Limit -->
+                <div class="filler-section" style="margin-bottom: 25px;">
+                    <label style="display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #e67e22;">
+                        📝 Total Prompt Character Limit
+                    </label>
+                    <input type="number" id="perfTotalPromptMaxChars" min="2000" max="15000" step="1000" value="6000" 
+                           style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 14px;">
+                    <div class="hint">Maximum total prompt size (system + history). Lower = faster. Default: 6000</div>
+                    <div style="margin-top: 8px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 12px;">
+                        <div>• <strong>2000-4000:</strong> Very fast, minimal context</div>
+                        <div>• <strong>5000-7000:</strong> Balanced, good context (recommended)</div>
+                        <div>• <strong>8000-15000:</strong> Slower, maximum context retention</div>
+                    </div>
+                </div>
+
+                <!-- Current Settings Summary -->
+                <div id="perfCurrentSettings" style="background: rgba(52, 152, 219, 0.1); border: 2px solid #3498db; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none;">
+                    <div style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: #3498db;">📊 Current Performance Profile</div>
+                    <div id="perfCurrentProfile" style="font-size: 13px; font-family: 'Courier New', monospace;"></div>
+                </div>
+
+                <!-- Save Button -->
+                <button class="btn-save" onclick="savePerformanceSettings()" style="width: 100%; padding: 15px; font-size: 15px; font-weight: 700;">
+                    💾 Save Performance Settings
+                </button>
+
+                <!-- Analyze Last Call Button -->
+                <button class="btn" onclick="analyzeLastCallPerformance()" style="width: 100%; padding: 15px; font-size: 15px; font-weight: 700; background: linear-gradient(135deg, #f39c12, #e67e22); margin-top: 12px;">
+                    🔍 Analyze Last Call & Get Suggestions
+                </button>
+
+                <div id="perfSaveStatus" style="margin-top: 12px; text-align: center; font-size: 13px;"></div>
+            </div>
+        </div>
+
+        <!-- Performance Suggestions Modal -->
+        <div id="perfSuggestionsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; justify-content: center; align-items: center;" onclick="closePerfSuggestionsModal()">
+            <div style="background: linear-gradient(135deg, #2c3e50, #34495e); border-radius: 16px; padding: 30px; max-width: 700px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);" onclick="event.stopPropagation()">
+                <button onclick="closePerfSuggestionsModal()" style="float: right; background: rgba(255, 255, 255, 0.1); border: none; color: white; font-size: 24px; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; font-weight: 700;">✕</button>
+                
+                <div style="font-size: 24px; font-weight: 700; margin-bottom: 20px; color: #f39c12;">🔍 Call Quality Analysis</div>
+                
+                <div id="perfSuggestionsContent"></div>
+                
+                <div id="perfSuggestionsApplyStatus" style="margin-top: 14px; text-align: center; font-size: 13px; opacity: 0.9;"></div>
+
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <button id="applyPerfSuggestionsBtn" class="btn" onclick="applyPerfSuggestions()" style="flex: 1; background: linear-gradient(135deg, #27ae60, #229954); padding: 12px; font-weight: 700;">
+                        ✅ Apply All Recommendations
+                    </button>
+                    <button class="btn" onclick="closePerfSuggestionsModal()" style="flex: 1; background: linear-gradient(135deg, #95a5a6, #7f8c8d); padding: 12px; font-weight: 700;">
+                        ❌ Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Feedback Modal (shown before analysis) -->
+        <div id="callFeedbackModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; justify-content: center; align-items: center;" onclick="closeCallFeedbackModal()">
+            <div style="background: linear-gradient(135deg, #2c3e50, #34495e); border-radius: 16px; padding: 24px; max-width: 700px; width: calc(100vw - 40px); max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);" onclick="event.stopPropagation()">
+                <button onclick="closeCallFeedbackModal()" style="float: right; background: rgba(255, 255, 255, 0.1); border: none; color: white; font-size: 24px; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; font-weight: 700;">✕</button>
+
+                <div style="font-size: 22px; font-weight: 800; margin-bottom: 6px; color: #f39c12;">📝 Quick questions about the last call</div>
+                <div style="font-size: 13px; opacity: 0.85; margin-bottom: 16px;">Answer these so the analysis can combine the logs/transcript with what actually happened.</div>
+
+                <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; border: 1px solid rgba(255,255,255,0.15);">
+                    <div style="font-size: 13px; font-weight: 800; margin-bottom: 10px; opacity: 0.8;">Required</div>
+
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Did the AI talk over you?</div>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_talked_over" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_talked_over" value="no"> No</label>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Were the response times fast enough?</div>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_fast_enough" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_fast_enough" value="no"> No</label>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Did it talk gibberish / nonsense?</div>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_gibberish" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_gibberish" value="no"> No</label>
+                    </div>
+
+                    <div style="margin-bottom: 6px;">
+                        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Did the call disconnect unexpectedly?</div>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_disconnected" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_disconnected" value="no"> No</label>
+                    </div>
+
+                    <div style="height: 1px; background: rgba(255,255,255,0.12); margin: 14px 0;"></div>
+                    <div style="font-size: 13px; font-weight: 800; margin-bottom: 10px; opacity: 0.8;">Optional</div>
+
+                    <div style="margin-bottom: 12px;">
+                        <label style="display:block; font-size: 14px; font-weight: 700; margin-bottom: 6px;">Any transfer problems?</label>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_transfer_problem" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_transfer_problem" value="no"> No</label>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <label style="display:block; font-size: 14px; font-weight: 700; margin-bottom: 6px;">Did it fail to follow instructions?</label>
+                        <label style="margin-right: 12px;"><input type="radio" name="fb_instruction_noncompliance" value="yes"> Yes</label>
+                        <label><input type="radio" name="fb_instruction_noncompliance" value="no"> No</label>
+                    </div>
+
+                    <div style="margin-bottom: 0;">
+                        <label style="display:block; font-size: 14px; font-weight: 700; margin-bottom: 6px;">Anything else to note? (optional)</label>
+                        <textarea id="fb_notes" placeholder="e.g. it cut off mid sentence, repeated itself, was rude..." style="width: 100%; min-height: 90px; padding: 10px 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 13px; resize: vertical;"></textarea>
+                    </div>
+                </div>
+
+                <div id="callFeedbackStatus" style="margin-top: 12px; text-align: center; font-size: 13px; opacity: 0.9;"></div>
+
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <button id="callFeedbackRunBtn" class="btn" onclick="submitCallFeedbackAndAnalyze()" style="flex: 1; background: linear-gradient(135deg, #f39c12, #e67e22); padding: 12px; font-weight: 800;">▶ Run analysis</button>
+                    <button class="btn" onclick="closeCallFeedbackModal()" style="flex: 1; background: linear-gradient(135deg, #95a5a6, #7f8c8d); padding: 12px; font-weight: 700;">Cancel</button>
+                </div>
             </div>
         </div>
 
@@ -1083,7 +1454,8 @@
         </div>
 
         <!-- Number Management Panel -->
-        <div class="panel">
+        <div id="section-vonage" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>📞 Vonage Number Management</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">View and manage all Vonage phone numbers, their assignments, and availability status.</p>
             
@@ -1104,7 +1476,8 @@
             </div>
         </div>
 
-        <div class="panel">
+        <div id="section-brain" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🧠 AI Brain Provider</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Choose which AI service will handle conversations and decision-making for all accounts.</p>
             <div class="brain-selector">
@@ -1133,7 +1506,8 @@
             </div>
         </div>
 
-        <div class="panel">
+        <div id="section-api-keys" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🔑 API Keys Configuration</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Manage all API keys securely. Keys are encrypted and stored in the database.</p>
 
@@ -1179,6 +1553,34 @@
                 </div>
 
                 <div class="api-key-section">
+                    <h3>Cartesia <span class="status not-configured" id="statusCartesia">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputCartesia" placeholder="sk_car_...">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('cartesia')">💾 Save</button>
+                </div>
+
+                <div class="api-key-section">
+                    <h3>Lemonfox <span class="status not-configured" id="statusLemonfox">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputLemonfox" placeholder="lf_...">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('lemonfox')">💾 Save</button>
+                </div>
+
+                <div class="api-key-section">
+                    <h3>Vapi <span class="status not-configured" id="statusVapi">⚠️</span></h3>
+                    <div class="input-wrapper">
+                        <input type="password" id="inputVapi" placeholder="Enter Private API Key">
+                    </div>
+                    <button class="btn-save" onclick="saveAPIKey('vapi')">💾 Save</button>
+                    <button class="btn-save" onclick="deleteAPIKey('vapi')" style="background: #c0392b; margin-top: 8px;">🗑️ Delete</button>
+                    <div style="margin-top: 8px; font-size: 12px; opacity: 0.7;">
+                        Use your <strong>Private API Key</strong> from vapi.ai dashboard (not Public Key)
+                    </div>
+                </div>
+
+                <div class="api-key-section">
                     <h3>Vonage <span class="status not-configured" id="statusVonage">⚠️</span></h3>
                     <div class="input-wrapper">
                         <input type="password" id="inputVonageKey" placeholder="API Key">
@@ -1193,12 +1595,51 @@
                         <textarea id="inputVonagePrivateKey" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows="4" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 13px; font-family: 'Courier New', monospace; resize: vertical;"></textarea>
                     </div>
                     <button class="btn-save" onclick="saveAPIKey('vonage')">💾 Save</button>
+                    <button class="btn-save" onclick="testVonageAPI()" style="background: #3498db; margin-top: 8px;">🧪 Test Vonage API</button>
                 </div>
             </div>
         </div>
 
-        <div class="panel">
-            <h2>� Global Instructions</h2>
+        <div id="section-testing" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <h2>🧪 Testing Features</h2>
+            <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
+                Enable experimental testing features to diagnose AI response behavior. These settings are for development/testing only.
+            </p>
+
+            <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;">
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Response Timeout Test</div>
+                        <label style="display:flex; gap: 10px; align-items:center; font-size: 13px; color: rgba(255,255,255,0.85);">
+                            <input type="checkbox" id="timeoutTestEnabled" style="transform: scale(1.15);">
+                            Play "deleted response" if AI takes too long to respond
+                        </label>
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">
+                            When enabled, an audio message will play if the AI agent doesn't respond within the specified timeout.
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Timeout Value (seconds)</div>
+                        <input id="timeoutTestSeconds" type="number" min="0.5" max="10.0" step="0.5" value="2.0" style="width: 100%; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.55);">How many seconds to wait before playing the timeout audio.</div>
+                    </div>
+
+                </div>
+
+                <div style="margin-top: 14px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                    <button class="btn-save" onclick="saveTimeoutTestSettings()">💾 Save Testing Settings</button>
+                    <button class="btn-save" onclick="loadTimeoutTestSettings()" style="background: rgba(255,255,255,0.12);">↻ Reload</button>
+                    <span id="timeoutTestStatus" style="font-size: 13px; opacity: 0.85;"></span>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-instructions" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <h2>📝 Global Instructions</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">These instructions override all individual account settings and apply to EVERY call across all accounts. Use this to set system-wide rules.</p>
             
             <div class="filler-section" style="margin-bottom: 20px;">
@@ -1233,7 +1674,8 @@
             <div id="accountsList" style="max-height: 600px; overflow-y: auto;"></div>
         </div>
 
-        <div class="panel">
+        <div id="section-backchannel" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🎛️ Backchannel / Turn-Taking Tuning</h2>
             <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
                 Use this to stop the agent treating short acknowledgements like “ok/yeah/right” as full turns.
@@ -1269,9 +1711,9 @@
 
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Barge-in Min Speech (seconds)</div>
-                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="1.50" step="0.05" value="0.55" style="width: 100%;">
-                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">0.55</span>s</div>
-                        <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">How long caller must talk before we cancel agent speech (interrupt).</div>
+                        <input id="bargeInMinSpeechSeconds" type="range" min="0.10" max="5.00" step="0.10" value="2.00" style="width: 100%;">
+                        <div style="margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.75);">Current: <span id="bargeInMinSpeechSecondsLabel">2.00</span>s</div>
+                        <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.55);">How long caller must continuously speak before AI stops talking (interrupts). Recommended: 2.0s</div>
                     </div>
 
                 </div>
@@ -1284,17 +1726,94 @@
             </div>
         </div>
 
-        <div class="panel">            <h2>�💬 Filler Words (Sarah Voice)</h2>
+        <!-- Vapi Assistants Section -->
+        <div id="section-vapi" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <h2>🎙️ Vapi Assistants (Pre-configured)</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">
+                Manage pre-configured Vapi assistants that users can select. Create assistants at 
+                <a href="https://dashboard.vapi.ai" target="_blank" style="color: #6495ed;">dashboard.vapi.ai</a> 
+                and add them here for all users to access.
+            </p>
+            
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 16px; margin-bottom: 10px;">➕ Add New Assistant</h3>
+                <div style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: end;">
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 13px; opacity: 0.9;">Name</label>
+                        <input type="text" id="vapiAssistantName" placeholder="e.g., Fast Customer Service" 
+                            style="width: 100%; padding: 10px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 13px; opacity: 0.9;">Assistant ID (from Vapi)</label>
+                        <input type="text" id="vapiAssistantId" placeholder="e.g., 677f4245-ef59-4d95-a877-e037e97b8bfe" 
+                            style="width: 100%; padding: 10px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 14px;">
+                    </div>
+                    <button class="btn-save" onclick="addVapiAssistant()" style="padding: 10px 20px;">
+                        ➕ Add
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <h3 style="font-size: 16px; margin-bottom: 10px;">📋 Current Assistants</h3>
+                <div id="vapiAssistantsList" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 15px; min-height: 100px;">
+                    <p style="color: rgba(255,255,255,0.5); text-align: center;">No assistants added yet</p>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn-save" onclick="saveVapiAssistants()">
+                    💾 Save Assistants
+                </button>
+                <button class="btn-save" onclick="loadVapiAssistants()" style="background: rgba(255,255,255,0.12);">
+                    🔄 Reload
+                </button>
+                <span id="vapiAssistantsStatus" style="font-size: 13px; opacity: 0.85;"></span>
+            </div>
+        </div>
+
+        <div id="section-filler" class="panel section-focused">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <h2>💬 Filler Words (By Latency)</h2>
+            <p style="margin-bottom: 14px; opacity: 0.8; font-size: 14px;">
+                The AI uses these phrases as “thinking” fillers. Selection is automatic:
+                under 0.5s = none, not bad = Small, average = Medium, very poor = Large.
+            </p>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Small</div>
+                    <textarea id="fillerWordsSmall" placeholder="One per line (short fillers)" style="width: 100%; min-height: 170px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;"></textarea>
+                </div>
+                <div>
+                    <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Medium</div>
+                    <textarea id="fillerWordsMedium" placeholder="One per line (medium fillers)" style="width: 100%; min-height: 170px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;"></textarea>
+                </div>
+                <div>
+                    <div style="font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); margin-bottom: 6px;">Large</div>
+                    <textarea id="fillerWordsLarge" placeholder="One per line (long fillers)" style="width: 100%; min-height: 170px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <div style="margin-top: 14px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                <button class="btn-save" onclick="saveFillerWordsBySize()">💾 Save Filler Words</button>
+                <button class="btn-save" onclick="loadFillerWordsBySize()" style="background: rgba(255,255,255,0.12);">↻ Reload</button>
+                <span id="fillerWordsBySizeStatus" style="font-size: 13px; opacity: 0.85;"></span>
+            </div>
+        </div>
+
+        <div class="panel">            <h2>💬 Filler Words (Sarah Voice)</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">10 audio files using Speechmatics Sarah voice. These will be randomly played during pauses to cover latency.</p>
             
             <div style="margin-bottom: 25px;">
                 <button class="btn-save" onclick="generateAllFillers()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 28px;">
-                    ✨ Generate All 10 with AI
+                    ✨ Generate All 30 with AI
                 </button>
                 <span id="generateAllStatus" style="margin-left: 15px; font-size: 14px; opacity: 0.8;"></span>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;" id="fillerSlots">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;" id="fillerSlots">
                 <!-- Filler slots will be loaded here -->
             </div>
         </div>
@@ -1324,12 +1843,169 @@
         </div>
     </div>
 
+    <!-- Test Results Modal -->
+    <div id="testModal" class="test-modal" onclick="if(event.target === this) closeTestModal()">
+        <div class="test-modal-content">
+            <h3 id="testModalTitle">🧪 Vonage API Test Results</h3>
+            <div id="testModalBody"></div>
+            <button class="btn-close-modal" onclick="closeTestModal()">Close</button>
+        </div>
+    </div>
+
     <script>
         // Global variables - declare at top to avoid hoisting issues
         let streamingStatusInterval = null;
         let healthCheckInterval = null;
         let healthData = {};
         let selectedCallUuid = null;
+        
+        // Navigation functions
+        function navigateToSection(sectionName) {
+            // Show all sections first
+            const sections = document.querySelectorAll('[id^="section-"]');
+            sections.forEach(section => {
+                section.classList.remove('section-blurred');
+                section.classList.add('section-focused');
+                const backBtn = section.querySelector('.back-to-menu');
+                if (backBtn) backBtn.style.display = 'none';
+            });
+            
+            // Remove active from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            if (sectionName === 'overview') {
+                // Show all sections
+                window.scrollTo({top: 0, behavior: 'smooth'});
+                document.querySelector('.nav-item').classList.add('active');
+                return;
+            }
+            
+            // Blur all sections except the target
+            const targetSection = document.getElementById('section-' + sectionName);
+            if (targetSection) {
+                sections.forEach(section => {
+                    if (section.id !== 'section-' + sectionName) {
+                        section.classList.add('section-blurred');
+                        section.classList.remove('section-focused');
+                    } else {
+                        section.classList.remove('section-blurred');
+                        section.classList.add('section-focused');
+                        const backBtn = section.querySelector('.back-to-menu');
+                        if (backBtn) backBtn.style.display = 'block';
+                    }
+                });
+                
+                // Scroll to section with offset for nav
+                const yOffset = -100;
+                const y = targetSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({top: y, behavior: 'smooth'});
+                
+                // Highlight active nav item
+                event.target.classList.add('active');
+                
+                // Load data when navigating to specific sections
+                if (sectionName === 'vapi') {
+                    loadVapiAssistants();
+                }
+            }
+        }
+        
+        function backToMenu() {
+            navigateToSection('overview');
+        }
+        
+        // Menu dragging and resizing functionality
+        (function initMenuControls() {
+            const navMenu = document.getElementById('navMenu');
+            let isDragging = false;
+            let currentX, currentY, initialX, initialY;
+            let xOffset = 0, yOffset = 0;
+            
+            // Add resize handle
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'menu-resize-handle';
+            resizeHandle.innerHTML = '⋰';
+            navMenu.appendChild(resizeHandle);
+            
+            // Add move handle
+            const moveHandle = document.createElement('div');
+            moveHandle.className = 'menu-move-handle';
+            moveHandle.innerHTML = '⋮⋮';
+            navMenu.appendChild(moveHandle);
+            
+            // Dragging functionality
+            moveHandle.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+            
+            function dragStart(e) {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+                if (e.target === moveHandle) {
+                    isDragging = true;
+                    navMenu.style.cursor = 'grabbing';
+                }
+            }
+            
+            function drag(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                    xOffset = currentX;
+                    yOffset = currentY;
+                    navMenu.style.transform = `translate(calc(-50% + ${currentX}px), ${currentY}px)`;
+                }
+            }
+            
+            function dragEnd() {
+                if (isDragging) {
+                    isDragging = false;
+                    navMenu.style.cursor = '';
+                }
+            }
+            
+            // Resizing functionality
+            let isResizing = false;
+            let startWidth, startHeight, startX, startY;
+            
+            resizeHandle.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                startWidth = navMenu.offsetWidth;
+                startHeight = navMenu.offsetHeight;
+                startX = e.clientX;
+                startY = e.clientY;
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (isResizing) {
+                    const width = startWidth + (e.clientX - startX);
+                    const height = startHeight + (e.clientY - startY);
+                    navMenu.style.maxWidth = width + 'px';
+                    navMenu.style.width = width + 'px';
+                    navMenu.style.height = height + 'px';
+                    navMenu.style.overflowY = 'auto';
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isResizing = false;
+            });
+            
+            // Double-click to reset position and size
+            moveHandle.addEventListener('dblclick', function() {
+                xOffset = 0;
+                yOffset = 0;
+                navMenu.style.transform = 'translateX(-50%)';
+                navMenu.style.maxWidth = 'min(1400px, 95vw)';
+                navMenu.style.width = '';
+                navMenu.style.height = '';
+                navMenu.style.overflowY = '';
+            });
+        })();
         
         // IMPORTANT: Super Admin security is enforced server-side.
         // This page only calls /api/super-admin/login to create a secure session cookie.
@@ -1423,6 +2099,78 @@
         checkExistingSession();
         checkSuperAdminStatus();
         document.getElementById('passwordInput')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') attemptLogin(); });
+        document.getElementById('otpInput')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') attemptOTPLogin(); });
+
+        let otpMode = false;
+
+        async function requestOTP() {
+            _setErr('');
+            const otpBtn = document.getElementById('otpBtn');
+            otpBtn.disabled = true;
+            otpBtn.textContent = '📤 Sending...';
+
+            try {
+                const resp = await fetch('/api/super-admin/request-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await resp.json();
+
+                if (resp.ok) {
+                    otpMode = true;
+                    document.getElementById('passwordInput').parentElement.style.display = 'none';
+                    document.getElementById('otpInputGroup').style.display = 'block';
+                    otpBtn.textContent = '✅ Code Sent!';
+                    otpBtn.style.background = 'rgba(46, 204, 113, 0.3)';
+                    setTimeout(() => {
+                        otpBtn.textContent = '🔄 Resend Code';
+                        otpBtn.disabled = false;
+                    }, 3000);
+                    document.getElementById('otpInput').focus();
+                } else {
+                    const err = data?.detail || 'Failed to send code';
+                    _setErr(err);
+                    otpBtn.disabled = false;
+                    otpBtn.textContent = '📱 Send Code to Mobile';
+                }
+            } catch (e) {
+                _setErr('Failed to send code');
+                otpBtn.disabled = false;
+                otpBtn.textContent = '📱 Send Code to Mobile';
+            }
+        }
+
+        async function attemptOTPLogin() {
+            const otp = document.getElementById('otpInput')?.value || '';
+            if (otp.length !== 6) {
+                _setErr('Enter 6-digit code');
+                return;
+            }
+            
+            _setErr('');
+            try {
+                const resp = await fetch('/api/super-admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp_code: otp })
+                });
+
+                if (resp.ok) {
+                    document.getElementById('otpInput').value = '';
+                    showDashboard();
+                    return;
+                }
+
+                const data = await resp.json().catch(() => ({}));
+                const err = data?.detail || 'Invalid code';
+                _setErr(err);
+                document.getElementById('otpInput').value = '';
+                document.getElementById('otpInput').focus();
+            } catch (e) {
+                _setErr('Login failed');
+            }
+        }
 
         async function attemptLogin() {
             const pwd = document.getElementById('passwordInput')?.value || '';
@@ -1441,7 +2189,7 @@
                 }
 
                 const data = await resp.json().catch(() => ({}));
-                const err = data?.error || 'Login failed';
+                const err = data?.error || data?.detail || 'Login failed';
                 _setErr(err);
                 if (resp.status === 503 && String(err).toLowerCase().includes('not configured')) {
                     _showSetupBox(true);
@@ -1557,15 +2305,22 @@
             await safe('checkAPIKeyStatus(groq)', () => checkAPIKeyStatus('groq'));
             await safe('checkAPIKeyStatus(openrouter)', () => checkAPIKeyStatus('openrouter'));
             await safe('checkAPIKeyStatus(speechmatics)', () => checkAPIKeyStatus('speechmatics'));
+            await safe('checkAPIKeyStatus(cartesia)', () => checkAPIKeyStatus('cartesia'));
+            await safe('checkAPIKeyStatus(lemonfox)', () => checkAPIKeyStatus('lemonfox'));
+            await safe('checkAPIKeyStatus(vapi)', () => checkAPIKeyStatus('vapi'));
             await safe('checkAPIKeyStatus(vonage)', () => checkAPIKeyStatus('vonage'));
 
             await safe('loadGlobalInstructions', () => loadGlobalInstructions());
             await safe('loadBackchannelSettings', () => loadBackchannelSettings());
+            await safe('loadTimeoutTestSettings', () => loadTimeoutTestSettings());
+            await safe('loadFillerWordsBySize', () => loadFillerWordsBySize());
             await safe('loadAccountsList', () => loadAccountsList());
             await safe('loadFillerSlots', () => loadFillerSlots());
             await safe('loadRecentCalls', () => loadRecentCalls());
             await safe('loadTunnelConfig', () => loadTunnelConfig());
             await safe('loadOpenRouterModels', () => loadOpenRouterModels());
+            await safe('loadPerformanceSettings', () => loadPerformanceSettings());
+            await safe('loadRacingSettings', () => loadRacingSettings());
         }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
@@ -1608,7 +2363,7 @@
                 if (ignore) ignore.checked = !!s.ignore_backchannels_always;
                 if (maxWords) maxWords.value = String(s.backchannel_max_words ?? 3);
                 if (minTurn) minTurn.value = String(s.min_user_turn_seconds ?? 0.45);
-                if (bargeIn) bargeIn.value = String(s.barge_in_min_speech_seconds ?? 0.55);
+                if (bargeIn) bargeIn.value = String(s.barge_in_min_speech_seconds ?? 2.00);
 
                 _wireBackchannelSliders();
                 _setBackchannelStatus('Loaded', true);
@@ -1626,7 +2381,7 @@
                 const ignore = document.getElementById('ignoreBackchannelsAlways')?.checked ?? true;
                 const maxWordsRaw = document.getElementById('backchannelMaxWords')?.value ?? '3';
                 const minTurnRaw = document.getElementById('minUserTurnSeconds')?.value ?? '0.45';
-                const bargeInRaw = document.getElementById('bargeInMinSpeechSeconds')?.value ?? '0.55';
+                const bargeInRaw = document.getElementById('bargeInMinSpeechSeconds')?.value ?? '2.00';
 
                 const payload = {
                     updated_by: 'super-admin',
@@ -1657,6 +2412,71 @@
                 console.error('Error saving backchannel settings:', e);
                 _setBackchannelStatus(`Save failed: ${e.message}`, false);
             }
+        }
+
+        // ==================== TIMEOUT TEST SETTINGS ====================
+        async function loadTimeoutTestSettings() {
+            try {
+                _setTimeoutTestStatus('Loading…', true);
+                const resp = await fetch('/api/super-admin/timeout-test-settings');
+                const data = await resp.json();
+                if (!data || !data.success) throw new Error(data?.error || 'Failed to load');
+                const s = data.settings || {};
+
+                const enabled = document.getElementById('timeoutTestEnabled');
+                const seconds = document.getElementById('timeoutTestSeconds');
+
+                if (enabled) enabled.checked = !!s.timeout_test_enabled;
+                if (seconds) seconds.value = String(s.timeout_test_seconds ?? 2.0);
+
+                _setTimeoutTestStatus('Loaded', true);
+            } catch (e) {
+                console.error('Error loading timeout test settings:', e);
+                _setTimeoutTestStatus('Load failed', false);
+            }
+        }
+
+        async function saveTimeoutTestSettings() {
+            try {
+                _setTimeoutTestStatus('Saving…', true);
+
+                const enabled = document.getElementById('timeoutTestEnabled')?.checked ?? false;
+                const secondsRaw = document.getElementById('timeoutTestSeconds')?.value ?? '2.0';
+
+                const payload = {
+                    updated_by: 'super-admin',
+                    settings: {
+                        timeout_test_enabled: !!enabled,
+                        timeout_test_seconds: Number(secondsRaw),
+                    }
+                };
+
+                console.log('Saving timeout test settings:', payload);
+
+                const resp = await fetch('/api/super-admin/timeout-test-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('Response status:', resp.status);
+                const data = await resp.json();
+                console.log('Response data:', data);
+                
+                if (!data || !data.success) throw new Error(data?.error || 'Save failed');
+
+                _setTimeoutTestStatus('Saved (applies immediately)', true);
+            } catch (e) {
+                console.error('Error saving timeout test settings:', e);
+                _setTimeoutTestStatus(`Save failed: ${e.message}`, false);
+            }
+        }
+
+        function _setTimeoutTestStatus(msg, isSuccess) {
+            const el = document.getElementById('timeoutTestStatus');
+            if (!el) return;
+            el.textContent = msg;
+            el.style.color = isSuccess ? 'rgba(39, 174, 96, 0.95)' : 'rgba(231, 76, 60, 0.95)';
         }
 
         // ==================== CONTENT MODERATION (FLAGGED ACCOUNTS) ====================
@@ -1951,34 +2771,347 @@
 
                 subtitle.textContent = `${data.name || 'Account'} (User ID: ${data.user_id})`;
 
-                const phoneNumber = escapeHtml(cfg.PHONE_NUMBER || '');
-                const businessInfo = escapeHtml(cfg.BUSINESS_INFO || '');
+                const agentName = escapeHtml(cfg.AGENT_NAME || '');
                 const callGreeting = escapeHtml(cfg.CALL_GREETING || '');
+                const transferNumber = escapeHtml(cfg.TRANSFER_NUMBER || '');
+                const businessInfo = escapeHtml(cfg.BUSINESS_INFO || '');
+                const agentPersonality = escapeHtml(cfg.AGENT_PERSONALITY || '');
+                const agentInstructions = escapeHtml(cfg.AGENT_INSTRUCTIONS || '');
 
-                const fieldBlock = (label, value, isMultiline) => {
-                    const displayValue = value || '<span style="opacity:0.6;">(empty)</span>';
+                const voiceProvider = (cfg.VOICE_PROVIDER || 'openai');
+                const openaiVoice = (cfg.VOICE || 'shimmer');
+                const googleVoice = (cfg.GOOGLE_VOICE || 'en-GB-Standard-A');
+                const speechmaticsVoiceId = (cfg.SPEECHMATICS_VOICE_ID || 'sarah');
+                const cartesiaVoiceId = (cfg.CARTESIA_VOICE_ID || 'a0e99841-438c-4a64-b679-ae501e7d6091');
+                const lemonfoxVoice = (cfg.LEMONFOX_VOICE || 'heart');
+
+                const fieldBlock = (label, value) => {
+                    const displayValue = value || '<span style="opacity:0.4;">(empty)</span>';
                     return `
-                        <div style="margin-bottom: 14px;">
-                            <div style="font-size: 12px; letter-spacing: 0.4px; font-weight: 900; color: rgba(255,255,255,0.85); margin-bottom: 6px;">${label}</div>
-                            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px; color: rgba(255,255,255,0.92); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; white-space: ${isMultiline ? 'pre-wrap' : 'normal'}; word-break: break-word;">${displayValue}</div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">${label}</div>
+                            <div style="font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.4; word-break: break-word; white-space: pre-wrap; max-height: 80px; overflow-y: auto;">${displayValue}</div>
                         </div>
                     `;
                 };
 
                 content.innerHTML = `
-                    ${fieldBlock('PHONE NUMBER', phoneNumber, false)}
-                    ${fieldBlock('BUSINESS INFORMATION', businessInfo, true)}
-                    ${fieldBlock('CALL GREETING (Opening Line)', callGreeting, true)}
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                        ${fieldBlock('Agent Name', agentName)}
+                        ${fieldBlock('Call Greeting', callGreeting)}
+                        ${fieldBlock('Transfer Number', transferNumber)}
+                        ${fieldBlock('Business Info', businessInfo)}
+                        ${fieldBlock('Agent Personality', agentPersonality)}
+                        ${fieldBlock('Agent Instructions', agentInstructions)}
+                    </div>
+
+                    <div style="margin-top: 16px; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 14px;">
+                        <div style="font-size: 14px; font-weight: 900; color: rgba(255,255,255,0.9); margin-bottom: 10px;">🎤 Voice Provider & Agent Voice</div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start;">
+                            <div>
+                                <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.75); margin-bottom: 6px;">Voice Provider</div>
+                                <select id="saVoiceProvider_${userId}" onchange="saSwitchAccountVoiceProvider(${userId})" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="google">Google Cloud</option>
+                                    <option value="speechmatics">Speechmatics</option>
+                                    <option value="cartesia">Cartesia</option>
+                                    <option value="lemonfox">Lemonfox</option>
+                                </select>
+                                <div style="margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.55);">Lemonfox requires a global Lemonfox API key (no filler sounds).</div>
+                            </div>
+
+                            <div>
+                                <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.75); margin-bottom: 6px;">Agent Voice</div>
+
+                                <div id="saVoiceOpenAIWrap_${userId}" style="display:none;">
+                                    <select id="saOpenAIVoice_${userId}" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                        <option value="shimmer">Shimmer</option>
+                                        <option value="nova">Nova</option>
+                                        <option value="alloy">Alloy</option>
+                                        <option value="echo">Echo</option>
+                                        <option value="fable">Fable</option>
+                                        <option value="onyx">Onyx</option>
+                                    </select>
+                                </div>
+
+                                <div id="saVoiceGoogleWrap_${userId}" style="display:none;">
+                                    <select id="saGoogleVoice_${userId}" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                        <option value="en-GB-Standard-A">en-GB-Standard-A</option>
+                                        <option value="en-GB-Standard-B">en-GB-Standard-B</option>
+                                        <option value="en-GB-Standard-C">en-GB-Standard-C</option>
+                                        <option value="en-GB-Standard-D">en-GB-Standard-D</option>
+                                        <option value="en-GB-Standard-F">en-GB-Standard-F</option>
+                                    </select>
+                                </div>
+
+                                <div id="saVoiceSpeechmaticsWrap_${userId}" style="display:none;">
+                                    <select id="saSpeechmaticsVoice_${userId}" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                        <option value="sarah">Sarah</option>
+                                    </select>
+                                </div>
+
+                                <div id="saVoiceCartesiaWrap_${userId}" style="display:none;">
+                                    <select id="saCartesiaVoice_${userId}" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                        <option value="a0e99841-438c-4a64-b679-ae501e7d6091">British Narration Lady</option>
+                                    </select>
+                                </div>
+
+                                <div id="saVoiceLemonfoxWrap_${userId}" style="display:none;">
+                                    <select id="saLemonfoxVoice_${userId}" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: white; font-size: 13px;">
+                                        <option value="heart">Heart</option>
+                                    </select>
+                                    <div id="saLemonfoxStatus_${userId}" style="margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.55);"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap: 10px; align-items:center; margin-top: 12px; flex-wrap: wrap;">
+                            <button onclick="saSaveAccountVoiceSettings(${userId})" style="background: linear-gradient(135deg, rgba(46, 204, 113, 0.85) 0%, rgba(39, 174, 96, 0.85) 100%); border: none; color: white; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;">💾 Save Voice Settings</button>
+                            <div id="saVoiceSaveStatus_${userId}" style="font-size: 12px; color: rgba(255,255,255,0.7);"></div>
+                        </div>
+                    </div>
                 `;
+
+                // Initialize selects
+                const providerEl = document.getElementById(`saVoiceProvider_${userId}`);
+                if (providerEl) providerEl.value = voiceProvider;
+                const openaiEl = document.getElementById(`saOpenAIVoice_${userId}`);
+                if (openaiEl) openaiEl.value = openaiVoice;
+                const googleEl = document.getElementById(`saGoogleVoice_${userId}`);
+                if (googleEl) googleEl.value = googleVoice;
+                const speechEl = document.getElementById(`saSpeechmaticsVoice_${userId}`);
+                if (speechEl) speechEl.value = speechmaticsVoiceId;
+                const cartesiaEl = document.getElementById(`saCartesiaVoice_${userId}`);
+                if (cartesiaEl) cartesiaEl.value = cartesiaVoiceId;
+                const lemonfoxEl = document.getElementById(`saLemonfoxVoice_${userId}`);
+                if (lemonfoxEl) lemonfoxEl.value = lemonfoxVoice;
+
+                await saSwitchAccountVoiceProvider(userId, true);
             } catch (error) {
                 subtitle.textContent = `User ID: ${userId}`;
                 content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.85); padding: 30px;"><div style="color:#ff6b6b; font-weight: 800;">Failed to load account configuration</div><div style="margin-top: 8px; opacity: 0.8;">' + String(error.message || error) + '</div></div>';
             }
         }
-        async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; statusId = 'statusGroq'; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; statusId = 'statusOpenRouter'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
+
+        async function saSwitchAccountVoiceProvider(userId, suppressLoad=false) {
+            const provider = document.getElementById(`saVoiceProvider_${userId}`)?.value || 'openai';
+            const show = (wrapId, on) => {
+                const el = document.getElementById(`${wrapId}_${userId}`);
+                if (el) el.style.display = on ? 'block' : 'none';
+            };
+
+            show('saVoiceOpenAIWrap', provider === 'openai');
+            show('saVoiceGoogleWrap', provider === 'google');
+            show('saVoiceSpeechmaticsWrap', provider === 'speechmatics');
+            show('saVoiceCartesiaWrap', provider === 'cartesia');
+            show('saVoiceLemonfoxWrap', provider === 'lemonfox');
+
+            if (provider === 'lemonfox' && !suppressLoad) {
+                await saLoadLemonfoxVoices(userId);
+            }
+            if (provider === 'cartesia' && !suppressLoad) {
+                await saLoadCartesiaVoices(userId);
+            }
+        }
+
+        async function saLoadLemonfoxVoices(userId) {
+            const selectEl = document.getElementById(`saLemonfoxVoice_${userId}`);
+            const statusEl = document.getElementById(`saLemonfoxStatus_${userId}`);
+            if (!selectEl) return;
+
+            try {
+                const resp = await fetch('/api/lemonfox-voices');
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    if (statusEl) statusEl.textContent = '⚠️ Failed to load Lemonfox voices.';
+                    return;
+                }
+
+                const voices = Array.isArray(data.voices) ? data.voices : [];
+                const current = selectEl.value;
+                selectEl.innerHTML = '';
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    const name = v.name || v.id;
+                    const gender = v.gender ? String(v.gender) : '';
+                    const accent = v.accent ? String(v.accent) : '';
+                    const meta = [gender, accent].filter(Boolean).join(', ');
+                    opt.textContent = meta ? `${name} (${meta})` : name;
+                    selectEl.appendChild(opt);
+                }
+
+                const hasCurrent = Array.from(selectEl.options).some(o => o.value === current);
+                selectEl.value = hasCurrent ? current : (voices[0]?.id || 'heart');
+                if (statusEl) statusEl.textContent = '✅ Lemonfox voices loaded.';
+            } catch (e) {
+                console.error('Failed to load Lemonfox voices:', e);
+            }
+        }
+
+        async function saLoadCartesiaVoices(userId) {
+            const selectEl = document.getElementById(`saCartesiaVoice_${userId}`);
+            if (!selectEl) return;
+            try {
+                const resp = await fetch('/api/cartesia-voices');
+                const data = await resp.json();
+                if (!resp.ok || !data.success) return;
+                const voices = Array.isArray(data.voices) ? data.voices : [];
+                const current = selectEl.value;
+                selectEl.innerHTML = '';
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    const label = v.description ? `${v.name} (${v.description})` : v.name;
+                    opt.textContent = label;
+                    selectEl.appendChild(opt);
+                }
+                const hasCurrent = Array.from(selectEl.options).some(o => o.value === current);
+                selectEl.value = hasCurrent ? current : (voices[0]?.id || 'a0e99841-438c-4a64-b679-ae501e7d6091');
+            } catch (e) {
+                console.error('Failed to load Cartesia voices (super-admin):', e);
+            }
+        }
+
+        async function saSaveAccountVoiceSettings(userId) {
+            const statusEl = document.getElementById(`saVoiceSaveStatus_${userId}`);
+            const setStatus = (msg, ok=true) => {
+                if (!statusEl) return;
+                statusEl.textContent = msg;
+                statusEl.style.color = ok ? 'rgba(255,255,255,0.8)' : 'rgba(255,160,160,0.95)';
+            };
+
+            try {
+                setStatus('Saving…');
+
+                const voice_provider = document.getElementById(`saVoiceProvider_${userId}`)?.value || 'openai';
+                const openai_voice = document.getElementById(`saOpenAIVoice_${userId}`)?.value || null;
+                const google_voice = document.getElementById(`saGoogleVoice_${userId}`)?.value || null;
+                const speechmatics_voice_id = document.getElementById(`saSpeechmaticsVoice_${userId}`)?.value || null;
+                const cartesia_voice_id = document.getElementById(`saCartesiaVoice_${userId}`)?.value || null;
+                const lemonfox_voice = document.getElementById(`saLemonfoxVoice_${userId}`)?.value || null;
+
+                const resp = await fetch('/api/super-admin/account-voice-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        voice_provider,
+                        openai_voice,
+                        google_voice,
+                        speechmatics_voice_id,
+                        cartesia_voice_id,
+                        lemonfox_voice,
+                    })
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    throw new Error(data?.error || 'Failed to save voice settings');
+                }
+
+                setStatus('✅ Saved. Applies to new calls.');
+                try { showAlert('✅ Voice settings saved for this account', 'success'); } catch (_) {}
+            } catch (e) {
+                console.error('Failed to save account voice settings:', e);
+                setStatus('❌ Save failed: ' + (e.message || e), false);
+                try { showAlert('❌ Failed to save voice settings', 'error'); } catch (_) {}
+            }
+        }
+        async function checkAPIKeyStatus(provider) { try { let endpoint = '', statusId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; statusId = 'statusOpenAI'; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; statusId = 'statusDeepSeek'; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; statusId = 'statusGroq'; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; statusId = 'statusOpenRouter'; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; statusId = 'statusSpeechmatics'; } else if (provider === 'cartesia') { endpoint = '/api/super-admin/cartesia-key'; statusId = 'statusCartesia'; } else if (provider === 'lemonfox') { endpoint = '/api/super-admin/lemonfox-key'; statusId = 'statusLemonfox'; } else if (provider === 'vapi') { endpoint = '/api/super-admin/vapi-key'; statusId = 'statusVapi'; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; statusId = 'statusVonage'; } const response = await fetch(endpoint); const data = await response.json(); const statusEl = document.getElementById(statusId); if (data.configured) { statusEl.textContent = '✅ Configured'; statusEl.className = 'status configured'; } else { statusEl.textContent = '⚠️ Not Configured'; statusEl.className = 'status not-configured'; } } catch (error) { console.error(`Error checking ${provider} status:`, error); } }
         function selectBrain(provider) { document.getElementById('brainOpenAI').classList.remove('selected'); document.getElementById('brainDeepSeek').classList.remove('selected'); document.getElementById('brainGroq').classList.remove('selected'); const br = document.getElementById('brainOpenRouter'); if (br) br.classList.remove('selected'); if (provider === 'openai') { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; } else if (provider === 'deepseek') { document.getElementById('brainDeepSeek').classList.add('selected'); document.querySelector('input[value="deepseek"]').checked = true; } else if (provider === 'groq') { document.getElementById('brainGroq').classList.add('selected'); document.querySelector('input[value="groq"]').checked = true; } else if (provider === 'openrouter') { const el = document.getElementById('brainOpenRouter'); if (el) el.classList.add('selected'); document.querySelector('input[value="openrouter"]').checked = true; } else { document.getElementById('brainOpenAI').classList.add('selected'); document.querySelector('input[value="openai"]').checked = true; provider = 'openai'; } saveBrainProvider(provider); }
         async function saveBrainProvider(provider) { try { const response = await fetch('/api/super-admin/brain-provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert(data.message, 'success'); else showAlert('Failed to update brain provider', 'error'); } catch (error) { console.error('Error saving brain provider:', error); showAlert('Error saving brain provider', 'error'); } }
-        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; inputId = 'inputGroq'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; inputId = 'inputOpenRouter'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); const appId = document.getElementById('inputVonageAppId').value.trim(); const privateKey = document.getElementById('inputVonagePrivateKey').value.trim(); if (!apiKey && !apiSecret && !appId && !privateKey) { showAlert('Please enter at least one Vonage credential', 'error'); return; } body = { updated_by: 'super-admin' }; if (apiKey) body.api_key = apiKey; if (apiSecret) body.api_secret = apiSecret; if (appId) body.application_id = appId; if (privateKey) body.private_key_pem = privateKey; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; document.getElementById('inputVonageAppId').value = ''; document.getElementById('inputVonagePrivateKey').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
+        async function testVonageAPI() {
+            const modal = document.getElementById('testModal');
+            const modalBody = document.getElementById('testModalBody');
+            modalBody.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="font-size: 32px;">⏳</div><p>Testing Vonage API...</p></div>';
+            modal.classList.add('show');
+
+            try {
+                const response = await fetch('/api/super-admin/test-vonage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}`
+                    }
+                });
+                const data = await response.json();
+
+                let html = '';
+                if (data.success) {
+                    html += `<div class="test-result success"><strong>✅ Everything Working:</strong> ${data.message}</div>`;
+                } else {
+                    html += `<div class="test-result error"><strong>❌ Problems Found:</strong> ${data.message || 'Your Vonage setup has issues that need fixing'}</div>`;
+                }
+
+                if (data.details) {
+                    data.details.forEach(detail => {
+                        const className = detail.status === 'success' ? 'success' : detail.status === 'warning' ? 'warning' : 'error';
+                        const icon = detail.status === 'success' ? '✅' : detail.status === 'warning' ? '⚠️' : '❌';
+                        html += `<div class="test-result ${className}"><strong>${icon} ${detail.check}:</strong> ${detail.message}`;
+                        
+                        // Add fix button if fixable
+                        if (detail.fixable && detail.fix_action) {
+                            html += `<br><button class="btn-save" onclick="fixVonageIssue('${detail.fix_action}')" style="margin-top: 8px; background: #f39c12;">🔧 Fix This</button>`;
+                        }
+                        html += '</div>';
+                    });
+                }
+
+                if (data.fixes && data.fixes.length > 0) {
+                    html += '<div class="test-result warning"><strong>🔧 What You Need To Do:</strong>';
+                    html += '<ul style="margin: 10px 0 0 20px; line-height: 1.8;">';
+                    data.fixes.forEach(fix => {
+                        html += `<li style="margin-bottom: 8px;"><strong>${fix.issue}:</strong> ${fix.action}`;
+                        if (fix.fixable && fix.fix_action) {
+                            html += ` <button class="btn-save" onclick="fixVonageIssue('${fix.fix_action}')" style="padding: 4px 12px; font-size: 11px; background: #f39c12; margin-left: 8px;">Fix Now</button>`;
+                        }
+                        html += '</li>';
+                    });
+                    html += '</ul></div>';
+                }
+
+                modalBody.innerHTML = html;
+            } catch (error) {
+                modalBody.innerHTML = `<div class="test-result error"><strong>❌ Test Failed:</strong> Could not run the test. Error: ${error.message}</div>`;
+            }
+        }
+
+        async function fixVonageIssue(action) {
+            showAlert('Attempting to fix issue...', 'info');
+            
+            try {
+                const response = await fetch('/api/super-admin/fix-vonage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}`
+                    },
+                    body: JSON.stringify({ action: action })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(data.message || 'Issue fixed successfully!', 'success');
+                    // Re-run test after 1 second
+                    setTimeout(() => testVonageAPI(), 1000);
+                } else {
+                    showAlert(data.message || 'Could not fix this issue automatically', 'error');
+                }
+            } catch (error) {
+                showAlert('Fix failed: ' + error.message, 'error');
+            }
+        }
+
+        function closeTestModal() {
+            document.getElementById('testModal').classList.remove('show');
+        }
+
+        async function saveAPIKey(provider) { try { let endpoint = '', body = {}, inputId = ''; if (provider === 'openai') { endpoint = '/api/super-admin/openai-key'; inputId = 'inputOpenAI'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'deepseek') { endpoint = '/api/super-admin/deepseek-key'; inputId = 'inputDeepSeek'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'groq') { endpoint = '/api/super-admin/groq-key'; inputId = 'inputGroq'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'openrouter') { endpoint = '/api/super-admin/openrouter-key'; inputId = 'inputOpenRouter'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'speechmatics') { endpoint = '/api/super-admin/speechmatics-key'; inputId = 'inputSpeechmatics'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'cartesia') { endpoint = '/api/super-admin/cartesia-key'; inputId = 'inputCartesia'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'lemonfox') { endpoint = '/api/super-admin/lemonfox-key'; inputId = 'inputLemonfox'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vapi') { endpoint = '/api/super-admin/vapi-key'; inputId = 'inputVapi'; const apiKey = document.getElementById(inputId).value.trim(); if (!apiKey) { showAlert('Please enter an API key', 'error'); return; } body = { api_key: apiKey, updated_by: 'super-admin' }; } else if (provider === 'vonage') { endpoint = '/api/super-admin/vonage-keys'; const apiKey = document.getElementById('inputVonageKey').value.trim(); const apiSecret = document.getElementById('inputVonageSecret').value.trim(); const appId = document.getElementById('inputVonageAppId').value.trim(); const privateKey = document.getElementById('inputVonagePrivateKey').value.trim(); if (!apiKey && !apiSecret && !appId && !privateKey) { showAlert('Please enter at least one Vonage credential', 'error'); return; } body = { updated_by: 'super-admin' }; if (apiKey) body.api_key = apiKey; if (apiSecret) body.api_secret = apiSecret; if (appId) body.application_id = appId; if (privateKey) body.private_key_pem = privateKey; } const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json(); if (data.success) { showAlert(data.message, 'success'); if (inputId) document.getElementById(inputId).value = ''; if (provider === 'vonage') { document.getElementById('inputVonageKey').value = ''; document.getElementById('inputVonageSecret').value = ''; document.getElementById('inputVonageAppId').value = ''; document.getElementById('inputVonagePrivateKey').value = ''; } await checkAPIKeyStatus(provider); } else { showAlert(data.error || 'Failed to save API key', 'error'); } } catch (error) { console.error('Error saving API key:', error); showAlert('Error saving API key', 'error'); } }
+
+        async function deleteAPIKey(provider) { try { if (provider !== 'vapi') { showAlert('Delete not supported for this provider yet', 'error'); return; } const ok = confirm('Delete the saved Vapi API key? This will disable Vapi calls until you add a new key.'); if (!ok) return; const response = await fetch('/api/super-admin/vapi-key', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) { try { document.getElementById('inputVapi').value = ''; } catch (_) {} showAlert(data.message || 'Vapi API key deleted', 'success'); await checkAPIKeyStatus('vapi'); } else { showAlert(data.error || 'Failed to delete API key', 'error'); } } catch (error) { console.error('Error deleting API key:', error); showAlert('Error deleting API key', 'error'); } }
         async function loadGlobalInstructions() { 
             try { 
                 const response = await fetch('/api/super-admin/global-instructions'); 
@@ -2332,19 +3465,246 @@
             }
         }
         
-        async function saveFillerWords() { try { const fillerWords = document.getElementById('fillerWords').value.trim(); const response = await fetch('/api/super-admin/filler-words', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filler_words: fillerWords, updated_by: 'super-admin' }) }); const data = await response.json(); if (data.success) showAlert('Filler words saved successfully', 'success'); else showAlert('Failed to save filler words', 'error'); } catch (error) { console.error('Error saving filler words:', error); showAlert('Error saving filler words', 'error'); } }
-        async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; for (let i = 1; i <= 10; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!filler; const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; const fillerText = (filler?.text || ''); card.innerHTML = `
+        function _setFillerWordsBySizeStatus(msg, ok=true) {
+            const el = document.getElementById('fillerWordsBySizeStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.style.color = ok ? 'rgba(120, 255, 160, 0.95)' : 'rgba(255, 140, 140, 0.95)';
+        }
+
+        // Vapi Assistants Management
+        let globalVapiAssistants = [];
+
+        async function loadVapiAssistants() {
+            try {
+                const response = await fetch('/api/super-admin/vapi-assistants');
+                const data = await response.json();
+                
+                if (data.success) {
+                    globalVapiAssistants = data.assistants || [];
+                    renderVapiAssistantsList();
+                    _setVapiStatus('Loaded', true);
+                } else {
+                    _setVapiStatus('Failed to load', false);
+                }
+            } catch (error) {
+                console.error('Failed to load Vapi assistants:', error);
+                _setVapiStatus('Failed to load', false);
+            }
+        }
+
+        function renderVapiAssistantsList() {
+            const container = document.getElementById('vapiAssistantsList');
+            
+            if (!container) return;
+            
+            if (globalVapiAssistants.length === 0) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">No assistants added yet</p>';
+                return;
+            }
+            
+            container.innerHTML = globalVapiAssistants.map((assistant, index) => `
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">${assistant.name}</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.6); font-family: monospace;">${assistant.id}</div>
+                    </div>
+                    <button class="btn-save" onclick="removeVapiAssistant(${index})" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.3);">
+                        🗑️ Remove
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function addVapiAssistant() {
+            const name = document.getElementById('vapiAssistantName').value.trim();
+            const id = document.getElementById('vapiAssistantId').value.trim();
+            
+            if (!name || !id) {
+                showAlert('Please enter both name and assistant ID', 'error');
+                return;
+            }
+            
+            // Check for duplicates
+            if (globalVapiAssistants.some(a => a.id === id)) {
+                showAlert('An assistant with this ID already exists', 'error');
+                return;
+            }
+            
+            globalVapiAssistants.push({ name, id });
+            renderVapiAssistantsList();
+            
+            // Clear inputs
+            document.getElementById('vapiAssistantName').value = '';
+            document.getElementById('vapiAssistantId').value = '';
+            
+            _setVapiStatus('⚠️ Unsaved changes', false);
+        }
+
+        function removeVapiAssistant(index) {
+            if (confirm(`Remove "${globalVapiAssistants[index].name}"?`)) {
+                globalVapiAssistants.splice(index, 1);
+                renderVapiAssistantsList();
+                _setVapiStatus('⚠️ Unsaved changes', false);
+            }
+        }
+
+        async function saveVapiAssistants() {
+            try {
+                _setVapiStatus('Saving…', true);
+                
+                const response = await fetch('/api/super-admin/vapi-assistants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assistants: globalVapiAssistants })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('Vapi assistants saved successfully', 'success');
+                    _setVapiStatus('Saved', true);
+                } else {
+                    showAlert('Failed to save: ' + (data.error || 'Unknown error'), 'error');
+                    _setVapiStatus('Failed to save', false);
+                }
+            } catch (error) {
+                console.error('Failed to save Vapi assistants:', error);
+                showAlert('Failed to save Vapi assistants', 'error');
+                _setVapiStatus('Error', false);
+            }
+        }
+
+        function _setVapiStatus(msg, ok) {
+            const el = document.getElementById('vapiAssistantsStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.style.color = ok ? 'rgba(120, 255, 160, 0.95)' : 'rgba(255, 140, 140, 0.95)';
+        }
+
+        async function loadFillerWordsBySize() {
+            try {
+                _setFillerWordsBySizeStatus('Loading…', true);
+                const resp = await fetch('/api/super-admin/filler-words-sized');
+                const data = await resp.json();
+                if (!data || !data.success) throw new Error(data?.error || 'Failed');
+                const small = document.getElementById('fillerWordsSmall');
+                const medium = document.getElementById('fillerWordsMedium');
+                const large = document.getElementById('fillerWordsLarge');
+                if (small) small.value = (data.filler_words_small || '').trim();
+                if (medium) medium.value = (data.filler_words_medium || '').trim();
+                if (large) large.value = (data.filler_words_large || '').trim();
+                _setFillerWordsBySizeStatus('Loaded', true);
+            } catch (e) {
+                console.error('Failed to load filler words by size:', e);
+                _setFillerWordsBySizeStatus('Failed to load', false);
+            }
+        }
+
+        async function saveFillerWordsBySize() {
+            try {
+                _setFillerWordsBySizeStatus('Saving…', true);
+                const small = (document.getElementById('fillerWordsSmall')?.value || '').trim();
+                const medium = (document.getElementById('fillerWordsMedium')?.value || '').trim();
+                const large = (document.getElementById('fillerWordsLarge')?.value || '').trim();
+                const resp = await fetch('/api/super-admin/filler-words-sized', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filler_words_small: small,
+                        filler_words_medium: medium,
+                        filler_words_large: large,
+                        updated_by: 'super-admin'
+                    })
+                });
+                const data = await resp.json();
+                if (!data || !data.success) throw new Error(data?.error || 'Failed');
+                _setFillerWordsBySizeStatus('Saved', true);
+                showAlert('Filler words saved successfully', 'success');
+            } catch (e) {
+                console.error('Failed to save filler words by size:', e);
+                _setFillerWordsBySizeStatus('Failed to save', false);
+                showAlert('Failed to save filler words', 'error');
+            }
+        }
+
+        // Backwards-compatible shim (older UI paths)
+        async function saveFillerWords() { return saveFillerWordsBySize(); }
+
+        function _normalizeFillerSize(size) {
+            const s = (size || '').toString().trim().toLowerCase();
+            if (s === 'small' || s === 'medium' || s === 'large') return s;
+            return 'small';
+        }
+
+        function _nextFillerSize(size) {
+            const s = _normalizeFillerSize(size);
+            if (s === 'small') return 'medium';
+            if (s === 'medium') return 'large';
+            return 'small';
+        }
+
+        function _sizeLabel(size) {
+            const s = _normalizeFillerSize(size);
+            if (s === 'small') return 'Small';
+            if (s === 'medium') return 'Medium';
+            return 'Large';
+        }
+
+        function getFillerSize(slot) {
+            const btn = document.getElementById(`fillerSizeBtn${slot}`);
+            return _normalizeFillerSize(btn?.dataset?.size || 'small');
+        }
+
+        function _setFillerSizeButton(slot, size) {
+            const btn = document.getElementById(`fillerSizeBtn${slot}`);
+            if (!btn) return;
+            const s = _normalizeFillerSize(size);
+            btn.dataset.size = s;
+            btn.textContent = `📏 ${_sizeLabel(s)}`;
+        }
+
+        async function setFillerSize(slot, size) {
+            const s = _normalizeFillerSize(size);
+            const btn = document.getElementById(`fillerSizeBtn${slot}`);
+            try {
+                if (btn) btn.disabled = true;
+                const response = await fetch(`/api/super-admin/set-filler-size/${slot}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voice_id: 'sarah', size: s })
+                });
+                const data = await response.json();
+                if (!data?.success) throw new Error(data?.error || 'Failed');
+                _setFillerSizeButton(slot, s);
+                showAlert(`Filler ${slot} set to ${_sizeLabel(s)}`, 'success', false);
+            } catch (e) {
+                console.error('Failed to set filler size:', e);
+                showAlert('Failed to set filler size', 'error', false);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function cycleFillerSize(slot) {
+            const current = getFillerSize(slot);
+            const next = _nextFillerSize(current);
+            await setFillerSize(slot, next);
+        }
+
+        async function loadFillerSlots() { try { const response = await fetch('/api/super-admin/list-fillers?voice_id=sarah'); const data = await response.json(); const container = document.getElementById('fillerSlots'); container.innerHTML = ''; const slotCount = Math.max(1, Math.min(50, parseInt(data.slot_count || 30, 10) || 30)); for (let i = 1; i <= slotCount; i++) { const filler = data.fillers?.find(f => f.number === i); const hasAudio = !!(filler && (filler.has_audio || filler.filename)); const card = document.createElement('div'); card.className = `filler-slot ${hasAudio ? 'has-audio' : ''}`; const fillerText = (filler?.text || ''); const fillerSize = _normalizeFillerSize(filler?.size || 'small'); card.innerHTML = `
                     <div class="filler-slot-header">
                         <div class="filler-slot-title">🎙️ Filler ${i}</div>
                         <div class="filler-slot-status ${hasAudio ? 'filled' : 'empty'}">${hasAudio ? '✅ Ready' : '⚪ Empty'}</div>
                     </div>
                     <div style="margin-bottom: 10px;">
                         <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Filler Text</div>
-                        <textarea id="fillerText${i}" placeholder="Type any filler phrase here (e.g., 'Just a second…')" style="width: 100%; min-height: 70px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;">${fillerText}</textarea>
+                        <textarea id="fillerText${i}" placeholder="Type any filler phrase here (e.g., 'Just a second…')" style="width: 100%; min-height: 55px; padding: 8px 10px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; resize: vertical;">${fillerText}</textarea>
                         <div style="margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.55);">Tip: leave blank to generate a random filler. Long text will be trimmed.</div>
                     </div>
                     <div class="filler-slot-controls">
                         <button class="btn-slot play" onclick="playFiller(${i})" ${!hasAudio ? 'disabled' : ''}>▶️ Play</button>
+                        <button class="btn-slot regenerate" id="fillerSizeBtn${i}" data-size="${fillerSize}" onclick="cycleFillerSize(${i})">📏 ${_sizeLabel(fillerSize)}</button>
                         <button class="btn-slot regenerate" onclick="regenerateFiller(${i})">🔄 Generate</button>
                         <button class="btn-slot delete" onclick="deleteFiller(${i})" ${!hasAudio ? 'disabled' : ''}>🗑️ Delete</button>
                     </div>
@@ -2370,7 +3730,8 @@
                         voice_id: 'sarah', 
                         updated_by: 'super-admin', 
                         use_ai: true, 
-                        text: customText || '' 
+                        text: customText || '',
+                        size: getFillerSize(slot)
                     }) 
                 }); 
                 const data = await response.json(); 
@@ -2404,10 +3765,10 @@
             } 
         }
         async function generateAllFillers() { 
-            if (!confirm('Generate all 10 filler audio files? This will overwrite existing ones.')) return; 
+            if (!confirm('Generate all 30 filler audio files? This will overwrite existing ones.')) return; 
             try { 
                 const statusEl = document.getElementById('generateAllStatus'); 
-                statusEl.textContent = '⏳ Generating all 10 fillers...'; 
+                statusEl.textContent = '⏳ Generating all 30 fillers...'; 
                 statusEl.style.color = '#f39c12'; 
                 const response = await fetch('/api/super-admin/generate-speechmatics-fillers', { 
                     method: 'POST', 
@@ -2988,12 +4349,16 @@
                         const resp = await fetch('/api/admin/ngrok-status');
                         if (!resp.ok) return { status: 'error', message: 'API error' };
                         const data = await resp.json();
-                        if (data.running) {
+                        const reachable = !!data.ngrok_reachable;
+                        if (data.running && reachable) {
                             const url = data.url || '';
                             const shortUrl = url.replace('https://', '').substring(0, 25);
                             return { status: 'ok', message: `Active: ${shortUrl}...`, details: data };
                         }
-                        return { status: 'error', message: data.message || 'Not running' };
+                        if (data.running && !reachable) {
+                            return { status: 'error', message: 'Running (but unreachable)', details: data };
+                        }
+                        return { status: 'error', message: data.message || 'Not running', details: data };
                     } catch (e) {
                         return { status: 'error', message: 'Check failed' };
                     }
@@ -3016,14 +4381,18 @@
                         if (!resp.ok) return { status: 'error', message: 'Not running' };
                         const data = await resp.json();
                         const cloudflareRunning = data.cloudflare_running || false;
+                        const reachable = !!data.cloudflare_reachable;
                         
-                        if (cloudflareRunning) {
+                        if (cloudflareRunning && reachable) {
                             const url = data.cloudflare_url || '';
                             if (url && url.includes('trycloudflare.com')) {
                                 const shortUrl = url.replace('https://', '').replace('http://', '').substring(0, 30);
                                 return { status: 'ok', message: shortUrl, details: data };
                             }
                             return { status: 'warning', message: 'Running (no URL yet)', details: data };
+                        }
+                        if (cloudflareRunning && !reachable) {
+                            return { status: 'error', message: 'Disconnected (restart tunnel)', details: data };
                         }
                         return { status: 'error', message: 'Offline - double-click to start' };
                     } catch (e) {
@@ -3636,6 +5005,26 @@
         }
 
         // ===== TUNNEL PROVIDER MANAGEMENT =====
+
+        // Cached tunnel config loaded from /api/super-admin/tunnel-config
+        let _cachedTunnelConfig = null;
+
+        function _getPreferredPublicUrl(statusData) {
+            try {
+                const cfg = _cachedTunnelConfig || {};
+                const provider = (cfg.provider || '').toLowerCase();
+                const domain = (cfg.cloudflare_domain || '').trim();
+                const tokenSaved = !!cfg.cloudflare_tunnel_token;
+
+                // If permanent Cloudflare is configured, always prefer it.
+                if (provider === 'cloudflare' && domain && tokenSaved) {
+                    return `https://${domain}`;
+                }
+            } catch (e) {
+                // Ignore
+            }
+            return (statusData && statusData.url) ? statusData.url : '';
+        }
         
         async function loadTunnelConfig() {
             try {
@@ -3643,8 +5032,28 @@
                 const data = await resp.json();
                 
                 if (data.success) {
+                    _cachedTunnelConfig = data;
                     document.getElementById('tunnelProvider').value = data.provider || 'ngrok';
                     document.getElementById('cloudflareDomain').value = data.cloudflare_domain || '';
+                    
+                    // Check if token is saved
+                    const tokenInput = document.getElementById('cloudflareTunnelToken');
+                    const tokenSavedIndicator = document.getElementById('tokenSavedIndicator');
+                    const toggleTokenBtn = document.getElementById('toggleTokenEdit');
+                    
+                    if (data.cloudflare_tunnel_token) {
+                        // Token is saved - show masked value and edit button
+                        tokenInput.value = '••••••••••••••••••••';
+                        tokenInput.disabled = true;
+                        tokenSavedIndicator.style.display = 'inline-block';
+                        toggleTokenBtn.style.display = 'block';
+                    } else {
+                        // No token saved - enable input
+                        tokenInput.value = '';
+                        tokenInput.disabled = false;
+                        tokenSavedIndicator.style.display = 'none';
+                        toggleTokenBtn.style.display = 'none';
+                    }
                     
                     // Show/hide cloudflare options
                     handleTunnelProviderChange();
@@ -3664,6 +5073,13 @@
             try {
                 const resp = await fetch('/api/admin/ngrok-status');
                 const data = await resp.json();
+
+                // If permanent Cloudflare is configured, prefer it over status-derived URLs.
+                const preferredUrl = _getPreferredPublicUrl(data);
+                if (preferredUrl) {
+                    updateWebhookUrls(preferredUrl, true); // initial load
+                    return;
+                }
                 
                 // Use the stored public URL (cloudflare_url or ngrok_url based on provider)
                 let publicUrl = '';
@@ -3703,10 +5119,36 @@
             }
         }
 
+        function toggleTokenEdit() {
+            const tokenInput = document.getElementById('cloudflareTunnelToken');
+            const toggleBtn = document.getElementById('toggleTokenEdit');
+            const tokenSavedIndicator = document.getElementById('tokenSavedIndicator');
+            
+            if (tokenInput.disabled) {
+                // Enable editing
+                tokenInput.disabled = false;
+                tokenInput.value = '';
+                tokenInput.placeholder = 'Enter new tunnel token...';
+                tokenInput.focus();
+                toggleBtn.textContent = 'Cancel';
+                toggleBtn.style.background = 'rgba(231, 76, 60, 0.2)';
+                toggleBtn.style.borderColor = 'rgba(231, 76, 60, 0.4)';
+            } else {
+                // Cancel editing - restore masked value
+                tokenInput.disabled = true;
+                tokenInput.value = '••••••••••••••••••••';
+                tokenInput.placeholder = 'eyJhIjoixxxx...';
+                toggleBtn.textContent = 'Edit';
+                toggleBtn.style.background = 'rgba(102, 126, 234, 0.2)';
+                toggleBtn.style.borderColor = 'rgba(102, 126, 234, 0.4)';
+            }
+        }
+
         async function saveTunnelConfig() {
             const provider = document.getElementById('tunnelProvider').value;
             const domain = document.getElementById('cloudflareDomain').value;
-            const token = document.getElementById('cloudflareTunnelToken').value;
+            const tokenInput = document.getElementById('cloudflareTunnelToken');
+            const token = tokenInput.disabled ? null : tokenInput.value; // Only send if editing
             
             showAlert('💾 Saving tunnel configuration...', 'info');
             
@@ -3714,13 +5156,19 @@
                 const resp = await fetch('/api/super-admin/tunnel-config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provider, domain, token })
+                    body: JSON.stringify({ 
+                        provider, 
+                        cloudflare_domain: domain, 
+                        cloudflare_tunnel_token: token 
+                    })
                 });
                 
                 const data = await resp.json();
                 
                 if (data.success) {
                     showAlert('✅ Tunnel configuration saved', 'success');
+                    // Reload config to show saved state
+                    await loadTunnelConfig();
                 } else {
                     showAlert('❌ Failed to save: ' + (data.error || 'Unknown error'), 'error');
                 }
@@ -3972,6 +5420,9 @@
                 }
 
                 _setOpenRouterModelStatus('Loaded', true);
+                
+                // Also populate racing model dropdowns with the same models
+                await populateRacingModelDropdowns();
             } catch (e) {
                 console.error('Error loading OpenRouter models:', e);
                 _setOpenRouterModelStatus(`Load failed: ${e.message || e}`, false);
@@ -4027,6 +5478,762 @@
             }
         }
 
+        async function useFastestModels() {
+            const btn = document.getElementById('useFastestModelsBtn');
+            const selectEl = document.getElementById('openrouterModelSelect');
+            const model2Select = document.getElementById('racingModel2Select');
+            const model3Select = document.getElementById('racingModel3Select');
+            const racingCheckbox = document.getElementById('racingEnabledCheckbox');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⚡ Setting...';
+            }
+            _setOpenRouterModelStatus('Setting fastest models…', true);
+
+            try {
+                // Proven fastest models for voice calls (low latency + reliable)
+                const fastestModels = {
+                    model1: 'google/gemini-2.0-flash-exp:free',  // Ultra-fast, free
+                    model2: 'openai/gpt-4o-mini',                // Very fast, cheap
+                    model3: 'deepseek/deepseek-chat'             // Fast, quality
+                };
+
+                // Set main model
+                if (selectEl) {
+                    selectEl.value = fastestModels.model1;
+                }
+
+                // Enable racing and set models
+                if (racingCheckbox) {
+                    racingCheckbox.checked = true;
+                    toggleRacingInputs();
+                }
+                if (model2Select) {
+                    model2Select.value = fastestModels.model2;
+                }
+                if (model3Select) {
+                    model3Select.value = fastestModels.model3;
+                }
+
+                // Save main model
+                const resp1 = await fetch('/api/super-admin/openrouter-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: fastestModels.model1, updated_by: 'super-admin' })
+                });
+
+                // Save racing settings
+                const resp2 = await fetch('/api/super-admin/racing-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        racing_enabled: 1,
+                        model_2: fastestModels.model2,
+                        model_3: fastestModels.model3,
+                        updated_by: 'super-admin'
+                    })
+                });
+
+                if (resp1.ok && resp2.ok) {
+                    _setOpenRouterModelStatus('✅ Fastest models configured!', true);
+                    showAlert('✅ Fastest models configured! Racing 3 ultra-fast models for <400ms responses.', 'success');
+                } else {
+                    throw new Error('Failed to save settings');
+                }
+            } catch (e) {
+                _setOpenRouterModelStatus(`Failed: ${e.message || e}`, false);
+                showAlert('❌ Failed to set fastest models: ' + (e.message || e), 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '⚡ Use Fastest Models';
+                }
+            }
+        }
+
+        // ========== Racing Mode Functions ==========
+        
+        async function loadRacingSettings() {
+            try {
+                const resp = await fetch('/api/super-admin/racing-settings');
+                const data = await resp.json();
+                
+                if (data && data.success) {
+                    const checkbox = document.getElementById('racingEnabledCheckbox');
+                    if (checkbox) {
+                        checkbox.checked = !!data.racing_enabled;
+                        toggleRacingInputs();
+                    }
+                    
+                    // Set selected models (dropdowns already populated by loadOpenRouterModels)
+                    const model2Select = document.getElementById('racingModel2Select');
+                    const model3Select = document.getElementById('racingModel3Select');
+                    if (model2Select && data.model_2) {
+                        model2Select.value = data.model_2;
+                    }
+                    if (model3Select && data.model_3) {
+                        model3Select.value = data.model_3;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading racing settings:', e);
+            }
+        }
+        
+        async function populateRacingModelDropdowns() {
+            try {
+                const resp = await fetch('/api/super-admin/openrouter-models');
+                const data = await resp.json();
+                
+                if (!data || !data.success) return;
+                
+                const models = Array.isArray(data.models) ? data.models : [];
+                const model2Select = document.getElementById('racingModel2Select');
+                const model3Select = document.getElementById('racingModel3Select');
+                
+                if (!model2Select || !model3Select) return;
+                
+                // Clear existing options except "None"
+                model2Select.innerHTML = '<option value="">None</option>';
+                model3Select.innerHTML = '<option value="">None</option>';
+                
+                // Add all models
+                for (const m of models) {
+                    const id = m?.id || '';
+                    if (!id) continue;
+                    const score = m?.call_latency_score || 5;
+                    const priceLabel = m?.pricing_per_million?.label ? ` — ${m.pricing_per_million.label}` : '';
+                    
+                    const opt2 = document.createElement('option');
+                    opt2.value = id;
+                    opt2.textContent = `★${score} ${id}${priceLabel}`;
+                    opt2.style.background = '#34495e';
+                    opt2.style.color = '#ecf0f1';
+                    model2Select.appendChild(opt2);
+                    
+                    const opt3 = document.createElement('option');
+                    opt3.value = id;
+                    opt3.textContent = `★${score} ${id}${priceLabel}`;
+                    opt3.style.background = '#34495e';
+                    opt3.style.color = '#ecf0f1';
+                    model3Select.appendChild(opt3);
+                }
+            } catch (e) {
+                console.error('Error populating racing model dropdowns:', e);
+            }
+        }
+        
+        function toggleRacingInputs() {
+            const checkbox = document.getElementById('racingEnabledCheckbox');
+            const inputs = document.getElementById('racingModelInputs');
+            if (checkbox && inputs) {
+                inputs.style.display = checkbox.checked ? 'block' : 'none';
+            }
+        }
+        
+        async function saveRacingSettings() {
+            const btn = document.getElementById('saveRacingSettingsBtn');
+            const checkbox = document.getElementById('racingEnabledCheckbox');
+            const model2Select = document.getElementById('racingModel2Select');
+            const model3Select = document.getElementById('racingModel3Select');
+            const statusEl = document.getElementById('racingStatus');
+            
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '💾 Saving...';
+            }
+            
+            if (statusEl) statusEl.innerHTML = '<span style="color: #f39c12;">Saving…</span>';
+            
+            try {
+                const racing_enabled = checkbox && checkbox.checked ? 1 : 0;
+                const model_2 = model2Select ? (model2Select.value || '').trim() : '';
+                const model_3 = model3Select ? (model3Select.value || '').trim() : '';
+                
+                const resp = await fetch('/api/super-admin/racing-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        racing_enabled,
+                        model_2,
+                        model_3,
+                        updated_by: 'super-admin'
+                    })
+                });
+                
+                const data = await resp.json();
+                
+                if (resp.ok && data && data.success) {
+                    if (statusEl) statusEl.innerHTML = '<span style="color: #2ecc71;">✅ Racing settings saved!</span>';
+                    showAlert('✅ Racing settings saved!', 'success');
+                } else {
+                    const err = data?.error || data?.message || `Save failed (HTTP ${resp.status})`;
+                    if (statusEl) statusEl.innerHTML = `<span style="color: #e74c3c;">${err}</span>`;
+                    showAlert('❌ Failed to save racing settings: ' + err, 'error');
+                }
+            } catch (e) {
+                if (statusEl) statusEl.innerHTML = `<span style="color: #e74c3c;">Save failed: ${e.message || e}</span>`;
+                showAlert('❌ Failed to save racing settings: ' + (e.message || e), 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Save Racing Settings';
+                }
+            }
+        }
+
+        // ========== Performance Tuning Functions ==========
+        
+        async function loadPerformanceSettings() {
+            try {
+                const resp = await fetch('/api/super-admin/performance-settings');
+                const data = await resp.json();
+                
+                if (data && data.success) {
+                    document.getElementById('perfHistoryParts').value = data.settings.history_parts || 4;
+                    document.getElementById('perfMaxTokens').value = data.settings.max_tokens || 100;
+                    document.getElementById('perfMaxMessageChars').value = data.settings.max_message_chars || 300;
+                    document.getElementById('perfRequestTimeout').value = data.settings.request_timeout || 8;
+                    document.getElementById('perfSystemMaxChars').value = data.settings.system_max_chars || 4000;
+                    document.getElementById('perfTotalPromptMaxChars').value = data.settings.total_prompt_max_chars || 6000;
+                    
+                    updatePerformanceProfile();
+                    showCurrentSettings();
+                }
+            } catch (e) {
+                console.error('Failed to load performance settings:', e);
+            }
+        }
+
+        async function savePerformanceSettings(options = {}) {
+            const showToast = (options && Object.prototype.hasOwnProperty.call(options, 'showToast')) ? !!options.showToast : true;
+            const timeoutMs = (options && Object.prototype.hasOwnProperty.call(options, 'timeoutMs')) ? Number(options.timeoutMs) : 12000;
+
+            const statusEl = document.getElementById('perfSaveStatus');
+            if (statusEl) {
+                statusEl.textContent = '💾 Saving...';
+                statusEl.style.color = '#3498db';
+            }
+            
+            try {
+                const settings = {
+                    history_parts: parseInt(document.getElementById('perfHistoryParts').value),
+                    max_tokens: parseInt(document.getElementById('perfMaxTokens').value),
+                    max_message_chars: parseInt(document.getElementById('perfMaxMessageChars').value),
+                    request_timeout: parseFloat(document.getElementById('perfRequestTimeout').value),
+                    system_max_chars: parseInt(document.getElementById('perfSystemMaxChars').value),
+                    total_prompt_max_chars: parseInt(document.getElementById('perfTotalPromptMaxChars').value)
+                };
+
+                console.log('Saving performance settings:', settings);
+
+                const controller = new AbortController();
+                const actualTimeout = isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 12000;
+                const timeoutId = setTimeout(() => {
+                    console.warn('Performance settings save timeout reached:', actualTimeout);
+                    try { controller.abort(); } catch (_) {}
+                }, actualTimeout);
+
+                let resp;
+                try {
+                    resp = await fetch('/api/super-admin/performance-settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings),
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+
+                console.log('Performance settings response status:', resp.status);
+                
+                const data = await resp.json();
+                console.log('Performance settings response data:', data);
+                
+                if (resp.ok && data && data.success) {
+                    if (statusEl) {
+                        statusEl.textContent = '✅ Settings saved! Applied to all new calls.';
+                        statusEl.style.color = '#27ae60';
+                    }
+                    if (showToast) {
+                        showAlert('⚡ Performance settings updated successfully!', 'success');
+                    }
+                    if (typeof updatePerformanceProfile === 'function') updatePerformanceProfile();
+                    if (typeof showCurrentSettings === 'function') showCurrentSettings();
+                    return true;
+                } else {
+                    const err = data?.error || `Save failed (HTTP ${resp.status})`;
+                    console.error('Performance settings save failed:', err);
+                    if (statusEl) {
+                        statusEl.textContent = '❌ ' + err;
+                        statusEl.style.color = '#e74c3c';
+                    }
+                    if (showToast) {
+                        showAlert('❌ Failed to save settings: ' + err, 'error');
+                    }
+                    return false;
+                }
+            } catch (e) {
+                console.error('Performance settings save exception:', e);
+                const msg = (e && (e.name === 'AbortError' || String(e.message || '').includes('aborted')))
+                    ? `Save timed out after ${Math.round((isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 12000) / 1000)}s. Try again.`
+                    : (e.message || String(e));
+
+                if (statusEl) {
+                    statusEl.textContent = '❌ Save failed: ' + msg;
+                    statusEl.style.color = '#e74c3c';
+                }
+                if (showToast) {
+                    showAlert('❌ Failed to save settings: ' + msg, 'error');
+                }
+                return false;
+            }
+        }
+
+        function applyPerformancePreset(preset) {
+            if (preset === 'maximum_speed') {
+                document.getElementById('perfHistoryParts').value = 2;
+                document.getElementById('perfMaxTokens').value = 60;
+                document.getElementById('perfMaxMessageChars').value = 200;
+                document.getElementById('perfRequestTimeout').value = 5;
+                document.getElementById('perfSystemMaxChars').value = 2000;
+                document.getElementById('perfTotalPromptMaxChars').value = 3000;
+                showAlert('🚀 Maximum Speed preset applied! (Save to activate)', 'success');
+            } else if (preset === 'balanced') {
+                document.getElementById('perfHistoryParts').value = 4;
+                document.getElementById('perfMaxTokens').value = 100;
+                document.getElementById('perfMaxMessageChars').value = 300;
+                document.getElementById('perfRequestTimeout').value = 8;
+                document.getElementById('perfSystemMaxChars').value = 4000;
+                document.getElementById('perfTotalPromptMaxChars').value = 6000;
+                showAlert('⚖️ Balanced preset applied! (Save to activate)', 'success');
+            } else if (preset === 'maximum_quality') {
+                document.getElementById('perfHistoryParts').value = 6;
+                document.getElementById('perfMaxTokens').value = 150;
+                document.getElementById('perfMaxMessageChars').value = 500;
+                document.getElementById('perfRequestTimeout').value = 12;
+                document.getElementById('perfSystemMaxChars').value = 6000;
+                document.getElementById('perfTotalPromptMaxChars').value = 10000;
+                showAlert('💎 Maximum Quality preset applied! (Save to activate)', 'success');
+            }
+            updatePerformanceProfile();
+        }
+
+        function updatePerformanceProfile() {
+            const history = parseInt(document.getElementById('perfHistoryParts').value);
+            const tokens = parseInt(document.getElementById('perfMaxTokens').value);
+            const msgChars = parseInt(document.getElementById('perfMaxMessageChars').value);
+            const timeout = parseFloat(document.getElementById('perfRequestTimeout').value);
+            
+            let speed = 'Unknown';
+            let speedColor = '#95a5a6';
+            
+            // Calculate rough speed estimate
+            if (history <= 2 && tokens <= 70 && msgChars <= 250 && timeout <= 6) {
+                speed = 'Very Fast (~300-500ms)';
+                speedColor = '#27ae60';
+            } else if (history <= 4 && tokens <= 100 && msgChars <= 350 && timeout <= 8) {
+                speed = 'Fast (~600-1000ms)';
+                speedColor = '#3498db';
+            } else if (history <= 5 && tokens <= 130 && msgChars <= 450 && timeout <= 10) {
+                speed = 'Moderate (~1000-1500ms)';
+                speedColor = '#f39c12';
+            } else {
+                speed = 'Slower (~1500ms+)';
+                speedColor = '#e67e22';
+            }
+            
+            const profileEl = document.getElementById('perfCurrentProfile');
+            if (profileEl) {
+                profileEl.innerHTML = `
+                    <div style="color: ${speedColor}; font-weight: 700; font-size: 14px; margin-bottom: 8px;">⚡ Estimated Speed: ${speed}</div>
+                    <div style="opacity: 0.8;">
+                        • History: ${history} message pairs<br>
+                        • Max tokens: ${tokens}<br>
+                        • Message limit: ${msgChars} chars<br>
+                        • Timeout: ${timeout}s
+                    </div>
+                `;
+            }
+        }
+
+        function showCurrentSettings() {
+            const container = document.getElementById('perfCurrentSettings');
+            if (container) {
+                container.style.display = 'block';
+            }
+        }
+
+        // Store suggestions globally
+        let currentPerfSuggestions = null;
+
+        let lastCallFeedback = null;
+
+        function openCallFeedbackModal() {
+            const modal = document.getElementById('callFeedbackModal');
+            const status = document.getElementById('callFeedbackStatus');
+            if (status) status.textContent = '';
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function closeCallFeedbackModal() {
+            const modal = document.getElementById('callFeedbackModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function _getRadioValue(name) {
+            const el = document.querySelector(`input[name="${name}"]:checked`);
+            return el ? (el.value || '') : '';
+        }
+
+        async function submitCallFeedbackAndAnalyze() {
+            const status = document.getElementById('callFeedbackStatus');
+            const btn = document.getElementById('callFeedbackRunBtn');
+            const prevText = btn ? btn.textContent : '';
+
+            const talkedOver = _getRadioValue('fb_talked_over');
+            const fastEnough = _getRadioValue('fb_fast_enough');
+            const gibberish = _getRadioValue('fb_gibberish');
+            const disconnected = _getRadioValue('fb_disconnected');
+
+            if (!talkedOver || !fastEnough || !gibberish || !disconnected) {
+                if (status) {
+                    status.textContent = '⚠️ Please answer the required questions.';
+                    status.style.color = '#f39c12';
+                }
+                return;
+            }
+
+            const feedback = {
+                talked_over: talkedOver === 'yes',
+                response_fast_enough: fastEnough === 'yes',
+                gibberish: gibberish === 'yes',
+                disconnected: disconnected === 'yes',
+            };
+
+            const transferProblem = _getRadioValue('fb_transfer_problem');
+            if (transferProblem) feedback.transfer_problem = transferProblem === 'yes';
+
+            const instructionNoncompliance = _getRadioValue('fb_instruction_noncompliance');
+            if (instructionNoncompliance) feedback.instruction_noncompliance = instructionNoncompliance === 'yes';
+
+            const notes = (document.getElementById('fb_notes')?.value || '').trim();
+            if (notes) feedback.notes = notes;
+
+            lastCallFeedback = feedback;
+
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Analyzing...';
+                }
+                if (status) {
+                    status.textContent = 'Analyzing last call (using your answers)…';
+                    status.style.color = 'rgba(255,255,255,0.85)';
+                }
+
+                const resp = await fetch('/api/super-admin/analyze-last-call-performance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback })
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || !data || !data.success) {
+                    const err = data?.error || `Analysis failed (HTTP ${resp.status})`;
+                    if (status) {
+                        status.textContent = '❌ ' + err;
+                        status.style.color = '#e74c3c';
+                    }
+                    showAlert('❌ ' + err, 'error', true);
+                    return;
+                }
+
+                closeCallFeedbackModal();
+
+                currentPerfSuggestions = data.suggestions;
+
+                clearPerfHighlights();
+                const highlights = data.highlights || [];
+                highlights.forEach(field => {
+                    const el = document.getElementById('perf' + field.charAt(0).toUpperCase() + field.slice(1));
+                    if (el && el.parentElement) {
+                        el.parentElement.style.background = 'rgba(243, 156, 18, 0.15)';
+                        el.parentElement.style.border = '2px solid #f39c12';
+                        el.parentElement.style.transition = 'all 0.3s ease';
+                    }
+                });
+
+                showPerfSuggestionsModal(data);
+            } catch (e) {
+                const msg = 'Failed to analyze: ' + (e.message || e);
+                if (status) {
+                    status.textContent = '❌ ' + msg;
+                    status.style.color = '#e74c3c';
+                }
+                showAlert('❌ ' + msg, 'error', true);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = prevText || '▶ Run analysis';
+                }
+            }
+        }
+
+        async function analyzeLastCallPerformance() {
+            // New flow: ask quick questions first, then run analysis with answers.
+            openCallFeedbackModal();
+        }
+
+        function showPerfSuggestionsModal(data) {
+            const modal = document.getElementById('perfSuggestionsModal');
+            const content = document.getElementById('perfSuggestionsContent');
+            
+            if (!modal || !content) return;
+            
+            let html = '';
+
+            // User feedback summary (if provided)
+            const fb = data.user_feedback || null;
+            if (fb) {
+                const yn = (v) => (v === true ? 'Yes' : (v === false ? 'No' : 'Unknown'));
+                html += `
+                    <div style="background: rgba(155, 89, 182, 0.12); border-left: 4px solid rgba(155, 89, 182, 0.9); padding: 15px; border-radius: 8px; margin-bottom: 18px;">
+                        <div style="font-size: 15px; font-weight: 800; margin-bottom: 8px; color: rgba(220, 190, 255, 0.95);">🧾 Your answers</div>
+                        <div style="font-size: 13px; opacity: 0.92; display: grid; grid-template-columns: auto 1fr; gap: 8px;">
+                            <div><strong>Talked over you:</strong></div><div>${yn(fb.talked_over)}</div>
+                            <div><strong>Fast enough:</strong></div><div>${yn(fb.response_fast_enough)}</div>
+                            <div><strong>Gibberish:</strong></div><div>${yn(fb.gibberish)}</div>
+                            <div><strong>Disconnected:</strong></div><div>${yn(fb.disconnected)}</div>
+                        </div>
+                        ${fb.notes ? `<div style="margin-top: 10px; font-size: 12px; opacity: 0.9;"><strong>Notes:</strong> ${String(fb.notes).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+                    </div>
+                `;
+            }
+            
+            // Call Info Summary
+            if (data.call_info) {
+                html += `
+                    <div style="background: rgba(52, 152, 219, 0.1); border-left: 4px solid #3498db; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #3498db;">📊 Call Summary</div>
+                        <div style="font-size: 13px; opacity: 0.9; display: grid; grid-template-columns: auto 1fr; gap: 8px;">
+                            <div><strong>Duration:</strong></div><div>${data.call_info.duration || 'N/A'}</div>
+                            <div><strong>Response Time:</strong></div><div>${data.call_info.avg_response_time || 'N/A'}</div>
+                            <div><strong>Model:</strong></div><div>${data.call_info.model || 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Issues Detected
+            const issues = data.issues || [];
+            if (issues.length > 0) {
+                html += `<div style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #e74c3c;">⚠️ Issues Detected (${issues.length})</div>`;
+                
+                issues.forEach((issue, idx) => {
+                    const severityColors = {
+                        critical: '#e74c3c',
+                        high: '#e67e22',
+                        medium: '#f39c12',
+                        low: '#3498db'
+                    };
+                    const color = severityColors[issue.severity] || '#95a5a6';
+                    
+                    html += `
+                        <div style="background: rgba(0, 0, 0, 0.2); border-left: 4px solid ${color}; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 700; color: ${color}; margin-bottom: 6px;">
+                                        ${issue.icon || '⚠️'} ${issue.title}
+                                    </div>
+                                    <div style="font-size: 13px; opacity: 0.85; margin-bottom: 8px;">${issue.description}</div>
+                                </div>
+                            </div>
+                    `;
+                    
+                    // Show affected settings with individual apply buttons
+                    if (issue.settings && Object.keys(issue.settings).length > 0) {
+                        html += `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">`;
+                        html += `<div style="font-size: 12px; font-weight: 700; margin-bottom: 8px; opacity: 0.7;">💡 Recommended Fix:</div>`;
+                        
+                        for (const [key, value] of Object.entries(issue.settings)) {
+                            const currentEl = document.getElementById('perf' + key.charAt(0).toUpperCase() + key.slice(1));
+                            const currentValue = currentEl ? currentEl.value : 'N/A';
+                            const settingLabels = {
+                                historyParts: 'History',
+                                maxTokens: 'Max Tokens',
+                                maxMessageChars: 'Msg Chars',
+                                requestTimeout: 'Timeout',
+                                systemMaxChars: 'System Chars',
+                                totalPromptMaxChars: 'Total Chars'
+                            };
+                            const label = settingLabels[key] || key;
+                            
+                            html += `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0;">
+                                    <div style="font-size: 12px;">
+                                        <strong>${label}:</strong> ${currentValue} → <span style="color: #2ecc71;">${value}</span>
+                                    </div>
+                                    <button onclick="applySingleSetting('${key}', ${JSON.stringify(value).replace(/"/g, '&quot;')})" 
+                                            class="btn" style="padding: 4px 12px; font-size: 11px; background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                                        Apply
+                                    </button>
+                                </div>
+                            `;
+                        }
+                        html += `</div>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+            }
+            
+            // Performance Suggestions
+            const suggestions = data.suggestions || {};
+            if (Object.keys(suggestions).length > 0) {
+                html += `<div style="font-size: 18px; font-weight: 700; margin: 20px 0 15px 0; color: #2ecc71;">✅ General Optimizations</div>`;
+                
+                const settingLabels = {
+                    historyParts: '💬 Conversation History',
+                    maxTokens: '🎤 Max Response Length',
+                    maxMessageChars: '✂️ Message Character Limit',
+                    requestTimeout: '⏱️ Request Timeout',
+                    systemMaxChars: '📋 System Instructions Limit',
+                    totalPromptMaxChars: '📝 Total Prompt Limit'
+                };
+                
+                for (const [key, value] of Object.entries(suggestions)) {
+                    const label = settingLabels[key] || key;
+                    const currentEl = document.getElementById('perf' + key.charAt(0).toUpperCase() + key.slice(1));
+                    const currentValue = currentEl ? currentEl.value : 'N/A';
+                    
+                    html += `
+                        <div style="background: rgba(46, 204, 113, 0.1); border: 1px solid #2ecc71; border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px; color: #2ecc71;">${label}</div>
+                                <div style="font-size: 12px; opacity: 0.8;">
+                                    Current: <strong>${currentValue}</strong> → Suggested: <strong style="color: #2ecc71;">${value}</strong>
+                                </div>
+                            </div>
+                            <button onclick="applySingleSetting('${key}', ${JSON.stringify(value).replace(/"/g, '&quot;')})" 
+                                    class="btn" style="padding: 8px 16px; font-size: 12px; background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                                Apply
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            
+            // No issues found
+            if (issues.length === 0 && Object.keys(suggestions).length === 0) {
+                html += `
+                    <div style="background: rgba(46, 204, 113, 0.1); border-left: 4px solid #2ecc71; padding: 20px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #2ecc71; margin-bottom: 8px;">Excellent Performance!</div>
+                        <div style="font-size: 13px; opacity: 0.9;">No issues detected. Your current settings are working well for this type of call.</div>
+                    </div>
+                `;
+            }
+            
+            content.innerHTML = html;
+            modal.style.display = 'flex';
+        }
+
+        function closePerfSuggestionsModal() {
+            const modal = document.getElementById('perfSuggestionsModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            clearPerfHighlights();
+        }
+
+        function clearPerfHighlights() {
+            const fields = ['historyParts', 'maxTokens', 'maxMessageChars', 'requestTimeout', 'systemMaxChars', 'totalPromptMaxChars'];
+            fields.forEach(field => {
+                const el = document.getElementById('perf' + field.charAt(0).toUpperCase() + field.slice(1));
+                if (el && el.parentElement) {
+                    el.parentElement.style.background = '';
+                    el.parentElement.style.border = '';
+                }
+            });
+        }
+
+        async function applySingleSetting(settingKey, value) {
+            const elementId = 'perf' + settingKey.charAt(0).toUpperCase() + settingKey.slice(1);
+            const element = document.getElementById(elementId);
+            
+            if (element) {
+                element.value = value;
+                
+                // Save the setting
+                const ok = await savePerformanceSettings({ showToast: false });
+                if (ok) {
+                    showAlert('✅ Applied: ' + settingKey, 'success', true);
+                } else {
+                    showAlert('❌ Failed to apply setting: ' + settingKey, 'error', true);
+                }
+            }
+        }
+
+        async function applyPerfSuggestions() {
+            if (!currentPerfSuggestions) return;
+
+            const btn = document.getElementById('applyPerfSuggestionsBtn');
+            const statusEl = document.getElementById('perfSuggestionsApplyStatus');
+            const prevText = btn ? btn.textContent : '';
+
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Applying...';
+                }
+                if (statusEl) {
+                    statusEl.textContent = 'Applying recommendations and saving…';
+                    statusEl.style.color = 'rgba(255, 255, 255, 0.85)';
+                }
+
+                for (const [key, value] of Object.entries(currentPerfSuggestions)) {
+                    const el = document.getElementById('perf' + key.charAt(0).toUpperCase() + key.slice(1));
+                    if (el) {
+                        el.value = value;
+                    }
+                }
+
+                const ok = await savePerformanceSettings({ showToast: false, timeoutMs: 20000 });
+                if (ok) {
+                    if (statusEl) {
+                        statusEl.textContent = '✅ Applied and saved.';
+                        statusEl.style.color = '#2ecc71';
+                    }
+                    showAlert('✅ All recommendations applied and saved.', 'success', true);
+                    setTimeout(() => {
+                        closePerfSuggestionsModal();
+                        if (statusEl) statusEl.textContent = '';
+                    }, 650);
+                } else {
+                    if (statusEl) {
+                        statusEl.textContent = '❌ Failed to save. Nothing confirmed as applied.';
+                        statusEl.style.color = '#e74c3c';
+                    }
+                    showAlert('❌ Failed to apply recommendations (save failed).', 'error', true);
+                }
+            } catch (e) {
+                console.error('Error applying recommendations:', e);
+                if (statusEl) {
+                    statusEl.textContent = '❌ Error: ' + (e.message || String(e));
+                    statusEl.style.color = '#e74c3c';
+                }
+                showAlert('❌ Error applying recommendations: ' + (e.message || String(e)), 'error', true);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = prevText || '✅ Apply All Recommendations';
+                }
+            }
+        }
+
         // Track last known webhook URLs to detect changes
         let lastKnownWebhookUrls = {
             answer: null,
@@ -4048,15 +6255,16 @@
                     statusEl.style.background = 'rgba(46, 204, 113, 0.2)';
                     statusEl.style.color = '#2ecc71';
                     statusEl.textContent = 'Running';
-                    
-                    urlEl.textContent = data.url || 'Unknown';
+
+                    const preferredUrl = _getPreferredPublicUrl(data);
+                    urlEl.textContent = preferredUrl || data.url || 'Unknown';
                     urlDisplay.style.display = 'block';
                     
                     startBtn.style.display = 'none';
                     stopBtn.style.display = 'block';
                     
                     // Update webhook URLs and check for changes
-                    updateWebhookUrls(data.url);
+                    updateWebhookUrls(preferredUrl || data.url);
                 } else {
                     statusEl.style.background = 'rgba(231, 76, 60, 0.2)';
                     statusEl.style.color = '#e74c3c';
@@ -4613,5 +6821,3 @@ ${data.logs}
         // Log page load
         console.log('Super Admin Dashboard loaded successfully');
     </script>
-</body>
-</html>

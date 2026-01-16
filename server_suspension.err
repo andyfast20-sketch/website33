@@ -1,0 +1,204 @@
+C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+2026-01-05 21:59:48,632 - VonageAgent - INFO - ElevenLabs client initialized
+2026-01-05 21:59:48,694 - VonageAgent - INFO - Google Cloud TTS client initialized
+2026-01-05 21:59:48,697 - VonageAgent - INFO - PlayHT TTS configured with API key
+2026-01-05 21:59:48,720 - VonageAgent - INFO - \u2705 Loaded Speechmatics API key from database
+2026-01-05 21:59:48,720 - VonageAgent - INFO - \u2705 Loaded OpenAI API key from database
+2026-01-05 21:59:48,721 - VonageAgent - INFO - \u2705 Loaded DeepSeek API key from database
+2026-01-05 21:59:48,721 - VonageAgent - INFO - \u2705 Loaded Groq API key from database
+2026-01-05 21:59:48,721 - VonageAgent - INFO - \u2705 Loaded OpenRouter API key from database
+2026-01-05 21:59:48,721 - VonageAgent - INFO - \u2705 Loaded OpenRouter model from database: deepseek/deepseek-chat
+2026-01-05 21:59:48,721 - VonageAgent - INFO - \u2705 Loaded Vonage API key from database
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 Loaded Vonage API secret from database
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 Loaded Vonage Application ID from database
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 Loaded Vonage private key (PEM) from database
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 AI Brain Provider set to: openrouter
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 Performance: History parts = 4
+2026-01-05 21:59:48,722 - VonageAgent - INFO - \u2705 Performance: Max tokens = 100
+2026-01-05 21:59:48,723 - VonageAgent - INFO - \u2705 Performance: Max message chars = 250
+2026-01-05 21:59:48,723 - VonageAgent - INFO - \u2705 Performance: Request timeout = 8.0s
+2026-01-05 21:59:48,723 - VonageAgent - INFO - \u2705 Performance: System max chars = 3500
+2026-01-05 21:59:48,723 - VonageAgent - INFO - \u2705 Performance: Total prompt max chars = 5000
+INFO:     Started server process [22248]
+INFO:     Waiting for application startup.
+2026-01-05 21:59:48,836 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
+2026-01-05 21:59:48,840 - VonageAgent - INFO - \U0001f310 Tunnel provider (DB): cloudflare
+2026-01-05 21:59:48,841 - VonageAgent - INFO - \U0001f4de Answer URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/answer
+2026-01-05 21:59:48,841 - VonageAgent - INFO - \U0001f4cb Event URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/events
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5004 (Press CTRL+C to quit)
+2026-01-05 22:00:32,605 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 22:00:32,606 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 22:00:32,606 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 22:00:32,610 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 22:00:32,612 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 22:00:32,613 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 22:00:32,615 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 22:00:32,640 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 22:00:35,571 - VonageAgent - WARNING - \U0001f6a8 Content FLAGGED for user 25: sexual - Business explicitly states it sells sexual items, which qualifies as adult content/services (confidence: 0.95)
+2026-01-05 22:00:35,587 - VonageAgent - WARNING - \U0001f6a8 ACCOUNT SUSPENDED - User 25: Content policy violation: sexual
+2026-01-05 22:00:35,588 - VonageAgent - ERROR - Failed to update config: 403: Account suspended: Content policy violation: sexual. Please contact support.
+2026-01-05 22:00:41,417 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:41,423 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:45,672 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:45,682 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:45,698 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:45,717 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:45,722 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 22:00:46,376 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 22:00:46,382 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 22:00:46,382 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 22:01:16,190 - VonageAgent - INFO - \u2705 AI Brain Provider set to openrouter by super-admin
+2026-01-05 22:01:30,891 - httpx - INFO - HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+2026-01-05 22:01:45,073 - VonageAgent - INFO - \u2705 Account unsuspended and restored to normal: User 25
+2026-01-05 22:01:52,505 - VonageAgent - INFO - User signed in: Julie Richardson (ID: 25)
+2026-01-05 22:02:01,732 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 22:02:01,771 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 22:02:01,779 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 22:02:04,872 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 22:02:04,884 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 22:02:04,886 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 22:02:14,663 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 22:02:14,663 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 22:02:14,664 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 22:02:14,664 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 22:02:14,664 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 22:02:14,665 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 22:02:14,666 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 22:02:14,865 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 22:04:56,479 - VonageAgent - ERROR - Content moderation error: 
+Traceback (most recent call last):
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\client.py", line 779, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\client.py", line 734, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        req, traces=traces, timeout=real_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\connector.py", line 642, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\connector.py", line 1209, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\connector.py", line 1532, in _create_direct_connection
+    hosts = await self._resolve_host(host, port, traces=traces)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\connector.py", line 1148, in _resolve_host
+    return await asyncio.shield(resolved_host_task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\website33new\website33-main\website33-main\vonage_agent.py", line 739, in moderate_business_content
+    async with session.post(
+               ~~~~~~~~~~~~^
+        'https://api.deepseek.com/chat/completions',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+        }
+        ^
+    ) as response:
+    ^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\client.py", line 1510, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\client.py", line 624, in _request
+    with timer:
+         ^^^^^
+  File "C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\aiohttp\helpers.py", line 713, in __exit__
+    raise asyncio.TimeoutError from exc_val
+TimeoutError
+2026-01-05 22:04:56,511 - VonageAgent - INFO - Business info updated for user 25
+2026-01-05 22:04:56,511 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 22:04:56,512 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 22:04:56,513 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 22:04:56,513 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 22:04:56,514 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 22:04:56,514 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 22:04:56,514 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 22:04:56,515 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 22:04:56,515 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 22:04:56,515 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 22:04:56,524 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 22:05:20,627 - VonageAgent - INFO - \U0001f50a Generating Speechmatics TTS sample (voice_id=sarah)
+2026-01-05 22:05:21,016 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 22:05:21,018 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 22:05:21,018 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 22:05:21,018 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 22:05:21,019 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 22:05:21,019 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 22:05:21,020 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 22:05:21,030 - VonageAgent - INFO - \U0001f50a Generating Speechmatics TTS sample (voice_id=sarah)
+2026-01-05 22:05:21,435 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 22:05:21,435 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 22:05:21,435 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 22:05:21,435 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 22:05:21,436 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 22:05:21,436 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 22:05:21,437 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 22:05:24,909 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 22:05:24,911 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 22:05:24,955 - VonageAgent - INFO - \U0001f50a Generating Speechmatics TTS sample (voice_id=sarah)
+2026-01-05 22:05:25,356 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 22:05:25,358 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 22:05:25,358 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 22:05:25,359 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 22:05:25,359 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 22:05:25,359 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 22:05:25,360 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 22:05:25,429 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 22:05:25,430 - VonageAgent - INFO - Business info unchanged for user 25; skipping moderation
+2026-01-05 22:05:25,430 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 22:05:25,430 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 22:05:25,431 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 22:05:25,431 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 22:05:25,431 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 22:05:25,431 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 22:05:25,432 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 22:05:25,432 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 22:05:25,432 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 22:05:25,433 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 22:05:25,447 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 22:05:25,450 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 22:05:25,450 - VonageAgent - INFO - Business info unchanged for user 25; skipping moderation
+2026-01-05 22:05:25,451 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 22:05:25,451 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 22:05:25,451 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 22:05:25,451 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 22:05:25,452 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 22:05:25,452 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 22:05:25,452 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 22:05:25,453 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 22:05:25,453 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 22:05:25,453 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 22:05:25,468 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 22:05:28,688 - VonageAgent - INFO - \u2705 Speechmatics sample generated: 265772 bytes
+2026-01-05 22:05:28,689 - VonageAgent - INFO - \u2705 Speechmatics sample generated: 262700 bytes
+2026-01-05 22:05:28,692 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 22:05:28,693 - VonageAgent - INFO - Business info unchanged for user 25; skipping moderation
+2026-01-05 22:05:28,693 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 22:05:28,693 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 22:05:28,694 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 22:05:28,694 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 22:05:28,694 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 22:05:28,695 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 22:05:28,695 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 22:05:28,696 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 22:05:28,696 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 22:05:28,696 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 22:05:28,712 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 22:05:28,925 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 22:05:32,355 - VonageAgent - INFO - \u2705 Speechmatics sample generated: 251948 bytes
+2026-01-05 22:06:03,103 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 22:06:03,112 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 22:06:03,119 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 22:06:03,785 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 22:06:03,797 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 22:06:03,804 - VonageAgent - INFO - Found 3 numbers from Vonage API

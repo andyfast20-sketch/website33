@@ -23,6 +23,7 @@ import hashlib
 import time
 import hmac
 import base64 as _py_base64
+import threading
 from typing import Dict, Optional, List, Tuple, Any, TYPE_CHECKING
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -31,6 +32,785 @@ import io
 import re
 
 import numpy as np
+
+
+# --- Vapi tool-call authentication (per-call tokens) ------------------------
+_VAPI_TOOL_TOKENS_LOCK = threading.Lock()
+_VAPI_TOOL_TOKENS: Dict[str, Dict[str, Any]] = {}
+
+
+def _register_vapi_tool_token(token: str, *, user_id: int, call_uuid: str, ttl_seconds: int = 7200) -> None:
+    expires_at = time.time() + max(60, int(ttl_seconds))
+    with _VAPI_TOOL_TOKENS_LOCK:
+        _VAPI_TOOL_TOKENS[token] = {
+            "user_id": int(user_id),
+            "call_uuid": str(call_uuid),
+            "expires_at": float(expires_at),
+        }
+
+
+def _get_vapi_tool_context(token: str) -> Optional[Dict[str, Any]]:
+    tok = (token or "").strip()
+    if not tok:
+        return None
+    now = time.time()
+    with _VAPI_TOOL_TOKENS_LOCK:
+        ctx = _VAPI_TOOL_TOKENS.get(tok)
+        if not ctx:
+            return None
+        if float(ctx.get("expires_at", 0) or 0) < now:
+            try:
+                _VAPI_TOOL_TOKENS.pop(tok, None)
+            except Exception:
+                pass
+            return None
+        return dict(ctx)
+
+
+def _revoke_vapi_tool_token(token: str) -> None:
+    tok = (token or "").strip()
+    if not tok:
+        return
+    with _VAPI_TOOL_TOKENS_LOCK:
+        _VAPI_TOOL_TOKENS.pop(tok, None)
+
+
+def _book_provisional_appointment_db(
+    *,
+    call_uuid: str,
+    user_id: Optional[int],
+    caller_number: str,
+    date: str,
+    time_str: str,
+    customer_name: str,
+    customer_phone: str,
+    description: str,
+    transcript_text: str = "",
+    duration_minutes: int = 30,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Shared appointment booking logic.
+
+    Returns a JSON-serializable dict with either:
+    - {success: True, appointment_id: int, message: str}
+    - {success: False, error: str, message: str, alternatives?: [..], business_hours?: {...}}
+    """
+    date = (date or "").strip()
+    time_str = (time_str or "").strip()
+    customer_name = (customer_name or "").strip()
+    customer_phone = (customer_phone or caller_number or "").strip()
+    description = (description or "").strip()
+
+    if not date or not time_str or ((not customer_name) and (not dry_run)):
+        return {
+            "success": False,
+            "error": "missing_fields",
+            "message": "Missing required appointment fields (date, time, customer_name).",
+        }
+
+    try:
+        requested_start = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M")
+    except Exception:
+        return {
+            "success": False,
+            "error": "invalid_datetime",
+            "message": "Invalid date/time format. Expected date YYYY-MM-DD and time HH:MM (24-hour).",
+        }
+
+    try:
+        requested_duration_minutes = int(duration_minutes or 30)
+    except Exception:
+        requested_duration_minutes = 30
+    if requested_duration_minutes <= 0:
+        requested_duration_minutes = 30
+    if requested_duration_minutes > 8 * 60:
+        requested_duration_minutes = 8 * 60
+    requested_end = requested_start + timedelta(minutes=requested_duration_minutes)
+
+    # Per-account business hours/timezone (best-effort)
+    business_timezone = 'Europe/London'
+    business_hours = _default_business_hours()
+    try:
+        conn_pref = get_db_connection()
+        cur_pref = conn_pref.cursor()
+        cur_pref.execute(
+            'SELECT business_hours_json, business_timezone FROM account_settings WHERE user_id = ?',
+            (user_id,),
+        )
+        pref_row = cur_pref.fetchone()
+        conn_pref.close()
+
+        if pref_row:
+            raw_hours = pref_row[0]
+            if raw_hours:
+                try:
+                    import json as _json
+                    business_hours = _normalize_business_hours(_json.loads(raw_hours))
+                except Exception:
+                    business_hours = _default_business_hours()
+            business_timezone = (pref_row[1] or 'Europe/London')
+    except Exception:
+        business_timezone = 'Europe/London'
+        business_hours = _default_business_hours()
+
+    # Min notice
+    min_notice_minutes = 60
+    now_dt = _best_effort_local_now_for_timezone(business_timezone)
+    min_allowed_start = now_dt + timedelta(minutes=min_notice_minutes)
+
+    weekday_key = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][requested_start.weekday()]
+    day_cfg = business_hours.get(weekday_key) or {"open": True, "start": "09:00", "end": "17:00"}
+    is_open_day = bool(day_cfg.get("open", True))
+    day_open_time = str(day_cfg.get("start", "09:00") or "09:00").strip()
+    day_close_time = str(day_cfg.get("end", "17:00") or "17:00").strip()
+    try:
+        open_dt = datetime.strptime(f"{date} {day_open_time}", "%Y-%m-%d %H:%M")
+        close_dt = datetime.strptime(f"{date} {day_close_time}", "%Y-%m-%d %H:%M")
+    except Exception:
+        open_dt = datetime.strptime(f"{date} 09:00", "%Y-%m-%d %H:%M")
+        close_dt = datetime.strptime(f"{date} 17:00", "%Y-%m-%d %H:%M")
+
+    # Open hours violation
+    if (not is_open_day) or (requested_start < open_dt) or (requested_end > close_dt):
+        return {
+            "success": False,
+            "error": "outside_business_hours",
+            "message": "That time is outside our business hours.",
+            "business_hours": {"timezone": business_timezone, "day": weekday_key, **day_cfg},
+        }
+
+    # Min notice violation
+    if requested_start < min_allowed_start:
+        return {
+            "success": False,
+            "error": "too_soon",
+            "message": "That time is too soon to book. Appointments need at least 1 hour notice.",
+        }
+
+    conn = sqlite3.connect('call_logs.db')
+    cursor = conn.cursor()
+
+    # Existing appointments for THIS user only.
+    cursor.execute(
+        """
+        SELECT time, COALESCE(duration, 30) as duration, status
+        FROM appointments
+        WHERE date = ? AND user_id = ? AND status IN ('scheduled', 'busy', 'pending')
+        ORDER BY time
+        """,
+        (date, user_id),
+    )
+    existing_rows = cursor.fetchall() or []
+
+    # Detect all-day busy blocks
+    day_fully_busy = False
+    for row in existing_rows:
+        existing_time = (row[0] or "").strip()
+        existing_duration = int(row[1] or 0)
+        existing_status = (row[2] or "").strip().lower()
+        if existing_status == "busy" and existing_duration >= 1440:
+            day_fully_busy = True
+            break
+        if existing_status == "busy" and existing_time == "00:00" and existing_duration >= 1440:
+            day_fully_busy = True
+            break
+
+    def _hour_slots_within_business_hours() -> List[str]:
+        if not is_open_day:
+            return []
+        latest_start = close_dt - timedelta(minutes=requested_duration_minutes)
+        if latest_start < open_dt:
+            return []
+        slots: List[str] = []
+        first_hour = open_dt.replace(minute=0, second=0, microsecond=0)
+        if first_hour < open_dt:
+            first_hour = first_hour + timedelta(hours=1)
+        t = first_hour
+        while t <= latest_start:
+            slots.append(t.strftime("%H:%M"))
+            t += timedelta(hours=1)
+        return slots
+
+    def _compute_alternatives() -> List[str]:
+        if day_fully_busy:
+            return []
+        slots = _hour_slots_within_business_hours()
+        allowed_start = max(min_allowed_start, open_dt)
+        filtered: List[str] = []
+        for t in slots:
+            try:
+                s = datetime.strptime(f"{date} {t}", "%Y-%m-%d %H:%M")
+            except Exception:
+                continue
+            if s < allowed_start:
+                continue
+            e = s + timedelta(minutes=requested_duration_minutes)
+            conflict = False
+            for r in existing_rows:
+                et = (r[0] or "").strip()
+                try:
+                    es = datetime.strptime(f"{date} {et}", "%Y-%m-%d %H:%M")
+                except Exception:
+                    continue
+                ed = es + timedelta(minutes=int(r[1] or 30))
+                if s < ed and e > es:
+                    conflict = True
+                    break
+            if not conflict:
+                filtered.append(t)
+        return filtered[:3]
+
+    if day_fully_busy:
+        conn.close()
+        return {
+            "success": False,
+            "error": "day_busy",
+            "message": f"Sorry, {date} is marked as unavailable.",
+            "alternatives": [],
+        }
+
+    # Overlap-based double booking prevention
+    conflict = False
+    for row in existing_rows:
+        existing_time = (row[0] or "").strip()
+        try:
+            existing_start = datetime.strptime(f"{date} {existing_time}", "%Y-%m-%d %H:%M")
+        except Exception:
+            continue
+        existing_end = existing_start + timedelta(minutes=int(row[1] or 30))
+        if requested_start < existing_end and requested_end > existing_start:
+            conflict = True
+            break
+
+    if conflict:
+        alternatives = _compute_alternatives()
+        conn.close()
+        return {
+            "success": False,
+            "error": "double_booking",
+            "message": f"Sorry, {time_str} is already booked on {date}.",
+            "alternatives": alternatives,
+        }
+
+    if dry_run:
+        conn.close()
+        return {
+            "success": True,
+            "available": True,
+            "date": date,
+            "time": time_str,
+            "duration": requested_duration_minutes,
+            "timezone": business_timezone,
+            "message": f"✅ {date} at {time_str} is available.",
+        }
+
+    # Optional call summary (skip if no transcript to avoid slowing tool calls)
+    call_summary = ""
+    if transcript_text and str(CONFIG.get('DEEPSEEK_API_KEY', '') or '').strip():
+        try:
+            import openai as openai_module
+            client = openai_module.OpenAI(
+                api_key=CONFIG['DEEPSEEK_API_KEY'],
+                base_url="https://api.deepseek.com",
+            )
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "Summarize this phone call in 1-2 brief sentences."},
+                    {"role": "user", "content": f"Call transcript:\n{transcript_text}"},
+                ],
+                max_tokens=100,
+            )
+            call_summary = (response.choices[0].message.content or "").strip()
+        except Exception:
+            call_summary = ""
+
+    provisional_note = "NOTE: Provisional appointment - requires confirmation by the business."
+    full_description = description.strip()
+    if full_description:
+        full_description = f"{full_description}\n\n{provisional_note}"
+    else:
+        full_description = provisional_note
+    if call_summary:
+        full_description = f"{full_description}\n\n--- Call Summary ---\n{call_summary}"
+
+    cursor.execute(
+        '''
+        INSERT INTO appointments
+        (date, time, duration, title, description, customer_name, customer_phone, status, created_by, call_uuid, user_id, is_read)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            date,
+            time_str,
+            requested_duration_minutes,
+            "Phone Appointment",
+            full_description,
+            customer_name,
+            customer_phone,
+            "pending",
+            "ai_agent",
+            call_uuid,
+            user_id,
+            0,
+        ),
+    )
+    appointment_id = cursor.lastrowid
+
+    # Track booking credits in the call record
+    booking_credits = 10.0
+    try:
+        cursor.execute('SELECT credits_per_calendar_booking FROM billing_config WHERE id = 1')
+        billing = cursor.fetchone()
+        booking_credits = billing[0] if billing else 10.0
+    except Exception:
+        booking_credits = 10.0
+
+    try:
+        cursor.execute(
+            '''
+            UPDATE calls
+            SET booking_credits_charged = COALESCE(booking_credits_charged, 0) + ?
+            WHERE call_uuid = ?
+            ''',
+            (booking_credits, call_uuid),
+        )
+    except Exception:
+        pass
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "appointment_id": int(appointment_id),
+        "message": f"Appointment pencilled in for {date} at {time_str} (pending confirmation).",
+    }
+
+
+def _normalize_appointment_date_time_inputs(
+    body: Dict[str, Any],
+    *,
+    default_timezone: str = "Europe/London",
+) -> Tuple[str, str, List[str]]:
+    """Best-effort normalization of date/time inputs coming from external tool calls.
+
+    Returns (date_yyyy_mm_dd, time_hh_mm, notes)
+    - date format: YYYY-MM-DD
+    - time format: HH:MM (24-hour)
+
+    Accepts common variations:
+    - date: YYYY-MM-DD, YYYY/MM/DD, DD/MM/YYYY, DD-MM-YYYY, '16 Jan 2026'
+    - time: HH:MM, HH.MM, HH:MM:SS, '2pm', '2:30 pm'
+    - datetime combined: '2026-01-16T14:00:00Z' or '2026-01-16 14:00'
+    """
+    notes: List[str] = []
+
+    def _clean(s: Any) -> str:
+        return str(s or "").strip()
+
+    raw_date = _clean(body.get("date"))
+    raw_time = _clean(body.get("time") or body.get("time_str"))
+
+    # Try combined datetime fields when date/time not provided cleanly
+    combined = _clean(
+        body.get("datetime")
+        or body.get("dateTime")
+        or body.get("date_time")
+        or body.get("start")
+        or body.get("start_time")
+        or body.get("startTime")
+    )
+
+    def _try_parse_iso_datetime(s: str) -> Optional[datetime]:
+        s = (s or "").strip()
+        if not s:
+            return None
+        try:
+            # Handle Zulu suffix
+            if s.endswith("Z"):
+                return datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return datetime.fromisoformat(s)
+        except Exception:
+            return None
+
+    def _to_local(dt: datetime) -> datetime:
+        """Convert aware datetimes to local timezone; leave naive as-is."""
+        try:
+            if getattr(dt, "tzinfo", None) is None:
+                return dt
+            from zoneinfo import ZoneInfo
+
+            return dt.astimezone(ZoneInfo(default_timezone))
+        except Exception:
+            return dt
+
+    def _normalize_date(s: str) -> str:
+        s = (s or "").strip()
+        if not s:
+            return ""
+
+        s_low = s.lower().strip()
+        try:
+            base_date = _best_effort_local_now_for_timezone(default_timezone).date()
+        except Exception:
+            base_date = datetime.now().date()
+
+        # Relative/common phrases
+        if s_low in {"today", "todays", "today's"}:
+            return base_date.isoformat()
+        if s_low in {"tomorrow", "tmr", "tmrw"}:
+            return (base_date + timedelta(days=1)).isoformat()
+        if s_low == "next week":
+            return (base_date + timedelta(days=7)).isoformat()
+
+        # Weekday handling: "next thursday" / "thursday"
+        weekdays = {
+            "monday": 0,
+            "mon": 0,
+            "tuesday": 1,
+            "tue": 1,
+            "tues": 1,
+            "wednesday": 2,
+            "wed": 2,
+            "thursday": 3,
+            "thu": 3,
+            "thur": 3,
+            "thurs": 3,
+            "friday": 4,
+            "fri": 4,
+            "saturday": 5,
+            "sat": 5,
+            "sunday": 6,
+            "sun": 6,
+        }
+        m = re.fullmatch(r"next\s+([a-z]+)", s_low)
+        if m and m.group(1) in weekdays:
+            target = weekdays[m.group(1)]
+            delta = (target - base_date.weekday()) % 7
+            if delta == 0:
+                delta = 7
+            return (base_date + timedelta(days=delta)).isoformat()
+        if s_low in weekdays:
+            target = weekdays[s_low]
+            delta = (target - base_date.weekday()) % 7
+            if delta == 0:
+                delta = 7
+            return (base_date + timedelta(days=delta)).isoformat()
+        # If date includes time, parse as datetime first.
+        if "T" in s or (" " in s and any(ch.isdigit() for ch in s)):
+            dt = _try_parse_iso_datetime(s)
+            if dt is None:
+                # Try 'YYYY-MM-DD HH:MM'
+                try:
+                    dt = datetime.strptime(s, "%Y-%m-%d %H:%M")
+                except Exception:
+                    dt = None
+            if dt is not None:
+                dt = _to_local(dt)
+                return dt.date().isoformat()
+
+        # Pure date formats
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"):
+            try:
+                return datetime.strptime(s, fmt).date().isoformat()
+            except Exception:
+                pass
+
+        # Named months
+        for fmt in ("%d %b %Y", "%d %B %Y", "%d %b, %Y", "%d %B, %Y"):
+            try:
+                return datetime.strptime(s, fmt).date().isoformat()
+            except Exception:
+                pass
+
+        # Month names without a year: assume current year; if already passed, roll to next year.
+        try:
+            cleaned = s_low
+            cleaned = re.sub(r"\b(st|nd|rd|th)\b", "", cleaned)
+            cleaned = cleaned.replace(",", " ").replace("of", " ")
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            for fmt in ("%d %b", "%d %B", "%b %d", "%B %d"):
+                try:
+                    d = datetime.strptime(cleaned, fmt).date()
+                    candidate = d.replace(year=base_date.year)
+                    if candidate < base_date:
+                        candidate = candidate.replace(year=base_date.year + 1)
+                    return candidate.isoformat()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Compact yyyymmdd
+        if re.fullmatch(r"\d{8}", s):
+            try:
+                return datetime.strptime(s, "%Y%m%d").date().isoformat()
+            except Exception:
+                pass
+
+        return ""
+
+    def _normalize_time(s: str) -> str:
+        s = (s or "").strip().lower()
+        if not s:
+            return ""
+
+        # If time includes date, parse as datetime
+        if "t" in s or ("-" in s and ":" in s):
+            dt = _try_parse_iso_datetime(s)
+            if dt is not None:
+                dt = _to_local(dt)
+                return dt.strftime("%H:%M")
+
+        s = s.replace(".", ":")
+
+        # HH:MM:SS -> HH:MM
+        m = re.fullmatch(r"\s*(\d{1,2})\s*:\s*(\d{2})(?:\s*:\s*\d{2})?\s*(am|pm)?\s*", s)
+        if m:
+            hh = int(m.group(1))
+            mm = int(m.group(2))
+            ap = (m.group(3) or "").lower()
+            if ap == "pm" and hh < 12:
+                hh += 12
+            if ap == "am" and hh == 12:
+                hh = 0
+            if 0 <= hh <= 23 and 0 <= mm <= 59:
+                return f"{hh:02d}:{mm:02d}"
+
+        # '2pm' / '2 pm'
+        m = re.fullmatch(r"\s*(\d{1,2})\s*(am|pm)\s*", s)
+        if m:
+            hh = int(m.group(1))
+            ap = m.group(2)
+            if ap == "pm" and hh < 12:
+                hh += 12
+            if ap == "am" and hh == 12:
+                hh = 0
+            if 0 <= hh <= 23:
+                return f"{hh:02d}:00"
+
+        # Bare hour '14' -> 14:00
+        if re.fullmatch(r"\d{1,2}", s):
+            hh = int(s)
+            if 0 <= hh <= 23:
+                return f"{hh:02d}:00"
+
+        return ""
+
+    # Prefer explicit fields
+    date_norm = _normalize_date(raw_date)
+    time_norm = _normalize_time(raw_time)
+
+    # If still missing, attempt combined datetime extraction.
+    if (not date_norm or not time_norm) and combined:
+        dt = _try_parse_iso_datetime(combined)
+        if dt is None:
+            # try 'YYYY-MM-DD HH:MM'
+            try:
+                dt = datetime.strptime(combined, "%Y-%m-%d %H:%M")
+            except Exception:
+                dt = None
+
+        if dt is not None:
+            dt = _to_local(dt)
+            if not date_norm:
+                date_norm = dt.date().isoformat()
+                notes.append("date_from_datetime")
+            if not time_norm:
+                time_norm = dt.strftime("%H:%M")
+                notes.append("time_from_datetime")
+
+    # As a last resort, if date field contains both date+time like '16/01/2026 2pm'
+    if (not date_norm or not time_norm) and raw_date and (" " in raw_date):
+        parts = raw_date.split()
+        if parts:
+            maybe_date = _normalize_date(parts[0])
+            maybe_time = _normalize_time(" ".join(parts[1:])) if len(parts) > 1 else ""
+            if not date_norm and maybe_date:
+                date_norm = maybe_date
+                notes.append("date_from_date_field")
+            if not time_norm and maybe_time:
+                time_norm = maybe_time
+                notes.append("time_from_date_field")
+
+    # Keep a note about timezone expectation (we treat interpreted values as local).
+    if date_norm or time_norm:
+        notes.append(f"interpreted_as_local:{default_timezone}")
+
+    return date_norm, time_norm, notes
+
+
+def _compute_availability_slots_db(
+    *,
+    user_id: Optional[int],
+    date: str,
+    duration_minutes: int = 30,
+    max_results: int = 8,
+) -> Dict[str, Any]:
+    """Return available slots for a given date (and nearby dates if needed).
+
+    This is used by the Vapi availability tool. Booking enforcement still happens
+    in `_book_provisional_appointment_db`.
+    """
+    date = (date or "").strip()
+    if not date:
+        return {"success": False, "error": "missing_date", "message": "Missing date (YYYY-MM-DD)."}
+
+    # Business hours/timezone
+    business_timezone = 'Europe/London'
+    business_hours = _default_business_hours()
+    try:
+        conn_pref = get_db_connection()
+        cur_pref = conn_pref.cursor()
+        cur_pref.execute(
+            'SELECT business_hours_json, business_timezone FROM account_settings WHERE user_id = ?',
+            (user_id,),
+        )
+        pref_row = cur_pref.fetchone()
+        conn_pref.close()
+        if pref_row:
+            raw_hours = pref_row[0]
+            if raw_hours:
+                try:
+                    import json as _json
+                    business_hours = _normalize_business_hours(_json.loads(raw_hours))
+                except Exception:
+                    business_hours = _default_business_hours()
+            business_timezone = (pref_row[1] or 'Europe/London')
+    except Exception:
+        business_timezone = 'Europe/London'
+        business_hours = _default_business_hours()
+
+    try:
+        requested_day = datetime.strptime(date, "%Y-%m-%d")
+    except Exception:
+        return {"success": False, "error": "invalid_date", "message": "Invalid date format. Use YYYY-MM-DD."}
+
+    # Min notice (applies across all searched days)
+    now_dt = _best_effort_local_now_for_timezone(business_timezone)
+    min_allowed = now_dt + timedelta(minutes=60)
+
+    def _day_cfg_for(day: datetime) -> Tuple[str, Dict[str, Any]]:
+        wk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][day.weekday()]
+        cfg = business_hours.get(wk) or {"open": True, "start": "09:00", "end": "17:00"}
+        return wk, cfg
+
+    def _existing_rows_for(day_str: str) -> List[Tuple[Any, Any, Any]]:
+        conn_local = sqlite3.connect('call_logs.db')
+        cur_local = conn_local.cursor()
+        cur_local.execute(
+            """
+            SELECT time, COALESCE(duration, 30) as duration, status
+            FROM appointments
+            WHERE date = ? AND user_id = ? AND status IN ('scheduled', 'busy', 'pending')
+            ORDER BY time
+            """,
+            (day_str, user_id),
+        )
+        rows = cur_local.fetchall() or []
+        conn_local.close()
+        return rows
+
+    def _is_day_fully_busy(rows: List[Tuple[Any, Any, Any]]) -> bool:
+        for row in rows:
+            existing_time = (row[0] or "").strip()
+            existing_duration = int(row[1] or 0)
+            existing_status = (row[2] or "").strip().lower()
+            if existing_status == "busy" and existing_duration >= 1440:
+                return True
+            if existing_status == "busy" and existing_time == "00:00" and existing_duration >= 1440:
+                return True
+        return False
+
+    def _compute_slots_for_day(day_str: str, wk: str, cfg: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any], str]:
+        if not bool(cfg.get("open", True)):
+            return [], {"day": wk, **cfg}, "Closed that day."
+
+        open_time = str(cfg.get("start", "09:00") or "09:00").strip()
+        close_time = str(cfg.get("end", "17:00") or "17:00").strip()
+        try:
+            open_dt = datetime.strptime(f"{day_str} {open_time}", "%Y-%m-%d %H:%M")
+            close_dt = datetime.strptime(f"{day_str} {close_time}", "%Y-%m-%d %H:%M")
+        except Exception:
+            open_dt = datetime.strptime(f"{day_str} 09:00", "%Y-%m-%d %H:%M")
+            close_dt = datetime.strptime(f"{day_str} 17:00", "%Y-%m-%d %H:%M")
+
+        latest_start = close_dt - timedelta(minutes=int(duration_minutes))
+        if latest_start < open_dt:
+            return [], {"day": wk, **cfg}, "No slots within business hours."
+
+        rows = _existing_rows_for(day_str)
+        if _is_day_fully_busy(rows):
+            return [], {"day": wk, **cfg}, "That day is fully blocked."
+
+        slots: List[str] = []
+
+        # Use 30-minute increments (more realistic than hour-aligned only).
+        step_minutes = 30
+        t = open_dt.replace(second=0, microsecond=0)
+        # Round up to next step boundary.
+        minute_mod = t.minute % step_minutes
+        if minute_mod != 0:
+            t = t + timedelta(minutes=(step_minutes - minute_mod))
+
+        while t <= latest_start:
+            if t >= min_allowed:
+                s = t
+                e = s + timedelta(minutes=int(duration_minutes))
+                conflict = False
+                for r in rows:
+                    et = (r[0] or "").strip()
+                    try:
+                        es = datetime.strptime(f"{day_str} {et}", "%Y-%m-%d %H:%M")
+                    except Exception:
+                        continue
+                    ed = es + timedelta(minutes=int(r[1] or 30))
+                    if s < ed and e > es:
+                        conflict = True
+                        break
+                if not conflict:
+                    slots.append(t.strftime("%H:%M"))
+                    if len(slots) >= int(max_results):
+                        break
+            t += timedelta(minutes=step_minutes)
+
+        return slots, {"day": wk, **cfg}, ""
+
+    # Search forward so callers don’t get “no slots” just because it’s after-hours.
+    searched_days = 0
+    last_reason = ""
+    for offset in range(0, 8):  # requested day + next 7 days
+        searched_days += 1
+        day = requested_day + timedelta(days=offset)
+        day_str = day.strftime("%Y-%m-%d")
+        wk, cfg = _day_cfg_for(day)
+        slots, bh, reason = _compute_slots_for_day(day_str, wk, cfg)
+        if slots:
+            payload: Dict[str, Any] = {
+                "success": True,
+                "requested_date": date,
+                "date": day_str,
+                "timezone": business_timezone,
+                "slots": slots,
+                "business_hours": bh,
+                "searched_days": searched_days,
+            }
+            if offset > 0:
+                payload["message"] = f"No slots on {date}; showing next available day."
+            return payload
+        if reason:
+            last_reason = reason
+
+    return {
+        "success": True,
+        "requested_date": date,
+        "date": date,
+        "timezone": business_timezone,
+        "slots": [],
+        "message": last_reason or "No slots found in the next 7 days.",
+        "searched_days": searched_days,
+    }
 
 
 # NOTE (Windows / Python 3.13 stability):
@@ -336,6 +1116,9 @@ CONFIG = {
     # Cartesia AI (real-time streaming, 100+ voices, low latency)
     "CARTESIA_API_KEY": os.getenv("CARTESIA_API_KEY", ""),
     "USE_CARTESIA": True,  # ✅ ENABLED - Fastest option with 100+ voices
+
+    # Lemonfox TTS (OpenAI-compatible speech endpoint)
+    "LEMONFOX_API_KEY": os.getenv("LEMONFOX_API_KEY", ""),
     
     # Summary model - which AI to use for call summaries
     # "openai": gpt-4o-mini ($0.15/$0.60 per 1M tokens)
@@ -350,6 +1133,9 @@ CONFIG = {
     "VONAGE_PRIVATE_KEY_PATH": os.getenv("VONAGE_PRIVATE_KEY_PATH", "private.key"),
     "VONAGE_API_KEY": os.getenv("VONAGE_API_KEY", ""),
     "VONAGE_API_SECRET": os.getenv("VONAGE_API_SECRET", ""),
+    # Debug/compat: force outbound audio frames to be JSON {audio: base64} instead of binary.
+    # Set to 1/true/yes to enable.
+    "VONAGE_FORCE_OUTBOUND_JSON_AUDIO": os.getenv("VONAGE_FORCE_OUTBOUND_JSON_AUDIO", ""),
     
     # Server
     "HOST": "0.0.0.0",
@@ -891,6 +1677,32 @@ def _sync_public_url_from_db_best_effort() -> Tuple[str, str]:
     Returns (provider, public_url).
     """
     provider, public_url = _get_global_tunnel_settings()
+
+    # If a permanent Cloudflare tunnel is configured (custom domain + token),
+    # prefer it over any stale stored public_url (which may still be a
+    # trycloudflare URL from a previous quick tunnel).
+    if provider == "cloudflare":
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT cloudflare_domain, cloudflare_tunnel_token FROM global_settings WHERE id = 1"
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                domain = (row[0] or "").strip()
+                token = (row[1] or "").strip()
+                if domain and token:
+                    permanent_url = _normalize_public_url(f"https://{domain}")
+                    if permanent_url:
+                        CONFIG["PUBLIC_URL"] = permanent_url
+                        if public_url != permanent_url:
+                            _persist_public_url(permanent_url)
+                        return provider, permanent_url
+        except Exception:
+            pass
+
     if public_url:
         CONFIG["PUBLIC_URL"] = public_url
         return provider, public_url
@@ -955,6 +1767,58 @@ def _ensure_column(cursor: sqlite3.Cursor, table: str, column: str, ddl: str) ->
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
     except Exception:
         pass
+
+
+def _ensure_ted_tables(cursor: sqlite3.Cursor) -> None:
+    """Ensure Ted's tracking tables exist in the active DB (call_logs.db)."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ted_performance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            call_uuid TEXT,
+            metric_type TEXT,
+            metric_value REAL,
+            issue_detected TEXT,
+            action_taken TEXT
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ted_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            problem_pattern TEXT,
+            solution_applied TEXT,
+            success_rate REAL DEFAULT 0.0,
+            times_encountered INTEGER DEFAULT 1,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ted_settings (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            performance_score REAL DEFAULT 100.0,
+            job_security_level REAL DEFAULT 100.0,
+            negative_feedback_count INTEGER DEFAULT 0,
+            auto_adjust_enabled INTEGER DEFAULT 1,
+            filler_timing_ms REAL DEFAULT 500.0,
+            min_user_turn_override REAL DEFAULT NULL,
+            barge_in_override REAL DEFAULT NULL,
+            last_adjustment DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ted_mood TEXT DEFAULT 'confident'
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO ted_settings (id, performance_score, job_security_level, ted_mood, auto_adjust_enabled, filler_timing_ms)
+        VALUES (1, 100.0, 100.0, 'confident', 1, 500.0)
+        """
+    )
 
 
 def ensure_auth_schema() -> None:
@@ -1029,10 +1893,64 @@ def ensure_sms_notification_schema() -> None:
     finally:
         conn.close()
 
+
+def ensure_appointments_schema() -> None:
+    """Best-effort schema migration for unread appointment tracking."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Tracks whether the user has opened/viewed an appointment.
+        _ensure_column(cursor, "appointments", "is_read", "INTEGER DEFAULT 0")
+
+        # Backward-compat: earlier versions abused status='read' to mean opened.
+        try:
+            cursor.execute("UPDATE appointments SET is_read = 1 WHERE status = 'read'")
+        except Exception:
+            pass
+        try:
+            cursor.execute("UPDATE appointments SET status = 'scheduled' WHERE status = 'read'")
+        except Exception:
+            pass
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def ensure_latency_events_schema() -> None:
+    """Best-effort schema migration for latency diagnostics (Super Admin)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Allow labels like "Test 1" for easier call identification.
+        _ensure_column(cursor, "calls", "call_label", "TEXT")
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS call_latency_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_uuid TEXT NOT NULL,
+                turn_index INTEGER DEFAULT 0,
+                ts_epoch REAL,
+                event_name TEXT NOT NULL,
+                ms_from_turn_start REAL,
+                meta_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_latency_events_call_uuid ON call_latency_events(call_uuid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_latency_events_call_turn ON call_latency_events(call_uuid, turn_index)")
+        conn.commit()
+    finally:
+        conn.close()
+
 # Initialize database on startup
 init_database()
 ensure_auth_schema()
 ensure_sms_notification_schema()
+ensure_appointments_schema()
+ensure_latency_events_schema()
 
 
 def ensure_global_settings_schema() -> None:
@@ -1043,7 +1961,12 @@ def ensure_global_settings_schema() -> None:
         _ensure_column(cursor, "global_settings", "groq_api_key", "TEXT")
         _ensure_column(cursor, "global_settings", "grok_api_key", "TEXT")
         _ensure_column(cursor, "global_settings", "openrouter_api_key", "TEXT")
+        _ensure_column(cursor, "global_settings", "cartesia_api_key", "TEXT")
+        _ensure_column(cursor, "global_settings", "lemonfox_api_key", "TEXT")
         _ensure_column(cursor, "global_settings", "openrouter_model", "TEXT")
+        _ensure_column(cursor, "global_settings", "racing_enabled", "INTEGER DEFAULT 0")
+        _ensure_column(cursor, "global_settings", "openrouter_model_2", "TEXT DEFAULT NULL")
+        _ensure_column(cursor, "global_settings", "openrouter_model_3", "TEXT DEFAULT NULL")
         conn.commit()
     finally:
         conn.close()
@@ -1051,12 +1974,125 @@ def ensure_global_settings_schema() -> None:
 
 ensure_global_settings_schema()
 
+
+def ensure_account_settings_tts_schema() -> None:
+    """Best-effort schema migration for per-account TTS settings."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        _ensure_column(cursor, "account_settings", "lemonfox_voice", "TEXT DEFAULT 'heart'")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+ensure_account_settings_tts_schema()
+
+
+def ensure_business_hours_schema() -> None:
+    """Best-effort schema migration for per-account business hours settings."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        _ensure_column(cursor, "account_settings", "business_hours_json", "TEXT")
+        _ensure_column(cursor, "account_settings", "business_timezone", "TEXT DEFAULT 'Europe/London'")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+ensure_business_hours_schema()
+
+
+def _default_business_hours() -> dict:
+    # Default to 09:00–17:00 every day, open.
+    return {
+        "mon": {"open": True, "start": "09:00", "end": "17:00"},
+        "tue": {"open": True, "start": "09:00", "end": "17:00"},
+        "wed": {"open": True, "start": "09:00", "end": "17:00"},
+        "thu": {"open": True, "start": "09:00", "end": "17:00"},
+        "fri": {"open": True, "start": "09:00", "end": "17:00"},
+        "sat": {"open": True, "start": "09:00", "end": "17:00"},
+        "sun": {"open": True, "start": "09:00", "end": "17:00"},
+    }
+
+
+def _normalize_business_hours(raw: object) -> dict:
+    """Validate/normalize business hours payload from API.
+
+    Shape: { mon: {open: bool, start: 'HH:MM', end: 'HH:MM'}, ... }
+    """
+    if raw is None or raw == "":
+        return _default_business_hours()
+    if not isinstance(raw, dict):
+        raise ValueError("BUSINESS_HOURS must be an object")
+
+    days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    out = {}
+
+    def _valid_hhmm(v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("Business hours times must be strings in HH:MM format")
+        s = v.strip()
+        try:
+            datetime.strptime(s, "%H:%M")
+        except Exception:
+            raise ValueError("Business hours times must be in HH:MM (24-hour) format")
+        return s
+
+    for d in days:
+        day_raw = raw.get(d)
+        if day_raw is None:
+            # Fill missing days with defaults.
+            out[d] = _default_business_hours()[d]
+            continue
+        if not isinstance(day_raw, dict):
+            raise ValueError(f"BUSINESS_HOURS.{d} must be an object")
+        is_open = bool(day_raw.get("open", True))
+        start = _valid_hhmm(day_raw.get("start", "09:00"))
+        end = _valid_hhmm(day_raw.get("end", "17:00"))
+        if start >= end:
+            raise ValueError(f"BUSINESS_HOURS.{d} start must be before end")
+        out[d] = {"open": is_open, "start": start, "end": end}
+
+    return out
+
+
+def _best_effort_local_now_for_timezone(tz_name: str) -> datetime:
+    """Return a naive datetime representing local time in tz_name, best-effort."""
+    tz_name = (tz_name or "").strip() or "Europe/London"
+    try:
+        from zoneinfo import ZoneInfo
+
+        tz = ZoneInfo(tz_name)
+        return datetime.now(tz).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
+
+
+def _init_cartesia_client() -> None:
+    """(Re)initialize the Cartesia client from CONFIG, best-effort."""
+    global cartesia_client
+    try:
+        if not CONFIG.get("USE_CARTESIA"):
+            cartesia_client = None
+            return
+        api_key = str(CONFIG.get("CARTESIA_API_KEY", "") or "").strip()
+        if not api_key:
+            cartesia_client = None
+            return
+        cartesia_client = Cartesia(api_key=api_key)
+        logger.info("Cartesia AI client initialized - Real-time voice streaming enabled")
+    except Exception as e:
+        cartesia_client = None
+        logger.warning(f"Failed to initialize Cartesia: {e}")
+
 def load_global_api_keys():
     """Load API keys from global_settings and update CONFIG"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, groq_api_key, grok_api_key, openrouter_api_key, openrouter_model, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider, openrouter_history_parts, openrouter_max_tokens, openrouter_max_message_chars, openrouter_request_timeout, openrouter_system_max_chars, openrouter_total_prompt_max_chars FROM global_settings WHERE id = 1')
+        cursor.execute('SELECT speechmatics_api_key, openai_api_key, deepseek_api_key, groq_api_key, grok_api_key, openrouter_api_key, openrouter_model, cartesia_api_key, lemonfox_api_key, vapi_api_key, vonage_api_key, vonage_api_secret, vonage_application_id, vonage_private_key_pem, ai_brain_provider, openrouter_history_parts, openrouter_max_tokens, openrouter_max_message_chars, openrouter_request_timeout, openrouter_system_max_chars, openrouter_total_prompt_max_chars, racing_enabled, openrouter_model_2, openrouter_model_3 FROM global_settings WHERE id = 1')
         result = cursor.fetchone()
 
         if result:
@@ -1068,6 +2104,9 @@ def load_global_api_keys():
                 grok_key_raw,
                 openrouter_key_raw,
                 openrouter_model_raw,
+                cartesia_key_raw,
+                lemonfox_key_raw,
+                vapi_key_raw,
                 vonage_key_raw,
                 vonage_secret_raw,
                 vonage_app_id_raw,
@@ -1079,6 +2118,9 @@ def load_global_api_keys():
                 perf_request_timeout,
                 perf_system_max_chars,
                 perf_total_prompt_max_chars,
+                racing_enabled_raw,
+                openrouter_model_2_raw,
+                openrouter_model_3_raw,
             ) = result
 
             speechmatics_key = _decrypt_secret(speechmatics_key_raw)
@@ -1088,6 +2130,9 @@ def load_global_api_keys():
             grok_key = _decrypt_secret(grok_key_raw)
             openrouter_key = _decrypt_secret(openrouter_key_raw)
             openrouter_model = str(openrouter_model_raw or "").strip()
+            cartesia_key = _decrypt_secret(cartesia_key_raw)
+            lemonfox_key = _decrypt_secret(lemonfox_key_raw)
+            vapi_key = _decrypt_secret(vapi_key_raw)
             vonage_key = _decrypt_secret(vonage_key_raw)
             vonage_secret = _decrypt_secret(vonage_secret_raw)
             vonage_app_id = _decrypt_secret(vonage_app_id_raw)
@@ -1114,6 +2159,9 @@ def load_global_api_keys():
             _warn_if_decrypt_missing("groq_api_key", groq_key_raw, groq_key)
             _warn_if_decrypt_missing("grok_api_key", grok_key_raw, grok_key)
             _warn_if_decrypt_missing("openrouter_api_key", openrouter_key_raw, openrouter_key)
+            _warn_if_decrypt_missing("cartesia_api_key", cartesia_key_raw, cartesia_key)
+            _warn_if_decrypt_missing("lemonfox_api_key", lemonfox_key_raw, lemonfox_key)
+            _warn_if_decrypt_missing("vapi_api_key", vapi_key_raw, vapi_key)
             _warn_if_decrypt_missing("vonage_api_key", vonage_key_raw, vonage_key)
             _warn_if_decrypt_missing("vonage_api_secret", vonage_secret_raw, vonage_secret)
             _warn_if_decrypt_missing("vonage_application_id", vonage_app_id_raw, vonage_app_id)
@@ -1134,6 +2182,12 @@ def load_global_api_keys():
                 updates["grok_api_key"] = _encrypt_secret(str(grok_key_raw))
             if openrouter_key_raw and not str(openrouter_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
                 updates["openrouter_api_key"] = _encrypt_secret(str(openrouter_key_raw))
+            if cartesia_key_raw and not str(cartesia_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["cartesia_api_key"] = _encrypt_secret(str(cartesia_key_raw))
+            if lemonfox_key_raw and not str(lemonfox_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["lemonfox_api_key"] = _encrypt_secret(str(lemonfox_key_raw))
+            if vapi_key_raw and not str(vapi_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
+                updates["vapi_api_key"] = _encrypt_secret(str(vapi_key_raw))
             if vonage_key_raw and not str(vonage_key_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
                 updates["vonage_api_key"] = _encrypt_secret(str(vonage_key_raw))
             if vonage_secret_raw and not str(vonage_secret_raw).startswith(_SECRET_PREFIX) and _get_fernet() is not None:
@@ -1191,6 +2245,44 @@ def load_global_api_keys():
             if openrouter_model:
                 CONFIG["OPENROUTER_MODEL"] = openrouter_model
                 logger.info(f"✅ Loaded OpenRouter model from database: {openrouter_model}")
+
+            if cartesia_key:
+                CONFIG["CARTESIA_API_KEY"] = cartesia_key
+                logger.info("✅ Loaded Cartesia API key from database")
+                _init_cartesia_client()
+
+            if lemonfox_key:
+                CONFIG["LEMONFOX_API_KEY"] = lemonfox_key
+                logger.info("✅ Loaded Lemonfox API key from database")
+
+            if vapi_key:
+                CONFIG["VAPI_API_KEY"] = vapi_key
+                logger.info("✅ Loaded Vapi API key from database")
+            
+            # Load racing settings
+            try:
+                racing_enabled = int(racing_enabled_raw or 0)
+                CONFIG["RACING_ENABLED"] = racing_enabled
+                if racing_enabled:
+                    logger.info(f"✅ Racing mode ENABLED")
+            except Exception:
+                CONFIG["RACING_ENABLED"] = 0
+            
+            try:
+                openrouter_model_2 = str(openrouter_model_2_raw or "").strip()
+                if openrouter_model_2:
+                    CONFIG["OPENROUTER_MODEL_2"] = openrouter_model_2
+                    logger.info(f"✅ Loaded OpenRouter model 2: {openrouter_model_2}")
+            except Exception:
+                pass
+            
+            try:
+                openrouter_model_3 = str(openrouter_model_3_raw or "").strip()
+                if openrouter_model_3:
+                    CONFIG["OPENROUTER_MODEL_3"] = openrouter_model_3
+                    logger.info(f"✅ Loaded OpenRouter model 3: {openrouter_model_3}")
+            except Exception:
+                pass
 
             if vonage_key:
                 CONFIG["VONAGE_API_KEY"] = vonage_key
@@ -1688,6 +2780,45 @@ def load_backchannel_settings() -> None:
 # Load backchannel settings from database on startup
 load_backchannel_settings()
 
+
+def load_timeout_test_settings() -> None:
+    """Load timeout test settings from global_settings into CONFIG."""
+    defaults = {
+        "TIMEOUT_TEST_ENABLED": False,
+        "TIMEOUT_TEST_SECONDS": 2.0,
+    }
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT timeout_test_enabled, timeout_test_seconds '
+            'FROM global_settings WHERE id = 1'
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            for k, v in defaults.items():
+                CONFIG[k] = v
+            return
+
+        enabled_raw, seconds_raw = row
+        CONFIG["TIMEOUT_TEST_ENABLED"] = bool(enabled_raw) if enabled_raw is not None else defaults["TIMEOUT_TEST_ENABLED"]
+
+        try:
+            CONFIG["TIMEOUT_TEST_SECONDS"] = float(seconds_raw) if seconds_raw is not None else defaults["TIMEOUT_TEST_SECONDS"]
+        except Exception:
+            CONFIG["TIMEOUT_TEST_SECONDS"] = defaults["TIMEOUT_TEST_SECONDS"]
+
+    except Exception as e:
+        logger.debug(f"Failed to load timeout test settings (this is normal if columns don't exist yet): {e}")
+        for k, v in defaults.items():
+            CONFIG[k] = v
+
+
+# Load timeout test settings from database on startup
+load_timeout_test_settings()
+
 # ============================================================================
 # AUTHENTICATION HELPER
 # ============================================================================
@@ -1930,7 +3061,10 @@ def _send_vonage_sms(to_e164: str, text: str) -> Tuple[bool, str]:
     status = str(first_msg.get("status") or "")
     if status != "0":
         err_text = first_msg.get("error-text") or "Unknown error"
-        logger.error(f"❌ SMS send failed: Vonage status {status} - {err_text}")
+        logger.error(f"❌ SMS send failed: Vonage status {status} - {err_text} (full response: {first_msg})")
+        # Return user-friendly error message
+        if "credentials" in err_text.lower() or status in ["2", "401"]:
+            return False, "SMS service configuration error - please contact support"
         return False, f"SMS send failed: {err_text}"
 
     msg_id = first_msg.get("message-id")
@@ -2993,34 +4127,58 @@ class CallLogger:
         """Get recent call logs for a specific user"""
         conn = sqlite3.connect('call_logs.db')
         cursor = conn.cursor()
+
+        # Backward compatible: older DBs may not have recording_url.
+        try:
+            cursor.execute("PRAGMA table_info(calls)")
+            cols = [r[1] for r in cursor.fetchall()]
+            has_recording_url = "recording_url" in cols
+        except Exception:
+            has_recording_url = False
         
+        recording_select = ", c.recording_url" if has_recording_url else ""
         if user_id:
-            cursor.execute('''
-                SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time, 
+            cursor.execute(
+                f'''
+                SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time,
                        c.end_time, c.duration, c.transcript, c.summary, c.status, c.sales_confidence, c.sales_reasoning, c.sales_ended_by_detector,
                        (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid AND user_id = ?) as has_appointment,
                        (SELECT id FROM appointments WHERE call_uuid = c.call_uuid AND user_id = ? ORDER BY created_at DESC LIMIT 1) as appointment_id
+                       {recording_select}
                 FROM calls c
                 WHERE c.user_id = ?
                 ORDER BY c.start_time DESC
                 LIMIT ?
-            ''', (user_id, user_id, user_id, limit))
+                ''',
+                (user_id, user_id, user_id, limit),
+            )
         else:
-            cursor.execute('''
-                SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time, 
+            cursor.execute(
+                f'''
+                SELECT c.call_uuid, c.caller_number, c.called_number, c.start_time,
                        c.end_time, c.duration, c.transcript, c.summary, c.status, c.sales_confidence, c.sales_reasoning, c.sales_ended_by_detector,
                        (SELECT COUNT(*) FROM appointments WHERE call_uuid = c.call_uuid) as has_appointment,
                        (SELECT id FROM appointments WHERE call_uuid = c.call_uuid ORDER BY created_at DESC LIMIT 1) as appointment_id
+                       {recording_select}
                 FROM calls c
                 ORDER BY c.start_time DESC
                 LIMIT ?
-            ''', (limit,))
+                ''',
+                (limit,),
+            )
         
         rows = cursor.fetchall()
         conn.close()
         
         calls = []
         for row in rows:
+            # recording_url is last column only if present.
+            recording_url = None
+            try:
+                if has_recording_url:
+                    recording_url = row[14]
+            except Exception:
+                recording_url = None
             calls.append({
                 "call_uuid": row[0],
                 "caller_number": row[1],
@@ -3035,10 +4193,575 @@ class CallLogger:
                 "sales_reasoning": row[10],
                 "sales_ended_by_detector": row[11],
                 "has_appointment": row[12] > 0,
-                "appointment_id": row[13]
+                "appointment_id": row[13],
+                "recording_url": recording_url,
             })
         
         return calls
+
+# ============================================================================
+# VAPI WEBSOCKET BRIDGE (WINDOWS-FRIENDLY)
+# ============================================================================
+
+class DailyBotSession:
+    """Bridges Vonage WebSocket audio to Vapi.
+
+    Note: The original implementation used Daily.co's Python SDK to join a
+    Daily room returned by Vapi's `webCallUrl`. On Windows, the official
+    Daily SDK is not trivially installable in this environment.
+
+    This implementation uses Vapi's WebSocket transport instead:
+    - Create a Vapi call with `transport.provider = vapi.websocket`
+    - Connect to the returned `websocketCallUrl`
+    - Bridge audio bidirectionally: Vonage ↔ Vapi
+
+    Speechmatics remains the fallback path if Vapi WS fails.
+    """
+    
+    def __init__(self, call_uuid: str, caller: str = "", called: str = ""):
+        self.call_uuid = call_uuid
+        self._session_started_at: float = time.time()
+        self.caller = caller
+        self.caller_number = caller
+        self.called = called
+        # Vapi websocket transport connection
+        self.vapi_ws = None
+        self.vonage_ws: Optional[WebSocket] = None
+        self.is_active = True
+        self.transcript_parts = []
+        self._last_speech_time = None
+        self._agent_speaking = False
+        self._call_end_logged: bool = False
+        self._last_vapi_transcript_fragment: str = ""
+        
+        # (Legacy placeholders kept for compatibility with older logs/attrs)
+        self.daily_client = None
+        self.daily_microphone = None
+        self.daily_speaker = None
+        
+        # Audio bridge threads
+        self._vonage_to_daily_task = None
+        self._daily_to_vonage_task = None
+        
+        # Vonage audio settings
+        self._vonage_audio_mode: str = "bytes"
+        self._vonage_audio_mode_logged: bool = False
+        
+        # User settings (loaded from database)
+        self.user_id = None
+        self.user_voice = "sarah"
+        self.voice_provider = "vapi"
+        self.vapi_voice_id = "jennifer-playht"
+        self.business_info = ""
+        self.agent_personality = ""
+        self.agent_instructions = ""
+        self.agent_name = "Assistant"
+        self.call_greeting = ""
+        self.transfer_number = None
+        self.transfer_people = ""
+        self.transfer_instructions = ""
+
+        # Vapi call preparation/cache
+        self._vapi_call_created: bool = False
+        self._vapi_websocket_url: Optional[str] = None
+        self._vapi_prepare_task: Optional[asyncio.Task] = None
+        self._vapi_tool_token: Optional[str] = None
+        
+        logger.info(f"[{call_uuid}] 🌉 DailyBotSession initialized - will bridge Vonage ↔ Vapi (websocket transport)")
+    
+    async def start(self):
+        """Start the Vapi WebSocket bridge.
+
+        Must return quickly; the actual audio bridging runs in background tasks.
+        """
+        try:
+            import base64
+            import httpx
+            import inspect
+            import json
+            from websockets import connect as ws_connect
+
+            vapi_key = str(CONFIG.get("VAPI_API_KEY", "") or "").strip()
+            if not vapi_key:
+                logger.error(f"[{self.call_uuid}] ❌ Vapi API key not configured")
+                return False
+
+            # Use the pre-created Vapi call (created in answer webhook)
+            websocket_call_url = (self._vapi_websocket_url or "").strip()
+            if not websocket_call_url:
+                logger.error(f"[{self.call_uuid}] ❌ Missing websocketCallUrl for Vapi")
+                return False
+
+            # Connect to Vapi websocket.
+            logger.info(f"[{self.call_uuid}] 🔌 Connecting to Vapi websocket...")
+            headers = {"Authorization": f"Bearer {vapi_key}"}
+
+            connect_sig = inspect.signature(ws_connect)
+            connect_kwargs: Dict[str, Any] = {}
+            if "extra_headers" in connect_sig.parameters:
+                connect_kwargs["extra_headers"] = headers
+            elif "additional_headers" in connect_sig.parameters:
+                connect_kwargs["additional_headers"] = headers
+            else:
+                connect_kwargs["extra_headers"] = headers
+
+            self.vapi_ws = await asyncio.wait_for(ws_connect(websocket_call_url, **connect_kwargs), timeout=15.0)
+
+            bridge_started_at = time.time()
+
+            async def _vonage_to_vapi() -> None:
+                try:
+                    first_audio_logged = False
+                    while self.is_active and self.vonage_ws is not None and self.vapi_ws is not None:
+                        msg = await self.vonage_ws.receive()
+                        if not isinstance(msg, dict):
+                            continue
+
+                        audio: Optional[bytes] = None
+                        if msg.get("bytes") is not None:
+                            audio = msg.get("bytes")
+                            if not self._vonage_audio_mode_logged:
+                                self._vonage_audio_mode_logged = True
+                                self._vonage_audio_mode = "bytes"
+                                logger.info(f"[{self.call_uuid}] 🎧 Vonage WS audio mode: bytes")
+                        elif msg.get("text") is not None:
+                            text = msg.get("text")
+                            if not self._vonage_audio_mode_logged:
+                                self._vonage_audio_mode_logged = True
+                                self._vonage_audio_mode = "json"
+                                logger.info(f"[{self.call_uuid}] 🎧 Vonage WS audio mode: json")
+                            try:
+                                parsed = json.loads(text)
+                                b64 = None
+                                if isinstance(parsed, dict):
+                                    b64 = parsed.get("audio") or parsed.get("audio_data") or parsed.get("payload")
+                                if isinstance(b64, str) and b64.strip():
+                                    audio = base64.b64decode(b64)
+                            except Exception:
+                                audio = None
+
+                        if not audio:
+                            continue
+                        self._last_speech_time = time.time()
+                        if not first_audio_logged:
+                            first_audio_logged = True
+                            logger.info(
+                                f"[{self.call_uuid}] ▶️ First caller audio seen at +{(time.time() - bridge_started_at):.3f}s"
+                            )
+                        await self.vapi_ws.send(audio)
+                except Exception:
+                    return
+
+            async def _vapi_to_vonage() -> None:
+                try:
+                    first_audio_logged = False
+                    while self.is_active and self.vonage_ws is not None and self.vapi_ws is not None:
+                        msg = await self.vapi_ws.recv()
+                        if msg is None:
+                            return
+                        if isinstance(msg, (bytes, bytearray)):
+                            if msg:
+                                if not first_audio_logged:
+                                    first_audio_logged = True
+                                    logger.info(
+                                        f"[{self.call_uuid}] ◀️ First assistant audio seen at +{(time.time() - bridge_started_at):.3f}s"
+                                    )
+                                await self.vonage_ws.send_bytes(bytes(msg))
+                            continue
+
+                        if not isinstance(msg, str):
+                            continue
+
+                        # Vapi control / transcript messages.
+                        try:
+                            parsed = json.loads(msg)
+                        except Exception:
+                            continue
+
+                        if isinstance(parsed, dict):
+                            # Some Vapi websocket payloads include base64 audio.
+                            audio_b64 = parsed.get("audio") or parsed.get("audioData")
+                            if isinstance(audio_b64, str) and audio_b64.strip():
+                                try:
+                                    audio_bytes = base64.b64decode(audio_b64)
+                                    if audio_bytes:
+                                        if not first_audio_logged:
+                                            first_audio_logged = True
+                                            logger.info(
+                                                f"[{self.call_uuid}] ◀️ First assistant audio (base64) at +{(time.time() - bridge_started_at):.3f}s"
+                                            )
+                                        await self.vonage_ws.send_bytes(audio_bytes)
+                                except Exception:
+                                    pass
+
+                            transcript_type = str(parsed.get("transcriptType", "") or "").lower()
+                            transcript = parsed.get("transcript")
+                            if isinstance(transcript, str):
+                                transcript = transcript.strip()
+                                if transcript and transcript_type not in {"partial", "interim"}:
+                                    if transcript != self._last_vapi_transcript_fragment:
+                                        self._last_vapi_transcript_fragment = transcript
+                                        self.transcript_parts.append(transcript)
+                except Exception:
+                    return
+
+            # Start audio bridge tasks.
+            self._vonage_to_daily_task = asyncio.create_task(_vonage_to_vapi())
+            self._daily_to_vonage_task = asyncio.create_task(_vapi_to_vonage())
+
+            # Give Vapi a moment to be ready, then trigger first message
+            # Vapi needs both the websocket connection AND a small audio packet to start speaking
+            await asyncio.sleep(0.1)
+            try:
+                # Send a short, very low-amplitude PCM stream to ensure Vapi detects an active audio stream.
+                # Pure zero-silence is often ignored by VAD and won't trigger assistant-speaks-first.
+                trigger_frame = (b'\x01\x00\xff\xff' * 80)  # 320 bytes: alternating +1 / -1 samples (20ms @ 16kHz)
+                for _ in range(10):  # ~200ms total
+                    await self.vapi_ws.send(trigger_frame)
+                    await asyncio.sleep(0.02)
+                logger.info(f"[{self.call_uuid}] 🎙️ Sent initial trigger audio stream to prompt Vapi first message")
+            except Exception as e:
+                logger.warning(f"[{self.call_uuid}] Could not send initial audio: {e}")
+
+            logger.info(f"[{self.call_uuid}] ✅ Vapi websocket bridge started")
+            return True
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] ❌ Vapi websocket bridge crashed: {e}")
+            return False
+
+    async def prepare_vapi_call(self) -> None:
+        """Pre-create the Vapi websocket call and cache websocketCallUrl."""
+        if self._vapi_websocket_url:
+            return
+
+        try:
+            import httpx
+            import json
+
+            vapi_key = str(CONFIG.get("VAPI_API_KEY", "") or "").strip()
+            if not vapi_key:
+                return
+
+            system_prompt = self._build_system_prompt()
+            voice_config = self._get_vapi_voice_config()
+            # IMPORTANT: Vapi rejects overriding `tools` inside `assistantOverrides`.
+            # We only use assistantId mode when the user's provider is explicitly
+            # `vapi_assistant`. For `vapi`, we force inline assistant mode so we can
+            # inject per-call tools (availability/booking endpoints).
+            provider_mode = str(getattr(self, 'voice_provider', '') or '').strip().lower()
+            use_assistant_id = bool(getattr(self, 'vapi_assistant_id', None)) and provider_mode == 'vapi_assistant'
+
+            try:
+                selected_vapi_voice = str(getattr(self, 'vapi_voice_id', '') or '').strip()
+                logger.info(
+                    f"[{self.call_uuid}] Vapi voice selection: provider_mode={'assistantId' if use_assistant_id else 'inline'} vapi_voice_id='{selected_vapi_voice}'"
+                )
+            except Exception:
+                pass
+
+            # We stream Vonage as 16kHz linear PCM (audio/l16;rate=16000).
+            # Explicitly set transport audioFormat so Vapi interprets bytes correctly.
+            transport_cfg: Dict[str, Any] = {
+                "provider": "vapi.websocket",
+                "audioFormat": {"format": "pcm_s16le", "container": "raw", "sampleRate": 16000},
+            }
+
+            tools: List[Dict[str, Any]] = []
+            if bool(getattr(self, 'calendar_booking_enabled', False)):
+                try:
+                    if not self._vapi_tool_token:
+                        self._vapi_tool_token = secrets.token_urlsafe(24)
+                        if getattr(self, 'user_id', None) is not None:
+                            _register_vapi_tool_token(self._vapi_tool_token, user_id=int(self.user_id), call_uuid=self.call_uuid)
+                    base_url = getattr(self, 'public_base_url', None) or str(CONFIG.get('PUBLIC_URL', '') or '').rstrip('/')
+                    if not base_url:
+                        try:
+                            _provider, _public_url = _get_global_tunnel_settings()
+                            base_url = str(_public_url or '').rstrip('/')
+                        except Exception:
+                            base_url = ''
+                    if base_url:
+                        tools.append({
+                            "type": "apiRequest",
+                            "name": "bookAppointment",
+                            "url": f"{base_url}/webhooks/vapi/book-appointment?token={self._vapi_tool_token}",
+                            "method": "POST",
+                            "body": {
+                                "type": "object",
+                                "properties": {
+                                    "date": {"type": "string", "description": "Preferred date. Accepts YYYY-MM-DD or natural language like 'tomorrow', 'next Thursday', '18 Jan 2026'."},
+                                    "time": {"type": "string", "description": "Preferred time. Accepts HH:MM 24-hour or natural language like '2pm', '11 am'."},
+                                    "customer_name": {"type": "string"},
+                                    "customer_phone": {"type": "string"},
+                                    "description": {"type": "string"},
+                                },
+                                "required": ["date", "time", "customer_name"],
+                            },
+                        })
+
+                        tools.append({
+                            "type": "apiRequest",
+                            "name": "checkAvailability",
+                            "url": f"{base_url}/webhooks/vapi/check-availability?token={self._vapi_tool_token}",
+                            "method": "POST",
+                            "body": {
+                                "type": "object",
+                                "properties": {
+                                    "date": {"type": "string", "description": "Date to check. Accepts YYYY-MM-DD or natural language like 'tomorrow', 'next Thursday', '18 Jan 2026'."},
+                                    "dateTime": {"type": "string", "description": "Optional ISO timestamp or natural phrase; backend will normalize."},
+                                },
+                                "required": ["date"],
+                            },
+                        })
+                except Exception:
+                    pass
+
+            async with httpx.AsyncClient(timeout=20.0) as http_client:
+                if use_assistant_id:
+                    assistant_overrides: Dict[str, Any] = {
+                        "model": {
+                            "provider": "openai",
+                            "model": "gpt-4o-mini",
+                            "messages": [{"role": "system", "content": system_prompt}],
+                            "temperature": 0.7,
+                            "maxTokens": 150,
+                        }
+                    }
+                    if tools:
+                        # Vapi schema expects tools under the model config.
+                        assistant_overrides["model"]["tools"] = tools
+
+                    # Ensure the assistant greets immediately.
+                    greet_text = (self.call_greeting or "").strip() or f"Hello, this is {self.agent_name}. How can I help you today?"
+                    assistant_overrides["firstMessage"] = greet_text
+                    assistant_overrides["firstMessageMode"] = "assistant-speaks-first"
+                    if hasattr(self, 'vapi_voice_id') and self.vapi_voice_id and self.vapi_voice_id != 'use-assistant-voice':
+                        assistant_overrides["voice"] = voice_config
+                        try:
+                            logger.info(f"[{self.call_uuid}] Vapi voice override enabled: {voice_config}")
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            logger.info(f"[{self.call_uuid}] Vapi voice override disabled (using assistant's configured voice in Vapi dashboard)")
+                        except Exception:
+                            pass
+
+                    call_payload = {
+                        "assistantId": self.vapi_assistant_id,
+                        "assistantOverrides": assistant_overrides,
+                        "transport": transport_cfg,
+                    }
+                else:
+                    greet_text = (self.call_greeting or "").strip() or f"Hello, this is {self.agent_name}. How can I help you today?"
+                    call_payload = {
+                        "assistant": {
+                            "model": {
+                                "provider": "openai",
+                                "model": "gpt-4o-mini",
+                                "messages": [{"role": "system", "content": system_prompt}],
+                                "temperature": 0.7,
+                                "maxTokens": 150,
+                            },
+                            "voice": voice_config,
+                            "firstMessage": greet_text,
+                            "firstMessageMode": "assistant-speaks-first",
+                        },
+                        "transport": transport_cfg,
+                    }
+                    if tools:
+                        # Vapi schema expects tools under the model config.
+                        call_payload["assistant"]["model"]["tools"] = tools
+
+                resp = await http_client.post(
+                    "https://api.vapi.ai/call",
+                    headers={"Authorization": f"Bearer {vapi_key}", "Content-Type": "application/json"},
+                    json=call_payload,
+                )
+                if resp.status_code not in (200, 201):
+                    logger.error(f"[{self.call_uuid}] ❌ Vapi API error: {resp.status_code} - {resp.text}")
+                    return
+                call_data = resp.json() if resp.text else {}
+                websocket_call_url = (
+                    (call_data.get("transport") or {}).get("websocketCallUrl")
+                    or (call_data.get("transport") or {}).get("websocketCallURL")
+                    or call_data.get("websocketCallUrl")
+                    or call_data.get("websocketCallURL")
+                )
+                if websocket_call_url:
+                    self._vapi_websocket_url = str(websocket_call_url)
+                    self._vapi_call_created = True
+        except Exception:
+            return
+    
+    def _build_system_prompt(self) -> str:
+        """Build system prompt from user configuration"""
+        parts = []
+        
+        # FIRST: Add global instructions (applies to ALL agents, set by super admin)
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT global_instructions FROM global_settings WHERE id = 1')
+            result = cursor.fetchone()
+            conn.close()
+            if result and result[0]:
+                global_instructions = str(result[0] or "").strip()
+                if global_instructions:
+                    parts.append(f"MANDATORY GLOBAL INSTRUCTIONS (for all agents): {global_instructions}")
+                    logger.info(f"[{self.call_uuid}] ✓ Applied global instructions to Vapi system prompt ({len(global_instructions)} chars)")
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Failed to load global instructions for Vapi: {e}")
+        
+        if self.agent_name:
+            parts.append(f"You are {self.agent_name}.")
+        
+        if self.agent_personality:
+            parts.append(self.agent_personality)
+        
+        if self.business_info:
+            parts.append(f"Business information: {self.business_info}")
+        
+        if self.agent_instructions:
+            parts.append(self.agent_instructions)
+
+        # Date context (reduces model date hallucinations like mixing up "next Thursday" with a random month).
+        try:
+            tz = "Europe/London"
+            today = datetime.now().date().isoformat()
+            parts.append(f"Today's date is {today} ({tz}).")
+        except Exception:
+            pass
+
+        # Calendar booking (Vapi): provide explicit tool guidance.
+        if bool(getattr(self, 'calendar_booking_enabled', False)):
+            parts.append(
+                "Appointments are enabled. When a caller wants to book and you have their details, you MUST use the bookAppointment tool to create a provisional appointment (pending confirmation). "
+                "You MAY use the checkAvailability tool to see available times for a specific date before proposing options. "
+                "Collect customer_name, customer_phone, a brief description, and the requested date and time. "
+                "IMPORTANT: Do NOT convert relative dates to month/day yourself (e.g., 'next Thursday', 'tomorrow'). Pass the caller's phrase directly to the tools; the backend will normalize it. "
+                "Never claim availability or unavailability unless you have called a tool and are using its result. "
+                "Only offer appointments when it makes business sense (high intent / likely revenue) or when the caller asks. Do not offer for spam/wrong number/complaints. "
+                "If the tool returns alternatives or business-hours/too-soon errors, offer the alternatives and stay within business hours."
+            )
+        
+        parts.append("Keep responses brief and conversational. Speak naturally like a human assistant.")
+        parts.append("If asked to transfer the call or speak to someone else, acknowledge the request.")
+        
+        return " ".join(parts)
+    
+    def _get_vapi_voice_config(self) -> dict:
+        """Map vapi_voice_id to Vapi voice configuration"""
+        voice_id = self.vapi_voice_id or "charlotte-uk"
+        
+        voice_configs = {
+            # PlayHT voices (may have timeouts)
+            "jennifer-playht": {"provider": "playht", "voiceId": "jennifer"},
+            "mark-playht": {"provider": "playht", "voiceId": "mark"},
+            
+            # UK ElevenLabs voices - Female
+            "charlotte-uk": {"provider": "11labs", "voiceId": "XB0fDUnXU5powFXDhCwa"},  # Professional, clear
+            "alice-uk": {"provider": "11labs", "voiceId": "Xb7hH8MSUJpSbSDYk0k2"},      # Warm, friendly
+            "lily-uk": {"provider": "11labs", "voiceId": "pFZP5JQG7iQjIQuC4Bku"},       # Bright, approachable
+            "jessica-uk": {"provider": "11labs", "voiceId": "cgSgspJ2msm6clMCkdW9"},    # Confident, mature
+            "nicole-uk": {"provider": "11labs", "voiceId": "piTKgcLEGmPE4e6mEKli"},      # Energetic, conversational
+            "emily-uk": {"provider": "11labs", "voiceId": "LcfcDJNUP1GQjkzn1xUU"},      # Soft, pleasant
+            "matilda-uk": {"provider": "11labs", "voiceId": "XrExE9yKIg1WjnnlVkGX"},    # Calm, reassuring
+            "freya-uk": {"provider": "11labs", "voiceId": "jsCqWAovK2LkecY7zXl4"},      # Young, friendly
+            
+            # UK ElevenLabs voices - Male
+            "george-uk": {"provider": "11labs", "voiceId": "JBFqnCBsd6RMkjVDRZzb"},     # Professional, clear
+            "harry-uk": {"provider": "11labs", "voiceId": "SOYHLrjzK2X1ezoPC6cr"},      # Confident, strong
+            "james-uk": {"provider": "11labs", "voiceId": "ZQe5CZNOzWyzPSCn5a3c"},      # Calm, authoritative
+            "brian-uk": {"provider": "11labs", "voiceId": "nPczCjzI2devNBz1zQrb"},      # Warm, conversational
+            "daniel-uk": {"provider": "11labs", "voiceId": "onwK4e9ZLuTAKqWW03F9"},     # Deep, professional
+            "thomas-uk": {"provider": "11labs", "voiceId": "GBv7mTt0atIp3Br8iCZE"},     # Mature, trustworthy
+            "callum-uk": {"provider": "11labs", "voiceId": "N2lVS1w4EtoT3dr4eOWO"},     # Young, energetic
+            "liam-uk": {"provider": "11labs", "voiceId": "TX3LPaxmHKxFdv7VOQHJ"},       # Friendly, approachable
+            
+            # US ElevenLabs voices
+            "sarah-elevenlabs": {"provider": "11labs", "voiceId": "EXAVITQu4vr4xnSDxMaL"},
+            "adam-elevenlabs": {"provider": "11labs", "voiceId": "pNInz6obpgDQGcFmaJgB"}
+        }
+        
+        # Default to Charlotte UK (professional British female)
+        return voice_configs.get(voice_id, voice_configs["charlotte-uk"])
+    
+    async def cleanup(self, log_call_end: bool = True):
+        """Clean up Vapi websocket resources.
+
+        Note: When falling back to Speechmatics, we call cleanup(log_call_end=False)
+        to avoid prematurely marking the call ended in call logs.
+        """
+        self.is_active = False
+        
+        # Stop bridge tasks
+        if self._vonage_to_daily_task:
+            self._vonage_to_daily_task.cancel()
+        if self._daily_to_vonage_task:
+            self._daily_to_vonage_task.cancel()
+        
+        # Close Vapi websocket
+        if self.vapi_ws:
+            try:
+                # Best-effort hangup message (if supported)
+                try:
+                    await self.vapi_ws.send('{"type":"hangup"}')
+                except Exception:
+                    pass
+                await self.vapi_ws.close()
+            except Exception as e:
+                logger.error(f"[{self.call_uuid}] Error closing Vapi websocket: {e}")
+
+        # Persist end-of-call details so Admin call logs aren't empty.
+        if log_call_end and not self._call_end_logged:
+            self._call_end_logged = True
+            try:
+                transcript = "\n".join([str(p) for p in (self.transcript_parts or []) if str(p).strip()]).strip()
+                if not transcript:
+                    transcript = "(Transcript pending from Vapi webhook)"
+
+                CallLogger.log_call_end(self.call_uuid, transcript=transcript)
+
+                # Avoid showing a misleading "Generating" state when we don't actually have a transcript yet.
+                if transcript.strip() == "(Transcript pending from Vapi webhook)":
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "UPDATE calls SET summary = ? WHERE call_uuid = ?",
+                            ("Waiting for Vapi transcript...", self.call_uuid),
+                        )
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        asyncio.create_task(CallLogger.generate_summary(self.call_uuid))
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error(f"[{self.call_uuid}] Failed to persist Vapi call end: {e}")
+
+        logger.info(f"[{self.call_uuid}] 🧹 Vapi websocket bridge cleaned up")
+    
+    async def close(self):
+        """Compatibility shim for SessionManager.close_session()"""
+        await self.cleanup(log_call_end=True)
+    
+    async def check_timeout(self):
+        """Check if call has been silent for too long"""
+        if not self._last_speech_time:
+            return
+        
+        silence_duration = time.time() - self._last_speech_time
+        timeout_seconds = 30
+        
+        if silence_duration > timeout_seconds:
+            logger.info(f"[{self.call_uuid}] ⏰ Call timeout after {silence_duration:.1f}s of silence")
+            await self.cleanup()
+
 
 # ============================================================================
 # CALL SESSION HANDLER
@@ -3080,6 +4803,22 @@ class CallSession:
         self._caller_vad_started_at: Optional[float] = None
         self._caller_vad_last_voice_at: float = 0.0
         self._caller_vad_energy_threshold: float = float(CONFIG.get("CALLER_VAD_ENERGY_THRESHOLD", 0.005))
+        # Additional guard against constant line noise being treated as speech.
+        # Vonage audio can have a non-zero noise floor; require some peak energy too.
+        try:
+            self._caller_vad_max_sample_threshold: int = int(CONFIG.get("CALLER_VAD_MAX_SAMPLE_THRESHOLD", 1800))
+        except Exception:
+            self._caller_vad_max_sample_threshold = 1800
+
+        # Allow a short period where outbound audio is not paused/blocked by VAD.
+        # This prevents the "no greeting" failure mode when VAD misfires at call start.
+        self._bypass_vad_audio_until: float = 0.0
+
+        # Vonage websocket payload mode tracking (used by websocket_endpoint).
+        # If this isn't initialized, the WS loop can crash and the call will go silent.
+        self._vonage_audio_mode: str = "bytes"
+        self._vonage_audio_mode_logged: bool = False
+        self._vonage_outbound_audio_mode_logged: bool = False
         self._caller_vad_hangover_seconds: float = float(CONFIG.get("CALLER_VAD_HANGOVER_SECONDS", 0.25))
         self._last_vad_barge_in_at: float = 0.0
         self._last_vad_debug_log_at: float = 0.0
@@ -3110,6 +4849,10 @@ class CallSession:
         self._response_times = []  # List of response latencies in milliseconds
         self.user_id = None  # Will be set from caller lookup
         
+        # Latency diagnostics (per-turn)
+        self._latency_turn_index: int = 0
+        self._latency_turn_started_at: Optional[float] = None
+        
         # Credit monitoring
         self._credit_monitor_task = None  # Task for monitoring credits
         self._last_credit_check = time.time()
@@ -3138,6 +4881,7 @@ class CallSession:
         self._filler_injecting = False
         self._suppress_filler_for_turn: bool = False
         self._last_filler_phrase: Optional[str] = None
+        self._post_filler_question_ack_played_for_turn: bool = False
         self._used_fillers_this_call: set = set()  # Track which fillers we've used
         self._suppress_openai_output_until = 0.0
         # Allows filler to cover dead-air even if transcript/brain trigger is delayed.
@@ -3175,6 +4919,23 @@ class CallSession:
         self._audio_generation_started = False  # Track if audio generation has started
         # Speechmatics early TTS (sentence-by-sentence) to reduce perceived latency
         self._speechmatics_pending_text = ""
+        
+        # Ted - Virtual Performance Manager (monitors call quality and auto-adjusts)
+        self._ted_monitoring_enabled = True
+        self._ted_response_times = []  # Track response latencies for Ted
+        self._ted_interruption_count = 0  # Track how many times AI went off-topic after interruption
+        self._ted_lag_warnings = 0  # Track slow responses
+        self._ted_last_check = time.time()
+
+        self._ted_performance_data = {
+            'avg_response_time': 0.0,
+            'max_response_time': 0.0,
+            'interruptions': 0,
+            'tangents_after_interrupt': 0,
+            'slow_responses': 0
+        }
+
+        # Speechmatics streaming queue (sentence-by-sentence) + worker.
         self._speechmatics_tts_queue: asyncio.Queue[str] = asyncio.Queue()
         self._speechmatics_tts_worker_task: Optional[asyncio.Task] = None
         # Increment to invalidate any in-flight Speechmatics stream (barge-in).
@@ -3186,17 +4947,14 @@ class CallSession:
         self._pending_filler_generation: int = 0
 
         # Track whether we have started sending assistant audio for the current user turn.
-        # Used to decide whether to inject filler due to long latency.
         self._assistant_audio_started_for_turn: bool = False
         self._assistant_audio_started_event: asyncio.Event = asyncio.Event()
 
         # Track whether the model has started producing assistant text for this turn.
-        # If text is flowing, we can wait slightly longer before injecting filler.
         self._assistant_text_started_for_turn: bool = False
         self._assistant_text_started_event: asyncio.Event = asyncio.Event()
 
-        # Track whether Speechmatics has started returning audio bytes for this turn
-        # (even if we are buffering during filler). If bytes are arriving, filler is usually unnecessary.
+        # Track whether Speechmatics has started returning audio bytes for this turn.
         self._speechmatics_audio_bytes_received_for_turn: bool = False
         self._speechmatics_audio_bytes_received_event: asyncio.Event = asyncio.Event()
 
@@ -3207,16 +4965,13 @@ class CallSession:
         self._pending_transfer_set_at: float = 0.0
 
         # Generic TTS output generation counter (ElevenLabs/Cartesia/Google/PlayHT/OpenAI audio).
-        # Incrementing this invalidates any in-flight TTS stream loops so we stop sending audio
-        # immediately on barge-in.
         self._tts_output_generation: int = 0
 
-        # Vonage websocket framing varies by integration; default to binary.
-        # If we detect JSON base64 audio inbound, we mirror it outbound.
-        self._vonage_audio_mode: str = "bytes"  # "bytes" | "json"
-        self._vonage_audio_mode_logged: bool = False
+        # Timeout test feature (for testing/development)
+        self._timeout_test_task: Optional[asyncio.Task] = None
+        self._timeout_test_triggered: bool = False
 
-        # AI brain provider (OpenAI vs DeepSeek) - effective provider is computed per-turn.
+        # AI brain provider (OpenAI vs DeepSeek/Groq/Grok/OpenRouter).
         self.brain_provider: str = str(CONFIG.get("AI_BRAIN_PROVIDER", "openai") or "openai").strip().lower()
         # Lock the brain provider for the lifetime of the call so a mid-call setting change
         # does not cause inconsistent behavior.
@@ -3229,13 +4984,11 @@ class CallSession:
         self._openrouter_task: Optional[asyncio.Task] = None
 
         # Cache of the current system instructions/context used for the call.
-        # (OpenAI receives these via session.update + injected system items; DeepSeek needs an explicit prompt.)
         self._brain_instructions_text: str = ""
         self._brain_global_instructions_text: str = ""
         self._brain_business_context_text: str = ""
 
-        # Brain usage tracking ("how much" each brain was used). We measure by assistant turns,
-        # plus a simple char-count as a secondary metric.
+        # Brain usage tracking.
         self._brain_openai_turns: int = 0
         self._brain_deepseek_turns: int = 0
         self._brain_groq_turns: int = 0
@@ -3247,11 +5000,64 @@ class CallSession:
         self._brain_grok_chars: int = 0
         self._brain_openrouter_chars: int = 0
 
-        # Diagnostics: when a non-OpenAI brain is selected, we may still fall back to OpenAI
-        # on a per-turn basis (timeouts/empty responses/errors). Track why, so we can explain
-        # "why OpenRouter was 0" after a call.
+        # Diagnostics: when a non-OpenAI brain is selected, we may still fall back to OpenAI.
         self._openai_fallback_turns: int = 0
         self._openai_fallback_reasons: List[str] = []
+
+        # Predictive filler: track average latency per brain provider for this call.
+        # Dict: {provider_name: [latency1_ms, latency2_ms, ...]}
+        self._brain_latency_history: dict = {}
+    
+    def _record_latency_event(self, event_name: str, ms_from_turn_start: Optional[float] = None, meta: Optional[dict] = None) -> None:
+        """Persist a latency marker for the current call/turn (best-effort, non-blocking)."""
+        try:
+            import json as _json
+
+            call_uuid = str(getattr(self, "call_uuid", "") or "").strip()
+            if not call_uuid:
+                return
+
+            turn_index = int(getattr(self, "_latency_turn_index", 0) or 0)
+            ts_epoch = time.time()
+
+            if ms_from_turn_start is None:
+                try:
+                    base = float(getattr(self, "_latency_turn_started_at", 0.0) or 0.0)
+                    if base > 0:
+                        ms_from_turn_start = (ts_epoch - base) * 1000
+                except Exception:
+                    ms_from_turn_start = None
+
+            meta_json = None
+            if meta:
+                try:
+                    meta_json = _json.dumps(meta, ensure_ascii=False)
+                except Exception:
+                    meta_json = None
+
+            def _write() -> None:
+                try:
+                    conn = get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute(
+                        """
+                        INSERT INTO call_latency_events (call_uuid, turn_index, ts_epoch, event_name, ms_from_turn_start, meta_json)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (call_uuid, turn_index, float(ts_epoch), str(event_name), ms_from_turn_start, meta_json),
+                    )
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+
+            try:
+                asyncio.create_task(asyncio.to_thread(_write))
+            except Exception:
+                # Fallback: do a best-effort direct write.
+                _write()
+        except Exception:
+            return
 
     def _brain_usage_snapshot(self) -> dict:
         openai_turns = int(getattr(self, "_brain_openai_turns", 0) or 0)
@@ -3408,6 +5214,73 @@ class CallSession:
         # Persist best-effort for Super Admin display.
         self._brain_usage_db_upsert()
 
+        # Record latency for predictive filler sizing.
+        self._record_brain_latency_for_prediction(p)
+
+    def _record_brain_latency_for_prediction(self, provider: str) -> None:
+        """Record time from trigger to first audio for predictive filler."""
+        try:
+            trigger_time = getattr(self, "_response_trigger_time", None)
+            audio_started_time = getattr(self, "_assistant_audio_started_time", None)
+            if trigger_time and audio_started_time:
+                latency_ms = (audio_started_time - trigger_time) * 1000.0
+                p = str(provider or "").strip().lower()
+                if p not in self._brain_latency_history:
+                    self._brain_latency_history[p] = []
+                self._brain_latency_history[p].append(latency_ms)
+                # Keep last 5 turns per provider.
+                if len(self._brain_latency_history[p]) > 5:
+                    self._brain_latency_history[p] = self._brain_latency_history[p][-5:]
+        except Exception:
+            pass
+
+    def _predict_filler_size(self) -> str:
+        """Predict filler size based on brain provider's historical latency."""
+        try:
+            provider = str(getattr(self, "_brain_provider_for_turn", "openai") or "openai").strip().lower()
+            history = self._brain_latency_history.get(provider, [])
+            
+            if history:
+                # Use average of recent latencies.
+                avg_ms = sum(history) / len(history)
+            else:
+                # No history yet - use conservative defaults per provider.
+                defaults = {
+                    "deepseek": 1200,
+                    "groq": 800,
+                    "grok": 1500,
+                    "openrouter": 1400,
+                    "openai": 600,
+                }
+                avg_ms = defaults.get(provider, 1000)
+            
+            # Convert predicted latency to filler size.
+            if avg_ms < 1000:
+                return "small"
+            elif avg_ms < 1800:
+                return "medium"
+            else:
+                return "large"
+        except Exception:
+            return "medium"
+
+    def _estimate_brain_answer_size_bucket(self) -> str:
+        """Estimate answer size (small/medium/large) from what the brain has produced so far.
+
+        Used for the Speechmatics "golden rule": if the caller has waited >2s, pick an
+        appropriate filler size based on how much the brain is going to say.
+        """
+        try:
+            chars = int(getattr(self, "_brain_chars_generated_for_turn", 0) or 0)
+        except Exception:
+            chars = 0
+
+        if chars >= 700:
+            return "large"
+        if chars >= 220:
+            return "medium"
+        return "small"
+
     def lock_brain_provider_for_call(self) -> None:
         """Freeze the configured brain provider for this call.
 
@@ -3521,17 +5394,73 @@ class CallSession:
         if not cleaned or not self.is_active:
             return
         
-        # Remove consecutive duplicate words (e.g., "ok ok" -> "ok", "yeah yeah" -> "yeah")
-        # This prevents repetitive speech without affecting content or transfer logic
+        # Remove consecutive duplicate words ONLY for common backchannels/fillers
+        # (e.g., "ok ok" -> "ok", "yeah yeah" -> "yeah") to prevent repetitive speech
+        # Don't remove all duplicates as some might be intentional (e.g., "very very important")
         import re
-        cleaned = re.sub(r'\b(\w+)\s+\1\b', r'\1', cleaned, flags=re.IGNORECASE)
+        backchannel_duplicates = r'\b(ok|okay|yeah|yep|yup|right|mm|mhm|uh|um|ah|hmm)\s+\1\b'
+        cleaned = re.sub(backchannel_duplicates, r'\1', cleaned, flags=re.IGNORECASE)
 
         voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
 
+        # If Speechmatics was selected but isn't configured, fall back to OpenAI realtime audio
+        # so the call doesn't go silent.
+        if voice_provider == "speechmatics" and not str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+            logger.warning(f"[{self.call_uuid}] Speechmatics selected but API key missing; falling back to OpenAI TTS")
+            voice_provider = "openai"
+
+        if voice_provider == "lemonfox" and not str(CONFIG.get("LEMONFOX_API_KEY", "") or "").strip():
+            logger.warning(f"[{self.call_uuid}] Lemonfox selected but API key missing; falling back to OpenAI TTS")
+            voice_provider = "openai"
+
+        if voice_provider == "vapi":
+            # Vapi should not be used here - DailyBotSession handles everything
+            logger.error(f"[{self.call_uuid}] ⚠️ Vapi provider reached _speak_text_via_voice_provider - this should not happen!")
+            logger.error(f"[{self.call_uuid}] ⚠️ DailyBotSession should handle all voice interactions directly via Daily.co bridge")
+            # Fall back to prevent dead air
+            voice_provider = "speechmatics" if str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip() else "openai"
+        
+        # Log what voice provider we're using
+        logger.info(f"[{self.call_uuid}] 🎤 _speak_text_via_voice_provider called with voice_provider={voice_provider}, text={cleaned[:50]}")
+
         # Prefer Speechmatics streaming when selected.
         if voice_provider == "speechmatics" and str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+            logger.info(f"[{self.call_uuid}] Using Speechmatics TTS (selected)")
             await self._enqueue_speechmatics_tts(cleaned)
             return
+
+        # OpenAI realtime audio TTS (works even when the conversational brain is non-OpenAI).
+        if voice_provider == "openai":
+            if not getattr(self, "openai_ws", None):
+                logger.error(f"[{self.call_uuid}] ❌ OpenAI TTS requested but OpenAI WebSocket is not connected")
+                return
+
+            try:
+                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+
+            tts_instructions = (
+                "You are a text-to-speech engine. Speak the following text to the caller exactly as written, "
+                "without adding or removing any words: "
+                + cleaned
+            )
+            try:
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "response.create",
+                            "response": {
+                                "modalities": ["text", "audio"],
+                                "instructions": tts_instructions,
+                            },
+                        }
+                    )
+                )
+                return
+            except Exception as e:
+                logger.error(f"[{self.call_uuid}] ❌ OpenAI TTS failed: {e}")
+                return
 
         # Non-streaming / external TTS options.
         # Increment generation so a new utterance invalidates older in-flight TTS streams.
@@ -3541,24 +5470,61 @@ class CallSession:
             self._tts_output_generation = 1
 
         if voice_provider == "cartesia" and cartesia_client:
+            logger.info(f"[{self.call_uuid}] Using Cartesia TTS")
             await self._send_cartesia_audio(cleaned)
             return
+        if voice_provider == "lemonfox" and str(CONFIG.get("LEMONFOX_API_KEY", "") or "").strip():
+            logger.info(f"[{self.call_uuid}] Using Lemonfox TTS")
+            await self._send_lemonfox_audio(cleaned)
+            return
         if voice_provider == "elevenlabs" and eleven_client:
+            logger.info(f"[{self.call_uuid}] Using ElevenLabs TTS")
             await self._send_elevenlabs_audio(cleaned)
             return
         if voice_provider == "google" and google_tts_client:
+            logger.info(f"[{self.call_uuid}] Using Google TTS")
             await self._send_google_tts_audio(cleaned)
             return
         if voice_provider == "playht" and (playht_api_key and playht_user_id):
+            logger.info(f"[{self.call_uuid}] Using PlayHT TTS")
             await self._send_playht_audio(cleaned)
             return
 
         # Last-resort: if Speechmatics is configured, use it even if not selected.
-        if str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip():
+        speechmatics_key = str(CONFIG.get("SPEECHMATICS_API_KEY", "") or "").strip()
+        if speechmatics_key:
+            logger.info(f"[{self.call_uuid}] Using Speechmatics TTS (fallback)")
             await self._enqueue_speechmatics_tts(cleaned)
             return
 
-        logger.error(f"[{self.call_uuid}] No usable TTS provider configured for voice_provider={voice_provider}; audio skipped")
+        # Absolute last-resort: if OpenAI realtime is connected, use it so we don't produce dead air.
+        if getattr(self, "openai_ws", None):
+            logger.warning(f"[{self.call_uuid}] No external TTS configured; falling back to OpenAI TTS")
+            try:
+                await self.openai_ws.send(json.dumps({"type": "response.cancel"}))
+            except Exception:
+                pass
+            try:
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "response.create",
+                            "response": {
+                                "modalities": ["text", "audio"],
+                                "instructions": (
+                                    "You are a text-to-speech engine. Speak the following text to the caller exactly as written, "
+                                    "without adding or removing any words: "
+                                    + cleaned
+                                ),
+                            },
+                        }
+                    )
+                )
+                return
+            except Exception as e:
+                logger.error(f"[{self.call_uuid}] ❌ OpenAI fallback TTS failed: {e}")
+
+        logger.error(f"[{self.call_uuid}] ❌ No usable TTS provider configured for voice_provider={voice_provider}; Speechmatics key={'present' if speechmatics_key else 'MISSING'}; audio skipped")
 
     def _effective_brain_provider(self) -> str:
         """Return the locked brain provider for this call."""
@@ -4164,7 +6130,19 @@ class CallSession:
         except Exception:
             max_tokens = 220
 
-        model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+        # NOTE: Non-streaming generation is used for non-Speechmatics voices (e.g., Lemonfox).
+        # Speechmatics has its own streaming + racing path. Here we still need to be resilient
+        # to a misconfigured/slow primary model, so we fall back to configured model 2/3.
+        models: List[str] = []
+        for k in ("OPENROUTER_MODEL", "OPENROUTER_MODEL_2", "OPENROUTER_MODEL_3"):
+            try:
+                m = str(CONFIG.get(k) or "").strip()
+            except Exception:
+                m = ""
+            if m and m not in models:
+                models.append(m)
+        if not models:
+            models = ["groq/llama-3.1-8b-instant"]
 
         # Define transfer function if transfer is configured and custom rules exist
         tools = None
@@ -4190,29 +6168,63 @@ class CallSession:
                 }
             }]
 
-        t0 = time.time()
         timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
-        try:
-            call_params = {
-                "model": model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": max_tokens,
-            }
-            if tools:
-                call_params["tools"] = tools
-                call_params["tool_choice"] = "auto"
-            
-            resp = await asyncio.wait_for(
-                client.chat.completions.create(**call_params),
-                timeout=timeout_seconds,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(f"[{self.call_uuid}] OpenRouter timed out after {timeout_seconds:.1f}s")
+
+        resp = None
+        last_err: Optional[Exception] = None
+        for model in models:
+            t0 = time.time()
+            try:
+                call_params = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": max_tokens,
+                }
+                if tools:
+                    call_params["tools"] = tools
+                    call_params["tool_choice"] = "auto"
+
+                resp = await asyncio.wait_for(
+                    client.chat.completions.create(**call_params),
+                    timeout=timeout_seconds,
+                )
+                last_err = None
+            except asyncio.TimeoutError as e:
+                last_err = e
+                logger.warning(f"[{self.call_uuid}] OpenRouter timed out after {timeout_seconds:.1f}s model={model}")
+                resp = None
+            except Exception as e:
+                last_err = e
+                resp = None
+                try:
+                    detail = self._safe_exception_summary(e)
+                except Exception:
+                    detail = str(e)
+                logger.warning(f"[{self.call_uuid}] OpenRouter error model={model}: {detail}")
+            finally:
+                dt = time.time() - t0
+                logger.info(f"[{self.call_uuid}] OpenRouter latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
+
+            if resp is None:
+                continue
+
+            # If we got a response, process it. If content is empty, fall back to next model.
+            try:
+                _content = (resp.choices[0].message.content or "").strip()
+            except Exception:
+                _content = ""
+            if _content or (hasattr(resp.choices[0].message, "tool_calls") and resp.choices[0].message.tool_calls):
+                break
+            resp = None
+
+        if resp is None:
+            if last_err is not None:
+                try:
+                    logger.warning(f"[{self.call_uuid}] OpenRouter failed for all models={models}")
+                except Exception:
+                    pass
             return ""
-        finally:
-            dt = time.time() - t0
-            logger.info(f"[{self.call_uuid}] OpenRouter latency={dt:.2f}s msgs={len(messages)} model={model} max_tokens={max_tokens}")
 
         # Check if AI wants to call the transfer function
         try:
@@ -4250,7 +6262,486 @@ class CallSession:
             content = ""
         return content
 
-    async def _openrouter_stream_deltas(self, user_text: str, extra_system_instruction: Optional[str] = None):
+    async def _race_openrouter_models(self, user_text: str, extra_system_instruction: Optional[str] = None):
+        """
+        TRUE racing with emergency fallback: Start streaming from ALL OpenRouter models simultaneously,
+        yield from whichever produces the first token. If NO model responds within 1500ms, start a
+        direct OpenAI GPT-4o-mini fallback (bypasses OpenRouter overhead for guaranteed response).
+        
+        This eliminates the probe overhead (saves 500-1500ms) and guarantees the absolute
+        fastest response with reliability failover.
+        """
+        models: List[str] = []
+        model_1 = str(CONFIG.get("OPENROUTER_MODEL") or "").strip()
+        model_2 = str(CONFIG.get("OPENROUTER_MODEL_2") or "").strip()
+        model_3 = str(CONFIG.get("OPENROUTER_MODEL_3") or "").strip()
+        if model_1:
+            models.append(model_1)
+        if model_2 and model_2 not in models:
+            models.append(model_2)
+        if model_3 and model_3 not in models:
+            models.append(model_3)
+
+        if not models:
+            logger.warning(f"[{self.call_uuid}] Racing enabled but no OpenRouter models configured")
+            return
+        
+        if len(models) == 1:
+            # No racing needed, just stream from the single model
+            async for delta in self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction, model_override=models[0]):
+                yield delta
+            return
+
+        # Start ALL OpenRouter models streaming in parallel
+        stream_tasks = []
+        stream_queues = []
+        provider_names = []  # Track which provider each queue belongs to
+        
+        for model in models:
+            queue = asyncio.Queue()
+            stream_queues.append(queue)
+            provider_names.append(f"openrouter:{model}")
+            task = asyncio.create_task(self._stream_to_queue(model, user_text, extra_system_instruction, queue))
+            stream_tasks.append(task)
+        
+        # Initialize winner tracking BEFORE the fallback delay function references it
+        winner = None
+        winner_queue = None
+        winner_provider = None
+        
+        # Schedule emergency fallback: direct OpenAI after 1500ms if no OpenRouter response
+        fallback_queue = asyncio.Queue()
+        fallback_task = None
+        fallback_started = False
+        
+        async def _start_fallback_after_delay():
+            nonlocal fallback_started, winner
+            try:
+                await asyncio.sleep(1.5)  # 1500ms delay
+                if winner is None:  # No winner yet
+                    fallback_started = True
+                    logger.warning(f"[{self.call_uuid}] ⏰ OpenRouter racing timeout (1500ms) - starting emergency fallback (direct OpenAI)")
+                    await self._stream_direct_openai_to_queue(user_text, extra_system_instruction, fallback_queue)
+            except asyncio.CancelledError:
+                pass
+        
+        fallback_task = asyncio.create_task(_start_fallback_after_delay())
+        
+        try:
+            # Wait for the FIRST token from ANY model (OpenRouter or fallback)
+            race_start = time.time()
+            while winner is None:
+                # Check OpenRouter queues
+                for i, queue in enumerate(stream_queues):
+                    try:
+                        delta = queue.get_nowait()
+                        if delta is not None:  # None = stream ended
+                            winner = models[i]
+                            winner_queue = queue
+                            winner_provider = provider_names[i]
+                            dt = (time.time() - race_start) * 1000
+                            logger.info(f"[{self.call_uuid}] 🏁 Racing: {winner} won (first token in {dt:.0f}ms)")
+                            yield delta
+                            break
+                    except asyncio.QueueEmpty:
+                        continue
+                
+                # Check fallback queue (if fallback has started)
+                if fallback_started and winner is None:
+                    try:
+                        delta = fallback_queue.get_nowait()
+                        if delta is not None:
+                            winner = "direct-openai-gpt-4o-mini"
+                            winner_queue = fallback_queue
+                            winner_provider = "openai:gpt-4o-mini"
+                            dt = (time.time() - race_start) * 1000
+                            logger.info(f"[{self.call_uuid}] 🚨 Emergency fallback won (first token in {dt:.0f}ms) - OpenRouter was too slow")
+                            yield delta
+                            break
+                    except asyncio.QueueEmpty:
+                        pass
+                
+                if winner is None:
+                    await asyncio.sleep(0.001)  # Tiny sleep to avoid busy loop
+            
+            # Cancel fallback if an OpenRouter model won
+            if fallback_task and not fallback_task.done():
+                try:
+                    fallback_task.cancel()
+                except Exception:
+                    pass
+            
+            # Cancel all losing streams immediately
+            for i, task in enumerate(stream_tasks):
+                if models[i] != winner and not task.done():
+                    try:
+                        task.cancel()
+                    except Exception:
+                        pass
+            
+            # Track which provider was used (for latency history)
+            if winner_provider:
+                try:
+                    # Store provider in session for latency tracking
+                    self._last_brain_provider = winner_provider
+                except Exception:
+                    pass
+            
+            # Continue yielding from the winner
+            while True:
+                try:
+                    delta = await asyncio.wait_for(winner_queue.get(), timeout=5.0)
+                    if delta is None:  # Stream ended
+                        break
+                    yield delta
+                except asyncio.TimeoutError:
+                    break
+                    
+        finally:
+            # Cleanup: cancel any remaining tasks
+            for task in stream_tasks:
+                if not task.done():
+                    try:
+                        task.cancel()
+                    except Exception:
+                        pass
+            if fallback_task and not fallback_task.done():
+                try:
+                    fallback_task.cancel()
+                except Exception:
+                    pass
+    
+    async def _stream_to_queue(self, model: str, user_text: str, extra_system_instruction: Optional[str], queue: asyncio.Queue):
+        """Helper: stream deltas from a model into a queue."""
+        try:
+            async for delta in self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction, model_override=model):
+                await queue.put(delta)
+            await queue.put(None)  # Signal end of stream
+        except asyncio.CancelledError:
+            await queue.put(None)
+        except Exception as e:
+            logger.debug(f"[{self.call_uuid}] Stream error for {model}: {e}")
+            await queue.put(None)
+    
+    async def _direct_openai_stream_deltas(self, user_text: str, extra_system_instruction: Optional[str] = None):
+        """Stream deltas directly from OpenAI API (emergency fallback, bypasses OpenRouter).
+        
+        Uses GPT-4o-mini via direct OpenAI Chat Completions API for maximum reliability
+        and lower latency (~500ms vs ~900ms via OpenRouter).
+        """
+        api_key = str(CONFIG.get("OPENAI_API_KEY", "") or "").strip()
+        if not api_key:
+            logger.warning(f"[{self.call_uuid}] Direct OpenAI fallback: No OPENAI_API_KEY configured")
+            return
+        
+        # Build messages (same structure as OpenRouter)
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        trimmed_history = []
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                trimmed_history.append({"role": role, "content": content})
+        messages.extend(trimmed_history)
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (
+                messages
+                and str(messages[-1].get("role")) == "user"
+                and str(messages[-1].get("content", "")).strip() == final_user
+            ):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        try:
+            max_tokens = int(CONFIG.get("OPENROUTER_MAX_TOKENS", 220) or 220)
+        except Exception:
+            max_tokens = 220
+
+        # Use direct OpenAI client (not OpenRouter)
+        import openai
+        client = openai.AsyncOpenAI(api_key=api_key)
+        
+        t0 = time.time()
+        stream = None
+        try:
+            stream = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=max_tokens,
+                    stream=True,
+                ),
+                timeout=8.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.call_uuid}] Direct OpenAI stream start timed out after 8.0s")
+            return
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Direct OpenAI stream error: {e}")
+            return
+        finally:
+            dt = time.time() - t0
+            logger.info(f"[{self.call_uuid}] 🚨 EMERGENCY FALLBACK: Direct OpenAI stream start latency={dt:.2f}s msgs={len(messages)} model=gpt-4o-mini")
+
+        # Stream deltas
+        try:
+            async for chunk in stream:
+                if not self.is_active:
+                    break
+                # Don't abort generation on transient VAD/echo. If barge-in becomes a real
+                # interruption, `_interrupt_agent_output()` flips `_block_outbound_audio`
+                # and cancels pending brain tasks.
+                if getattr(self, "_block_outbound_audio", False):
+                    break
+
+                try:
+                    delta_obj = chunk.choices[0].delta
+                    delta = getattr(delta_obj, "content", None) or ""
+                except Exception:
+                    delta = ""
+
+                if delta:
+                    # Track how much the brain is producing this turn (for golden-rule filler sizing).
+                    try:
+                        self._brain_chars_generated_for_turn = int(getattr(self, "_brain_chars_generated_for_turn", 0) or 0) + len(delta)
+                    except Exception:
+                        pass
+                    if not getattr(self, "_brain_first_token_at", None):
+                        try:
+                            self._brain_first_token_at = time.time()
+                        except Exception:
+                            pass
+                    yield delta
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Direct OpenAI stream iteration error: {e}")
+    
+    async def _stream_direct_openai_to_queue(self, user_text: str, extra_system_instruction: Optional[str], queue: asyncio.Queue):
+        """Helper: stream deltas from direct OpenAI into a queue."""
+        try:
+            async for delta in self._direct_openai_stream_deltas(user_text, extra_system_instruction=extra_system_instruction):
+                await queue.put(delta)
+            await queue.put(None)  # Signal end of stream
+        except asyncio.CancelledError:
+            await queue.put(None)
+        except Exception as e:
+            logger.debug(f"[{self.call_uuid}] Stream error for direct OpenAI: {e}")
+            await queue.put(None)
+
+    async def _race_openrouter_models_OLD_PROBE_METHOD(self, user_text: str, extra_system_instruction: Optional[str] = None):
+        """
+        OLD METHOD: Probe-then-stream (SLOW - kept for reference).
+        1) Run a very small, non-streaming "probe" request across models in parallel.
+           Whichever completes first (successfully) is treated as the fastest right now.
+        2) Stream the real response ONLY from the winning model.
+        """
+        models: List[str] = []
+        model_1 = str(CONFIG.get("OPENROUTER_MODEL") or "").strip()
+        model_2 = str(CONFIG.get("OPENROUTER_MODEL_2") or "").strip()
+        model_3 = str(CONFIG.get("OPENROUTER_MODEL_3") or "").strip()
+        if model_1:
+            models.append(model_1)
+        if model_2 and model_2 not in models:
+            models.append(model_2)
+        if model_3 and model_3 not in models:
+            models.append(model_3)
+
+        if not models:
+            logger.warning(f"[{self.call_uuid}] Racing enabled but no OpenRouter models configured")
+            return
+
+        # Prefer likely-fast models first, but still probe all in parallel.
+        try:
+            models = sorted(models, key=lambda m: self._openrouter_speed_rank(m))
+        except Exception:
+            pass
+
+        api_key = str(CONFIG.get("OPENROUTER_API_KEY", "") or "").strip()
+        client = _get_openrouter_async_client(api_key)
+
+        # Build the same messages as streaming does, but without tools.
+        # (Tools in streaming are about transfers; the probe should be as minimal as possible.)
+        system_chunks = []
+        if self._brain_instructions_text:
+            system_chunks.append(self._brain_instructions_text)
+        if self._brain_global_instructions_text:
+            system_chunks.append(self._brain_global_instructions_text)
+        if self._brain_business_context_text:
+            system_chunks.append(self._brain_business_context_text)
+        if extra_system_instruction:
+            system_chunks.append(str(extra_system_instruction).strip())
+        system_text = "\n\n".join([c for c in system_chunks if c])
+
+        try:
+            system_max = int(CONFIG.get("OPENROUTER_SYSTEM_MAX_CHARS", 7000) or 7000)
+        except Exception:
+            system_max = 7000
+        if system_text and system_max > 0 and len(system_text) > system_max:
+            system_text = system_text[:system_max]
+
+        messages = []
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        try:
+            history_limit = int(CONFIG.get("OPENROUTER_HISTORY_PARTS", 6) or 6)
+        except Exception:
+            history_limit = 6
+        history = self._messages_from_transcript_parts(max_parts=history_limit)
+
+        try:
+            msg_max = int(CONFIG.get("OPENROUTER_MAX_MESSAGE_CHARS", 500) or 500)
+        except Exception:
+            msg_max = 500
+
+        for m in history:
+            role = str(m.get("role", "user"))
+            content = self._truncate_tail(str(m.get("content", "") or ""), msg_max)
+            if content:
+                messages.append({"role": role, "content": content})
+
+        final_user = str(user_text or "").strip()
+        if final_user:
+            if not (
+                messages
+                and str(messages[-1].get("role")) == "user"
+                and str(messages[-1].get("content", "")).strip() == final_user
+            ):
+                messages.append({"role": "user", "content": self._truncate_tail(final_user, msg_max)})
+
+        try:
+            total_cap = int(CONFIG.get("OPENROUTER_TOTAL_PROMPT_MAX_CHARS", 12000) or 12000)
+        except Exception:
+            total_cap = 12000
+        messages = self._cap_messages_total_chars(messages, total_cap)
+
+        timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
+        probe_timeout = max(1.5, min(4.0, timeout_seconds * 0.5))
+
+        # Keep probe short; we only care which model returns first.
+        try:
+            configured_max_tokens = int(CONFIG.get("OPENROUTER_MAX_TOKENS", 220) or 220)
+        except Exception:
+            configured_max_tokens = 220
+        probe_max_tokens = max(12, min(48, configured_max_tokens))
+
+        async def _probe(model_name: str) -> Tuple[str, float, bool]:
+            """Return (model, elapsed_ms, ok)."""
+            t0 = time.time()
+            try:
+                # A tiny completion; no streaming.
+                call_params = {
+                    "model": model_name,
+                    "messages": messages,
+                    "temperature": 0.2,
+                    "max_tokens": probe_max_tokens,
+                }
+                await asyncio.wait_for(client.chat.completions.create(**call_params), timeout=probe_timeout)
+                dt_ms = (time.time() - t0) * 1000.0
+                return (model_name, dt_ms, True)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                dt_ms = (time.time() - t0) * 1000.0
+                return (model_name, dt_ms, False)
+
+        probe_tasks = [asyncio.create_task(_probe(m)) for m in models]
+        winner: Optional[str] = None
+        winner_ms: Optional[float] = None
+
+        try:
+            pending = set(probe_tasks)
+            while pending and winner is None:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    try:
+                        m, dt_ms, ok = task.result()
+                    except Exception:
+                        continue
+                    if ok:
+                        winner = m
+                        winner_ms = dt_ms
+                        break
+            # If all probes failed, fall back to the first configured model.
+            if winner is None:
+                winner = models[0]
+        finally:
+            # Cancel remaining probes.
+            for t in probe_tasks:
+                if not t.done():
+                    try:
+                        t.cancel()
+                    except Exception:
+                        pass
+
+        try:
+            if winner_ms is not None:
+                logger.info(f"[{self.call_uuid}] 🏁 Racing picked model={winner} probe={winner_ms:.0f}ms candidates={models}")
+            else:
+                logger.info(f"[{self.call_uuid}] 🏁 Racing fallback picked model={winner} candidates={models}")
+        except Exception:
+            pass
+
+        # Stream from the winner. If streaming yields nothing (provider error), try the next models.
+        ordered_fallbacks = [winner] + [m for m in models if m != winner]
+        for chosen in ordered_fallbacks:
+            yielded_any = False
+            try:
+                async for delta in self._openrouter_stream_deltas(
+                    user_text,
+                    extra_system_instruction=extra_system_instruction,
+                    model_override=chosen,
+                ):
+                    yielded_any = True
+                    yield delta
+                if yielded_any:
+                    return
+            except Exception as e:
+                logger.warning(f"[{self.call_uuid}] Racing stream failed for {chosen}: {e}")
+                continue
+
+    async def _openrouter_stream_deltas(self, user_text: str, extra_system_instruction: Optional[str] = None, model_override: Optional[str] = None):
         """Yield text deltas from OpenRouter streaming chat completion.
 
         This is used to start Speechmatics TTS earlier (sentence-by-sentence) instead
@@ -4320,7 +6811,7 @@ class CallSession:
         except Exception:
             max_tokens = 220
 
-        model = str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
+        model = model_override or str(CONFIG.get("OPENROUTER_MODEL", "groq/llama-3.1-8b-instant") or "groq/llama-3.1-8b-instant").strip()
         timeout_seconds = float(CONFIG.get("OPENROUTER_REQUEST_TIMEOUT_SECONDS", 12) or 12)
 
         t0 = time.time()
@@ -4385,7 +6876,9 @@ class CallSession:
             async for chunk in stream:
                 if not self.is_active:
                     break
-                if getattr(self, "_caller_speaking", False):
+                # Don't abort generation on transient VAD/echo. Only stop if hard barge-in
+                # has engaged and we're blocking outbound audio.
+                if getattr(self, "_block_outbound_audio", False):
                     break
 
                 # Tool calls may arrive in streaming mode.
@@ -4462,13 +6955,6 @@ class CallSession:
             # Active Call can misleadingly show 0 OpenRouter turns even though OpenRouter spoke.
             turn_counted = False
 
-            if not getattr(self, "_assistant_text_started_for_turn", False):
-                self._assistant_text_started_for_turn = True
-                try:
-                    self._assistant_text_started_event.set()
-                except Exception:
-                    pass
-
             voice_provider = getattr(self, "voice_provider", "openai")
             enqueued_any_speechmatics = False
 
@@ -4497,14 +6983,38 @@ class CallSession:
                 pending = ""
                 started_any_audio = False
                 min_sentence_chars = 20  # Balance: not too small (gaps) not too large (latency)
-                force_start_chars = 60  # Start speaking quickly
-                force_cut_chars = 50  # Cut at natural points
+                force_start_chars = 45  # Start speaking quickly
+                force_cut_chars = 45  # Cut at natural points
 
-                async for delta in self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction):
+                # Check if racing is enabled AND we have multiple models configured
+                racing_enabled = CONFIG.get("RACING_ENABLED", 0)
+                model_2 = CONFIG.get("OPENROUTER_MODEL_2", "")
+                model_3 = CONFIG.get("OPENROUTER_MODEL_3", "")
+                has_multiple_models = bool(model_2 or model_3)
+                
+                if racing_enabled and has_multiple_models:
+                    # Racing mode: start multiple models, use first response
+                    stream_generator = self._race_openrouter_models(user_text, extra_system_instruction=extra_system_instruction)
+                else:
+                    # Normal mode: single model
+                    stream_generator = self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction)
+                
+                async for delta in stream_generator:
                     if not self.is_active:
                         return
                     if not delta:
                         continue
+
+                    # Track how much the brain is producing this turn (for golden-rule filler sizing).
+                    try:
+                        self._brain_chars_generated_for_turn = int(getattr(self, "_brain_chars_generated_for_turn", 0) or 0) + len(delta)
+                    except Exception:
+                        pass
+                    if not getattr(self, "_brain_first_token_at", None):
+                        try:
+                            self._brain_first_token_at = time.time()
+                        except Exception:
+                            pass
 
                     if not turn_counted:
                         turn_counted = True
@@ -4521,6 +7031,12 @@ class CallSession:
                             self._assistant_text_started_event.set()
                         except Exception:
                             pass
+                        
+                        # Log first token latency
+                        if hasattr(self, '_speech_stopped_time') and self._speech_stopped_time is not None:
+                            first_token_latency = (time.time() - self._speech_stopped_time) * 1000
+                            logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: First token from OpenRouter in {first_token_latency:.0f}ms")
+                            self._record_latency_event("first_token_openrouter", ms_from_turn_start=float(first_token_latency))
 
                     full_text += delta
                     pending += delta
@@ -4586,7 +7102,9 @@ class CallSession:
                     await self._enqueue_speechmatics_tts(text)
                 # Flush remaining tail.
                 tail = pending.strip()
-                if tail and self.is_active and not getattr(self, "_caller_speaking", False):
+                # Don't drop the final flush just because caller-speaking detection is sticky.
+                # If outbound audio is blocked, downstream send/buffer logic will pause naturally.
+                if tail and self.is_active:
                     try:
                         t_lower = tail.lower()
                         if "transfer_call" not in t_lower and "uses transfer" not in t_lower and "tool call" not in t_lower:
@@ -4595,6 +7113,154 @@ class CallSession:
                     except Exception:
                         enqueued_any_speechmatics = True
                         await self._enqueue_speechmatics_tts(tail)
+
+            # Lemonfox (and other non-streaming external TTS providers) previously waited for the
+            # FULL OpenRouter completion before speaking, which can feel extremely slow.
+            # For Lemonfox, stream OpenRouter and speak sentence-by-sentence to reduce perceived latency.
+            elif (
+                voice_provider == "lemonfox"
+                and str(CONFIG.get("LEMONFOX_API_KEY", "") or "").strip()
+                and not force_non_streaming_for_transfer_tools
+            ):
+                logger.info(f"[{self.call_uuid}] 🚀 Lemonfox: streaming OpenRouter + sentence-by-sentence TTS")
+                import re
+
+                full_text = ""
+                pending = ""
+                started_any_audio = False
+                min_sentence_chars = 22
+                force_start_chars = 70
+                force_cut_chars = 55
+
+                # Small bounded queue so OpenRouter can keep streaming while Lemonfox TTS runs.
+                tts_queue: asyncio.Queue = asyncio.Queue(maxsize=8)
+
+                async def _tts_worker() -> None:
+                    try:
+                        while self.is_active and not getattr(self, "_caller_speaking", False):
+                            chunk = await tts_queue.get()
+                            if chunk is None:
+                                return
+                            chunk_text = str(chunk or "").strip()
+                            if not chunk_text:
+                                continue
+                            # Speak each chunk via the configured provider (Lemonfox).
+                            await self._speak_text_via_voice_provider(chunk_text)
+                    except asyncio.CancelledError:
+                        return
+                    except Exception:
+                        return
+
+                worker_task = asyncio.create_task(_tts_worker())
+
+                racing_enabled = CONFIG.get("RACING_ENABLED", 0)
+                model_2 = CONFIG.get("OPENROUTER_MODEL_2", "")
+                model_3 = CONFIG.get("OPENROUTER_MODEL_3", "")
+                has_multiple_models = bool(model_2 or model_3)
+
+                if racing_enabled and has_multiple_models:
+                    stream_generator = self._race_openrouter_models(user_text, extra_system_instruction=extra_system_instruction)
+                else:
+                    stream_generator = self._openrouter_stream_deltas(user_text, extra_system_instruction=extra_system_instruction)
+
+                try:
+                    async for delta in stream_generator:
+                        if not self.is_active:
+                            return
+                        if not delta:
+                            continue
+
+                        if not turn_counted:
+                            turn_counted = True
+                            try:
+                                self._brain_openrouter_turns += 1
+                                self._brain_usage_db_upsert()
+                            except Exception:
+                                pass
+
+                        if not getattr(self, "_assistant_text_started_for_turn", False):
+                            self._assistant_text_started_for_turn = True
+                            try:
+                                self._assistant_text_started_event.set()
+                            except Exception:
+                                pass
+                            try:
+                                if hasattr(self, "_speech_stopped_time") and self._speech_stopped_time is not None:
+                                    first_token_latency = (time.time() - self._speech_stopped_time) * 1000
+                                    logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: First token from OpenRouter in {first_token_latency:.0f}ms")
+                                    self._record_latency_event("first_token_openrouter", ms_from_turn_start=float(first_token_latency))
+                            except Exception:
+                                pass
+
+                        full_text += delta
+                        pending += delta
+
+                        # Extract complete sentences.
+                        while True:
+                            match = re.search(r"(.+?[.!?])(\s+|$)", pending)
+                            if not match:
+                                break
+                            sentence = match.group(1).strip()
+                            pending = pending[match.end():]
+                            if len(sentence) < min_sentence_chars:
+                                continue
+
+                            try:
+                                s_lower = sentence.lower()
+                                if "transfer_call" in s_lower or "uses transfer" in s_lower or "tool call" in s_lower:
+                                    continue
+                            except Exception:
+                                pass
+
+                            started_any_audio = True
+                            await tts_queue.put(sentence)
+
+                        # Force-start if no punctuation appears for a while.
+                        if (not started_any_audio) and len(pending.strip()) >= force_start_chars:
+                            raw = pending
+                            raw2 = raw.lstrip()
+                            chunk = raw2[:force_cut_chars]
+                            cut_at = max(chunk.rfind(","), chunk.rfind(";"), chunk.rfind(" "))
+                            if cut_at >= 40:
+                                chunk = chunk[:cut_at].strip()
+                            if len(chunk) >= min_sentence_chars:
+                                try:
+                                    c_lower = chunk.lower()
+                                    if "transfer_call" in c_lower or "uses transfer" in c_lower or "tool call" in c_lower:
+                                        raw2 = raw2[len(chunk):]
+                                        pending = raw2
+                                        continue
+                                except Exception:
+                                    pass
+                                started_any_audio = True
+                                await tts_queue.put(chunk)
+                                raw2 = raw2[len(chunk):]
+                                pending = raw2
+                finally:
+                    # Flush remaining tail.
+                    try:
+                        tail = pending.strip()
+                        if tail and self.is_active:
+                            try:
+                                t_lower = tail.lower()
+                                if "transfer_call" not in t_lower and "uses transfer" not in t_lower and "tool call" not in t_lower:
+                                    await tts_queue.put(tail)
+                            except Exception:
+                                await tts_queue.put(tail)
+                    except Exception:
+                        pass
+
+                    # Stop worker.
+                    try:
+                        await tts_queue.put(None)
+                    except Exception:
+                        pass
+                    try:
+                        await worker_task
+                    except Exception:
+                        pass
+
+                text = full_text.strip()
 
             else:
                 text = await self._openrouter_generate_text(user_text, extra_system_instruction=extra_system_instruction)
@@ -4897,6 +7563,10 @@ class CallSession:
             self._brain_provider_for_turn = "deepseek"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._deepseek_task = asyncio.create_task(self._run_deepseek_turn(user_text, extra_system_instruction=extra_system_instruction))
+            
+            # Start timeout test monitoring if enabled
+            self._start_timeout_test_monitor()
+            
             logger.info(f"[{self.call_uuid}] ✅ DeepSeek brain triggered ({reason})")
             return True
 
@@ -4922,6 +7592,10 @@ class CallSession:
             self._brain_provider_for_turn = "groq"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._groq_task = asyncio.create_task(self._run_groq_turn(user_text, extra_system_instruction=extra_system_instruction))
+            
+            # Start timeout test monitoring if enabled
+            self._start_timeout_test_monitor()
+            
             logger.info(f"[{self.call_uuid}] ✅ Groq brain triggered ({reason})")
             return True
 
@@ -4946,6 +7620,10 @@ class CallSession:
             self._brain_provider_for_turn = "grok"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._grok_task = asyncio.create_task(self._run_grok_turn(user_text, extra_system_instruction=extra_system_instruction))
+            
+            # Start timeout test monitoring if enabled
+            self._start_timeout_test_monitor()
+            
             logger.info(f"[{self.call_uuid}] ✅ Grok brain triggered ({reason})")
             return True
 
@@ -4970,6 +7648,16 @@ class CallSession:
             self._brain_provider_for_turn = "openrouter"
             self._last_speech_time = asyncio.get_event_loop().time()
             self._openrouter_task = asyncio.create_task(self._run_openrouter_turn(user_text, extra_system_instruction=extra_system_instruction))
+            
+            # Start timeout test monitoring if enabled
+            self._start_timeout_test_monitor()
+            
+            # Log brain trigger latency
+            if hasattr(self, '_speech_stopped_time') and self._speech_stopped_time:
+                trigger_latency = (time.time() - self._speech_stopped_time) * 1000
+                logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: Brain triggered in {trigger_latency:.0f}ms after caller stopped")
+                self._record_latency_event("brain_triggered_openrouter", ms_from_turn_start=float(trigger_latency))
+            
             logger.info(f"[{self.call_uuid}] ✅ OpenRouter brain triggered ({reason})")
             return True
 
@@ -4987,6 +7675,16 @@ class CallSession:
                 self._response_trigger_time = None
             self._brain_provider_for_turn = "openai"
             self._last_speech_time = asyncio.get_event_loop().time()
+            
+            # Start timeout test monitoring if enabled
+            self._start_timeout_test_monitor()
+            
+            # Log brain trigger latency
+            if hasattr(self, '_speech_stopped_time') and self._speech_stopped_time:
+                trigger_latency = (time.time() - self._speech_stopped_time) * 1000
+                logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: Brain triggered in {trigger_latency:.0f}ms after caller stopped")
+                self._record_latency_event("brain_triggered_openai", ms_from_turn_start=float(trigger_latency))
+            
             logger.info(f"[{self.call_uuid}] ✅ OpenAI brain triggered ({reason})")
             return True
         except Exception as e:
@@ -5029,9 +7727,16 @@ class CallSession:
             return
 
     async def _schedule_latency_filler_for_trigger(self, min_turn: float, delay_seconds: float) -> None:
-        """Schedule Speechmatics filler after triggering a response, if needed."""
+        """Schedule latency filler after triggering a response, if needed.
+
+        Historically this only ran for `voice_provider == 'speechmatics'`.
+        However, for non-OpenAI brains in realtime mode (OpenAI ASR + external brain + OpenAI audio
+        voices like Sam/Judie), we still need fillers to cover dead-air. In those cases we play
+        Sarah filler audio directly to Vonage.
+        """
         voice_provider = getattr(self, 'voice_provider', 'openai')
-        if voice_provider != 'speechmatics':
+        # Low-latency providers: do not play filler audio for them.
+        if str(voice_provider or "").strip().lower() in {'cartesia', 'lemonfox'}:
             return
         if self._pending_filler_task is not None and not self._pending_filler_task.done():
             try:
@@ -5040,9 +7745,14 @@ class CallSession:
                 pass
         self._pending_filler_generation += 1
         gen = self._pending_filler_generation
-        self._pending_filler_task = asyncio.create_task(
-            self._maybe_play_speechmatics_filler(gen, min_turn, delay_seconds=delay_seconds)
-        )
+        if voice_provider == 'speechmatics':
+            self._pending_filler_task = asyncio.create_task(
+                self._maybe_play_speechmatics_filler(gen, min_turn, delay_seconds=delay_seconds)
+            )
+        else:
+            self._pending_filler_task = asyncio.create_task(
+                self._maybe_play_generic_latency_filler(gen, min_turn, delay_seconds=delay_seconds)
+            )
 
     @staticmethod
     def _normalize_backchannel_text(text: str) -> str:
@@ -5062,6 +7772,57 @@ class CallSession:
         return t
 
     @classmethod
+    @staticmethod
+    def _is_caller_leaving(transcript: str) -> bool:
+        """Detect if caller is indicating they want to end/leave the call."""
+        if not transcript or not transcript.strip():
+            return False
+        
+        t = transcript.lower().strip()
+        
+        # Common leaving/goodbye phrases
+        leaving_phrases = [
+            "i'm going to get going",
+            "im going to get going",
+            "i have to get going",
+            "gotta get going",
+            "got to get going",
+            "i need to get going",
+            "i have to go",
+            "i've got to go",
+            "ive got to go",
+            "i gotta go",
+            "gotta go",
+            "got to go",
+            "need to go",
+            "i need to run",
+            "gotta run",
+            "got to run",
+            "have to run",
+            "i'll let you go",
+            "ill let you go",
+            "let you go",
+            "talk to you later",
+            "speak to you later",
+            "catch you later",
+            "i'll talk to you later",
+            "goodbye",
+            "good bye",
+            "bye bye",
+            "bye",
+            "take care",
+            "have a good day",
+            "have a great day",
+            "have a nice day",
+        ]
+        
+        # Check exact matches and contains (for phrases within longer sentences)
+        for phrase in leaving_phrases:
+            if phrase in t:
+                return True
+        
+        return False
+
     def _is_backchannel_utterance(cls, transcript: str) -> bool:
         """Return True for short acknowledgements that should not interrupt the agent."""
         t = cls._normalize_backchannel_text(transcript)
@@ -5122,6 +7883,55 @@ class CallSession:
 
         return False
 
+    @classmethod
+    def _is_question_utterance(cls, transcript: str) -> bool:
+        """Best-effort heuristic: detect when the caller asked a question."""
+        raw = (transcript or "").strip()
+        if not raw:
+            return False
+        if "?" in raw:
+            return True
+
+        t = cls._normalize_backchannel_text(raw)
+        if not t:
+            return False
+        words = t.split()
+        if not words:
+            return False
+
+        first = words[0]
+        starters = {
+            "what",
+            "why",
+            "how",
+            "when",
+            "where",
+            "who",
+            "which",
+            "can",
+            "could",
+            "would",
+            "should",
+            "do",
+            "does",
+            "did",
+            "is",
+            "are",
+            "will",
+            "may",
+        }
+        if first in starters:
+            return True
+
+        if t.startswith("can you ") or t.startswith("could you ") or t.startswith("would you "):
+            return True
+        if t.startswith("is it ") or t.startswith("are you "):
+            return True
+        if t.startswith("i wonder"):
+            return True
+
+        return False
+
     def _get_effective_barge_in_threshold_seconds(self, now: float) -> float:
         """Return the barge-in duration threshold to use for *cancelling* agent output.
 
@@ -5151,11 +7961,11 @@ class CallSession:
 
         # No transcript yet: protect against premature cancels on backchannels.
         if ignore_backchannels_always:
-            return max(raw, 0.9)
+            return max(raw, 0.55)
 
         return raw
 
-    async def _maybe_play_speechmatics_filler(self, generation: int, min_turn: float, delay_seconds: float = 0.25) -> None:
+    async def _maybe_play_speechmatics_filler(self, generation: int, min_turn: float, delay_seconds: float = 1.0) -> None:
         """Latency-based filler playback for Speechmatics.
 
         Waits `delay_seconds` after we trigger a response; if the caller resumes speaking OR the
@@ -5182,14 +7992,18 @@ class CallSession:
             except Exception:
                 pass
 
-            # If Speechmatics is already producing bytes (even if we're buffering), skip filler.
+            # Check if Speechmatics bytes started arriving (but allow filler to continue briefly)
+            # This gives a grace period for Speechmatics TTS processing without cancelling filler too early
             if getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
-                return
-            try:
-                if self._speechmatics_audio_bytes_received_event.is_set():
-                    return
-            except Exception:
-                pass
+                try:
+                    # If audio bytes started recently, give it 200ms to actually start playing
+                    # This covers the gap between TTS starting and audio actually reaching the caller
+                    await asyncio.sleep(0.2)
+                    if getattr(self, "_assistant_audio_started_for_turn", False):
+                        return
+                except Exception:
+                    pass
+            
             if self._filler_injecting or self._filler_played_for_turn or self._suppress_filler_for_turn:
                 return
 
@@ -5266,18 +8080,21 @@ class CallSession:
                 return
 
             # Only play filler if this was a meaningful user turn.
-            if min_turn and self._last_speech_duration_seconds < min_turn and len(last_transcript.split()) < 3:
+            # Exception: short questions (e.g. "Price?" / "How much?") should still get filler
+            # when the AI/TTS is slow.
+            if (
+                min_turn
+                and self._last_speech_duration_seconds < min_turn
+                and len(last_transcript.split()) < 3
+                and not self._is_question_utterance(last_transcript)
+            ):
                 return
 
-            # Latency-based bucket selection:
-            # - <0.5s: no filler
-            # - not bad: small
-            # - average: medium
-            # - very poor: large
+            # GOLDEN RULE (Speechmatics): caller must not wait >2s with dead-air.
+            # If assistant audio hasn't started by 2s after speech end, force filler.
             try:
                 loop = asyncio.get_event_loop()
                 now = loop.time()
-                # Prefer speech-end anchor so filler timing is based on when the caller finished.
                 anchor_at = getattr(self, "_filler_latency_anchor_time", None)
                 if anchor_at is None:
                     anchor_at = getattr(self, "_response_trigger_time", None)
@@ -5286,10 +8103,12 @@ class CallSession:
                 now = None
 
             if anchor_at is not None and now is not None:
-                elapsed = max(0.0, float(now - anchor_at))
-                no_filler_max = 0.50
-                if elapsed < no_filler_max:
-                    remaining = no_filler_max - elapsed
+                try:
+                    elapsed = max(0.0, float(now - float(anchor_at)))
+                except Exception:
+                    elapsed = 0.0
+                if elapsed < 2.0:
+                    remaining = max(0.0, 2.0 - float(elapsed))
                     wait_tasks = []
                     try:
                         wait_tasks.append(asyncio.create_task(self._assistant_audio_started_event.wait()))
@@ -5301,11 +8120,7 @@ class CallSession:
                         pass
                     if wait_tasks:
                         try:
-                            done, pending = await asyncio.wait(
-                                wait_tasks,
-                                timeout=remaining,
-                                return_when=asyncio.FIRST_COMPLETED,
-                            )
+                            done, pending = await asyncio.wait(wait_tasks, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
                             for p in pending:
                                 try:
                                     p.cancel()
@@ -5316,29 +8131,38 @@ class CallSession:
                         except Exception:
                             pass
                     else:
-                        await asyncio.sleep(max(0.0, remaining))
+                        await asyncio.sleep(remaining)
 
-                    # Re-check after waiting up to the no-filler threshold.
-                    if getattr(self, "_assistant_audio_started_for_turn", False):
-                        return
-                    if getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
-                        return
+                # Re-check after waiting up to the 2s deadline.
+                # IMPORTANT: bytes-received is not the same as audible audio (we may be buffering
+                # while filler plays), so only treat "audio started" as success here.
+                if getattr(self, "_assistant_audio_started_for_turn", False):
+                    return
 
+            # GOLDEN RULE sizing: if we've waited >=2s, choose filler size based on
+            # estimated answer length (not just elapsed time).
+            try:
+                loop = asyncio.get_event_loop()
+                now = loop.time()
+                anchor_at = getattr(self, "_filler_latency_anchor_time", None)
+                if anchor_at is None:
+                    anchor_at = getattr(self, "_response_trigger_time", None)
+            except Exception:
+                anchor_at = None
+                now = None
+
+            if anchor_at is not None and now is not None:
                 try:
-                    elapsed = max(0.0, float(asyncio.get_event_loop().time() - triggered_at))
+                    elapsed = max(0.0, float(now - float(anchor_at)))
                 except Exception:
                     elapsed = 0.0
-
-                # Default thresholds (seconds).
-                if elapsed < 1.00:
-                    size_bucket = "small"
-                elif elapsed < 1.80:
-                    size_bucket = "medium"
+                if elapsed >= 2.0:
+                    size_bucket = self._estimate_brain_answer_size_bucket()
+                    logger.info(f"[{self.call_uuid}] 📏 Golden rule filler size (by answer length): {size_bucket}")
                 else:
-                    size_bucket = "large"
+                    size_bucket = self._predict_filler_size()
             else:
-                # Fallback if we can't compute elapsed.
-                size_bucket = "medium"
+                size_bucket = self._predict_filler_size()
 
             candidate = self._pick_random_global_filler("sarah", size_preference=size_bucket)
             if not candidate or not self.vonage_ws:
@@ -5350,9 +8174,20 @@ class CallSession:
 
             self._filler_injecting = True
             self._filler_played_for_turn = True
+            try:
+                self._filler_started_at = asyncio.get_event_loop().time()
+            except Exception:
+                self._filler_started_at = None
             logger.info(f"[{self.call_uuid}] 🎵 Playing filler: {phrase}")
             await self._stream_wav_to_vonage(audio_path)
             self._last_filler_phrase = phrase
+
+            # New latency rule: if filler played and AI/TTS still hasn't started, immediately
+            # speak a short Sarah acknowledgement *only if* the caller asked a question.
+            try:
+                await self._maybe_play_post_filler_question_ack(last_transcript)
+            except Exception:
+                pass
 
             # After we use a prep-filler, clear the flag so we don't treat subsequent turns as eligible.
             try:
@@ -5371,6 +8206,329 @@ class CallSession:
         finally:
             # Only clear injecting flag; per-turn flags are managed elsewhere.
             self._filler_injecting = False
+
+    async def _maybe_play_generic_latency_filler(self, generation: int, min_turn: float, delay_seconds: float = 1.0) -> None:
+        """Latency-based filler playback for non-Speechmatics voice providers.
+
+        Plays Sarah filler audio directly to Vonage while we wait for assistant audio.
+        """
+        try:
+            await asyncio.sleep(max(0.0, float(delay_seconds)))
+            if not self.is_active:
+                return
+            if generation != getattr(self, "_pending_filler_generation", 0):
+                return
+            if self._caller_speaking:
+                return
+            # If assistant audio has started, filler would be wasted/interruptive.
+            if getattr(self, "_assistant_audio_started_for_turn", False):
+                return
+            try:
+                if self._assistant_audio_started_event.is_set():
+                    return
+            except Exception:
+                pass
+
+            if self._filler_injecting or self._filler_played_for_turn or self._suppress_filler_for_turn:
+                return
+
+            # Only play filler if we intend to respond for this turn.
+            if not getattr(self, "_response_triggered_for_turn", False) and not getattr(self, "_allow_filler_without_response_for_turn", False):
+                return
+
+            # Adaptive wait: if we have text started, give a small extra window for audio to begin.
+            provider_for_turn = str(getattr(self, "_brain_provider_for_turn", "openai") or "openai").strip().lower()
+            if provider_for_turn == "openrouter":
+                try:
+                    max_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MAX_MS", "750"))
+                except Exception:
+                    max_ms = 750.0
+            else:
+                try:
+                    max_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MAX_MS", "1100"))
+                except Exception:
+                    max_ms = 1100.0
+            max_wait_seconds = max(0.0, max_ms / 1000.0)
+
+            try:
+                text_started = self._assistant_text_started_event.is_set()
+            except Exception:
+                text_started = bool(getattr(self, "_assistant_text_started_for_turn", False))
+
+            if text_started and max_wait_seconds > float(delay_seconds):
+                remaining = max_wait_seconds - float(delay_seconds)
+                try:
+                    await asyncio.wait_for(self._assistant_audio_started_event.wait(), timeout=remaining)
+                    return
+                except Exception:
+                    pass
+
+                if not self.is_active:
+                    return
+                if generation != getattr(self, "_pending_filler_generation", 0):
+                    return
+                if self._caller_speaking:
+                    return
+                if getattr(self, "_assistant_audio_started_for_turn", False):
+                    return
+
+            # Wait briefly for transcript to suppress filler on backchannels/closings.
+            last_transcript = (getattr(self, "_last_caller_transcript", "") or "").strip()
+            if not last_transcript:
+                try:
+                    await asyncio.wait_for(self._turn_transcript_ready.wait(), timeout=0.15)
+                except Exception:
+                    pass
+                last_transcript = (getattr(self, "_last_caller_transcript", "") or "").strip()
+
+            if not last_transcript:
+                if min_turn and self._last_speech_duration_seconds < min_turn:
+                    return
+
+            if self._is_backchannel_utterance(last_transcript):
+                return
+
+            t_norm = self._normalize_backchannel_text(last_transcript)
+            if t_norm in {"thanks", "thank you", "thankyou", "goodbye", "good bye", "bye"}:
+                return
+
+            if (
+                min_turn
+                and self._last_speech_duration_seconds < min_turn
+                and len(last_transcript.split()) < 3
+                and not self._is_question_utterance(last_transcript)
+            ):
+                return
+
+            # Latency-based bucket selection using speech-end anchor.
+            try:
+                loop = asyncio.get_event_loop()
+                now = loop.time()
+                anchor_at = getattr(self, "_filler_latency_anchor_time", None)
+                if anchor_at is None:
+                    anchor_at = getattr(self, "_response_trigger_time", None)
+            except Exception:
+                anchor_at = None
+                now = None
+
+            if anchor_at is not None and now is not None:
+                elapsed = max(0.0, float(now - anchor_at))
+                # PREDICTIVE: if we haven't waited yet, predict size based on brain provider.
+                # REACTIVE: if we've already waited, measure elapsed and choose dynamically.
+                if elapsed < 0.10:
+                    # We just started — predict based on provider's historical average.
+                    size_bucket = self._predict_filler_size()
+                    logger.info(f"[{self.call_uuid}] 🔮 Predicted filler size (generic): {size_bucket}")
+                else:
+                    # We've been waiting — use actual elapsed time.
+                    if elapsed < 1.00:
+                        size_bucket = "small"
+                    elif elapsed < 1.80:
+                        size_bucket = "medium"
+                    else:
+                        size_bucket = "large"
+            else:
+                size_bucket = "medium"
+
+            candidate = self._pick_random_global_filler("sarah", size_preference=size_bucket)
+            if not candidate or not self.vonage_ws:
+                return
+
+            audio_path, phrase = candidate
+            if not phrase or not phrase.strip():
+                logger.warning(f"[{self.call_uuid}] ⚠️ Filler metadata missing phrase/text; playing audio anyway")
+
+            self._filler_injecting = True
+            self._filler_played_for_turn = True
+            logger.info(f"[{self.call_uuid}] 🎵 Playing filler (generic): {phrase}")
+            await self._stream_wav_to_vonage(audio_path)
+            self._last_filler_phrase = phrase
+
+            try:
+                self._allow_filler_without_response_for_turn = False
+            except Exception:
+                pass
+
+            if phrase:
+                try:
+                    await self._tell_openai_avoid_repeating_filler(phrase)
+                except Exception:
+                    pass
+
+            # Post-filler question acknowledgement rule.
+            try:
+                await self._maybe_play_post_filler_question_ack(last_transcript)
+            except Exception:
+                pass
+
+            await asyncio.sleep(0.10)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Generic filler task error: {e}")
+        finally:
+            self._filler_injecting = False
+
+    async def _maybe_play_post_filler_question_ack(self, last_transcript: str) -> None:
+        if getattr(self, "_post_filler_question_ack_played_for_turn", False):
+            return
+        if not self.is_active or not self.vonage_ws:
+            return
+        if self._caller_speaking:
+            return
+        if getattr(self, "_assistant_audio_started_for_turn", False):
+            return
+        if getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
+            return
+        if not self._is_question_utterance(last_transcript):
+            return
+
+        options = [
+            "Thanks for your question.",
+            "Ah right ok thanks for your question.",
+            "Great question.",
+        ]
+        try:
+            text = secrets.choice(options)
+        except Exception:
+            text = options[0]
+
+        self._post_filler_question_ack_played_for_turn = True
+        logger.info(f"[{self.call_uuid}] 🗣️ Post-filler question ack: '{text}'")
+
+        ok = await self._generate_and_play_speechmatics_tts(text=text, voice_name="sarah")
+        if not ok:
+            try:
+                await self._speak_text_via_voice_provider(text)
+            except Exception:
+                pass
+
+    async def _generate_and_play_speechmatics_tts(self, text: str, voice_name: str = "sarah") -> bool:
+        try:
+            speechmatics_key = self._get_speechmatics_key()
+            if not speechmatics_key:
+                return False
+
+            url = "https://api.speechmatics.com/v1/tts"
+            headers = {
+                "Authorization": f"Bearer {speechmatics_key}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "text": str(text or ""),
+                "voice_name": str(voice_name or "sarah"),
+                "audio_format": {
+                    "type": "raw",
+                    "encoding": "pcm_s16le",
+                    "sample_rate": 16000,
+                },
+            }
+
+            response = await self._speechmatics_client.post(url, json=payload, headers=headers)
+            if response.status_code != 200:
+                return False
+            audio_bytes = response.content
+            if not audio_bytes:
+                return False
+            await self._send_vonage_audio_bytes(audio_bytes)
+            return True
+        except Exception:
+            return False
+
+    def _start_timeout_test_monitor(self) -> None:
+        """Start the timeout test monitoring task if enabled."""
+        try:
+            # Cancel any existing timeout test task
+            if self._timeout_test_task and not self._timeout_test_task.done():
+                try:
+                    self._timeout_test_task.cancel()
+                except Exception:
+                    pass
+            
+            # Reset the triggered flag for this turn
+            self._timeout_test_triggered = False
+            
+            # Start a new timeout test task
+            self._timeout_test_task = asyncio.create_task(self._monitor_timeout_test())
+        except Exception as e:
+            logger.debug(f"[{self.call_uuid}] Error starting timeout test monitor: {e}")
+
+    async def _monitor_timeout_test(self) -> None:
+        """Monitor AI response timeout for testing purposes.
+        
+        If enabled in super admin, plays a 'deleted response' audio if the AI
+        takes longer than the configured timeout to start producing audio.
+        """
+        try:
+            # Check if timeout test is enabled
+            timeout_enabled = CONFIG.get("TIMEOUT_TEST_ENABLED", False)
+            if not timeout_enabled:
+                return
+
+            timeout_seconds = float(CONFIG.get("TIMEOUT_TEST_SECONDS", 2.0))
+            
+            # Wait for the configured timeout
+            await asyncio.sleep(timeout_seconds)
+
+            # Check if audio has started yet
+            if not getattr(self, "_assistant_audio_started_for_turn", False):
+                # Audio hasn't started - play the timeout audio
+                if self.is_active and self.vonage_ws and not self._timeout_test_triggered:
+                    self._timeout_test_triggered = True
+                    logger.warning(
+                        f"[{self.call_uuid}] ⏰ TIMEOUT TEST: AI response exceeded {timeout_seconds}s - playing 'deleted response' audio"
+                    )
+                    
+                    # Use Speechmatics TTS to generate "deleted response" audio on the fly
+                    # This is more reliable than trying to use a pre-recorded file
+                    await self._generate_and_play_timeout_audio()
+                    
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Timeout test monitor error: {e}")
+
+    async def _generate_and_play_timeout_audio(self) -> None:
+        """Generate and play 'deleted response' audio using Speechmatics TTS."""
+        try:
+            speechmatics_key = self._get_speechmatics_key()
+            if not speechmatics_key:
+                logger.warning(f"[{self.call_uuid}] Cannot generate timeout audio: No Speechmatics key")
+                return
+
+            text_to_speak = "Deleted response."
+            
+            # Use the Speechmatics client to generate audio
+            url = "https://api.speechmatics.com/v1/tts"
+            headers = {
+                "Authorization": f"Bearer {speechmatics_key}",
+                "Content-Type": "application/json",
+            }
+            
+            payload = {
+                "text": text_to_speak,
+                "voice_name": "sarah",
+                "audio_format": {
+                    "type": "raw",
+                    "encoding": "pcm_s16le",
+                    "sample_rate": 16000,
+                },
+            }
+
+            response = await self._speechmatics_client.post(url, json=payload, headers=headers)
+            
+            if response.status_code == 200:
+                audio_bytes = response.content
+                # Send directly to Vonage
+                await self._send_vonage_audio_bytes(audio_bytes)
+                logger.info(f"[{self.call_uuid}] 🔊 Played timeout test audio: '{text_to_speak}'")
+            else:
+                logger.warning(
+                    f"[{self.call_uuid}] Failed to generate timeout audio: {response.status_code}"
+                )
+                
+        except Exception as e:
+            logger.warning(f"[{self.call_uuid}] Error generating timeout audio: {e}")
 
     async def _maybe_barge_in_after_delay(self) -> None:
         """Only cancel agent output if caller speech persists long enough to be a real interruption."""
@@ -5479,8 +8637,61 @@ class CallSession:
     async def _send_vonage_audio_bytes_raw(self, pcm_bytes: bytes) -> None:
         # HARD STOP: if caller has interrupted and we're blocking audio, drop this chunk silently.
         if getattr(self, "_block_outbound_audio", False):
-            logger.debug(f"[{self.call_uuid}] ❌ BLOCKED {len(pcm_bytes)} bytes (caller interrupted)")
-            return
+            try:
+                now = asyncio.get_event_loop().time()
+            except Exception:
+                now = 0.0
+            # Safety net: if we're blocked but the caller is no longer speaking, auto-unblock
+            # after a short timeout to avoid the "agent went silent" failure mode.
+            try:
+                caller_speaking = bool(getattr(self, "_caller_speaking", False) or getattr(self, "_caller_vad_speaking", False))
+            except Exception:
+                caller_speaking = True
+
+            if now and (not caller_speaking):
+                try:
+                    blocked_since = float(getattr(self, "_block_outbound_audio_set_at", now) or now)
+                    stuck_for = max(0.0, now - blocked_since)
+                except Exception:
+                    stuck_for = 0.0
+                try:
+                    unstuck_after = float(CONFIG.get("VAD_BLOCK_UNSTICK_SECONDS", 1.5) or 1.5)
+                except Exception:
+                    unstuck_after = 1.5
+
+                if stuck_for >= unstuck_after:
+                    self._block_outbound_audio = False
+                    try:
+                        self._block_outbound_audio_set_at = None
+                    except Exception:
+                        pass
+                    try:
+                        self._record_latency_event("vad_block_unstuck", ms_from_turn_start=0.0)
+                    except Exception:
+                        pass
+                    logger.warning(f"[{self.call_uuid}] 🔓 Unsticking outbound audio block after {stuck_for:.2f}s (caller not speaking)")
+                else:
+                    # Throttle to avoid log spam while blocked.
+                    try:
+                        last = float(getattr(self, "_last_blocked_audio_log_at", 0.0) or 0.0)
+                        if now and (now - last) >= 1.0:
+                            self._last_blocked_audio_log_at = now
+                            logger.warning(
+                                f"[{self.call_uuid}] ❌ BLOCKED outbound audio ({len(pcm_bytes)} bytes): _block_outbound_audio=True"
+                            )
+                    except Exception:
+                        pass
+                    return
+            else:
+                # Still speaking (or unknown); keep blocking.
+                try:
+                    last = float(getattr(self, "_last_blocked_audio_log_at", 0.0) or 0.0)
+                    if now and (now - last) >= 1.0:
+                        self._last_blocked_audio_log_at = now
+                        logger.warning(f"[{self.call_uuid}] ❌ BLOCKED outbound audio ({len(pcm_bytes)} bytes): _block_outbound_audio=True")
+                except Exception:
+                    pass
+                return
         
         if not self.vonage_ws:
             logger.warning(f"[{self.call_uuid}] ⚠️ Cannot send audio: vonage_ws is None")
@@ -5498,8 +8709,25 @@ class CallSession:
         except Exception:
             pass
 
+        try:
+            force_json = str(CONFIG.get("VONAGE_FORCE_OUTBOUND_JSON_AUDIO", "") or "").strip().lower() in {"1", "true", "yes"}
+        except Exception:
+            force_json = False
+
+        if force_json and getattr(self, "_vonage_audio_mode", "bytes") != "json":
+            self._vonage_audio_mode = "json"
+
+        if not getattr(self, "_vonage_outbound_audio_mode_logged", False):
+            try:
+                self._vonage_outbound_audio_mode_logged = True
+                logger.info(
+                    f"[{self.call_uuid}] Vonage outbound audio mode: {getattr(self, '_vonage_audio_mode', 'bytes')} (force_json={force_json})"
+                )
+            except Exception:
+                pass
+
         logger.debug(f"[{self.call_uuid}] 🔊 Sending {len(pcm_bytes)} bytes to Vonage (ws={bool(self.vonage_ws)}, active={self.is_active})")
-        
+
         if getattr(self, "_vonage_audio_mode", "bytes") == "json":
             await self.vonage_ws.send_text(json.dumps({"audio": base64.b64encode(pcm_bytes).decode()}))
             logger.debug(f"[{self.call_uuid}] ✅ Sent as JSON")
@@ -5525,6 +8753,11 @@ class CallSession:
         # If we're flushing paused audio, bypass pause/interrupt checks.
         if not getattr(self, "_flushing_paused_agent_audio", False):
             now = asyncio.get_event_loop().time()
+
+            # During the greeting / initial seconds, don't let VAD pause/block audio.
+            if float(getattr(self, "_bypass_vad_audio_until", 0.0) or 0.0) > now:
+                await self._send_vonage_audio_bytes_raw(pcm_bytes)
+                return
 
             if getattr(self, "_caller_vad_speaking", False):
                 # Check if this is a backchannel - don't pause for backchannels
@@ -5687,10 +8920,39 @@ class CallSession:
 
                 # Stream in larger chunks for smoother, clearer audio (no sleep delays)
                 chunk_size = 6400  # 200ms chunks - same as Speechmatics responses for consistency
+                try:
+                    started_at = asyncio.get_event_loop().time()
+                except Exception:
+                    started_at = 0.0
                 while self.is_active and self.vonage_ws:
                     chunk = wf.readframes(chunk_size // 2)  # readframes takes sample count
                     if not chunk:
                         break
+
+                    # GOLDEN RULE: if we're playing filler and Speechmatics is ready to speak,
+                    # stop filler after ~1s so TTS can start immediately.
+                    try:
+                        voice_provider = str(getattr(self, "voice_provider", "openai") or "openai").strip().lower()
+                    except Exception:
+                        voice_provider = "openai"
+                    if voice_provider == "speechmatics" and getattr(self, "_filler_injecting", False):
+                        try:
+                            now = asyncio.get_event_loop().time()
+                            elapsed = max(0.0, float(now - float(started_at or now)))
+                        except Exception:
+                            elapsed = 0.0
+                        if elapsed >= 1.0:
+                            if (
+                                bool(getattr(self, "_assistant_audio_started_for_turn", False))
+                                or bool(getattr(self, "_speechmatics_audio_bytes_received_for_turn", False))
+                                or bool(getattr(self, "_assistant_text_started_for_turn", False))
+                            ):
+                                # Stop filler immediately so Speechmatics can flush buffered audio.
+                                try:
+                                    self._filler_injecting = False
+                                except Exception:
+                                    pass
+                                break
                     await self._send_vonage_audio_bytes(chunk)
 
             return True
@@ -6476,6 +9738,68 @@ Provide your analysis."""
             logger.error(f"[{self.call_uuid}] Transfer guard error: {e}", exc_info=True)
             return (True, f"Transfer guard error (allowing): {e}")
 
+    def _has_custom_transfer_rules(self) -> bool:
+        """Return True when transfer instructions appear to include conditional/custom rules.
+
+        This is used to decide whether to enable LLM tool-calling for `transfer_call` and
+        whether to skip some heuristic auto-detection paths.
+
+        IMPORTANT: keep this conservative; returning True too often changes routing.
+        """
+        try:
+            business_context = str(getattr(self, "business_info", "") or "")
+            agent_instructions_text = str(getattr(self, "agent_instructions", "") or "")
+            transfer_instructions_text = str(getattr(self, "transfer_instructions", "") or "")
+
+            combined = (business_context + " " + agent_instructions_text + " " + transfer_instructions_text).strip().lower()
+            if not combined:
+                return False
+
+            # If there's no mention of transfers at all, there are no transfer rules.
+            if "transfer" not in combined and "put through" not in combined and "connect" not in combined:
+                return False
+
+            # Explicit rule section markers.
+            if "transfer rules" in combined or "confidential call transfer rules" in combined:
+                return True
+
+            # Strong conditional / guard language around transfer behavior.
+            strong_markers = [
+                "only transfer",
+                "do not transfer",
+                "don't transfer",
+                "never transfer",
+                "unless",
+                "if the caller",
+                "if caller",
+                "if they say",
+                "if the user says",
+                "when the caller",
+                "when caller",
+                "when they say",
+                "then transfer",
+            ]
+            if any(m in combined for m in strong_markers):
+                return True
+
+            # Regex fallback: conditional term near a transfer action within a short window.
+            try:
+                import re
+
+                patterns = [
+                    r"\b(?:if|when|unless|only if|provided that|as long as)\b.{0,140}\b(?:transfer|put\s+me\s+through|put\s+them\s+through|connect\s+me|connect\s+them)\b",
+                    r"\b(?:transfer|put\s+me\s+through|put\s+them\s+through|connect\s+me|connect\s+them)\b.{0,140}\b(?:if|when|unless|only if|provided that|as long as)\b",
+                ]
+                for pat in patterns:
+                    if re.search(pat, combined):
+                        return True
+            except Exception:
+                pass
+
+            return False
+        except Exception:
+            return False
+
     def _infer_transfer_target_name(self) -> str:
         """Best-effort: infer a human-friendly transfer recipient name from business/agent instructions.
 
@@ -7019,11 +10343,22 @@ Provide your analysis."""
                         instructions_parts.append("- When you need to transfer, say something like: 'Let me transfer you now' or 'I'll put you through'")
                         instructions_parts.append("- The system will detect your transfer intent and execute it automatically")
                 
-                # Only mention booking if calendar bundle is enabled
+                # Calendar booking bundle behavior
                 if getattr(self, 'calendar_booking_enabled', True):
-                    instructions_parts.append("\nYou can book appointments using the book_appointment function when a caller requests one.")
-                    instructions_parts.append("\nIf a time slot is already booked, the system will return alternative available times - offer these alternatives to the caller.")
-                    instructions_parts.append("\nIf the booking function returns an 'insufficient_credits' error, politely tell the caller: 'I don't have access to the diary right now, but I can take your details and ask [person's name] to call you back.'")
+                    instructions_parts.append("\n📅 APPOINTMENTS (Calendar bundle is ON):")
+                    instructions_parts.append("- PROACTIVELY offer to book an appointment when the caller will likely generate revenue for the business.")
+                    instructions_parts.append("- Examples of when to offer: they need a service, want a quote/consultation, ask about availability, mention a specific job/repair/visit, or express interest in your services.")
+                    instructions_parts.append("- Do NOT offer appointments for: general enquiries, complaints, wrong numbers, or spam calls.")
+                    instructions_parts.append("- When offering, say something like: 'Would you like me to book you in for an appointment?' or 'I can get you booked in - what day works best for you?'")
+                    instructions_parts.append("- Once they agree, collect these details:")
+                    instructions_parts.append("  • Customer name")
+                    instructions_parts.append("  • Contact phone number")
+                    instructions_parts.append("  • What the appointment is for (brief description)")
+                    instructions_parts.append("  • Preferred date and time")
+                    instructions_parts.append("- Immediately call book_appointment(date, time, customer_name, customer_phone, description) with the details.")
+                    instructions_parts.append("- Tell them: 'I've penciled that in for [date] at [time], but the office will confirm this with you.'")
+                    instructions_parts.append("- If booking fails with alternatives, offer those times. If business hours error, suggest times within business hours only.")
+                    instructions_parts.append("- If 'insufficient_credits' error, say: 'I can't access the diary right now, but I'll make sure someone calls you back to arrange this.'")
                 
                 current_instructions = "\n".join(instructions_parts)
                 # Cache for DeepSeek brain prompt construction.
@@ -7075,7 +10410,7 @@ Provide your analysis."""
                 # Configure modalities based on voice provider
                 # - For external TTS providers, we typically only need text.
                 # - For Speechmatics, we also request OpenAI audio as a reliability fallback.
-                if voice_provider in ['cartesia', 'elevenlabs', 'google', 'playht']:
+                if voice_provider in ['cartesia', 'lemonfox', 'elevenlabs', 'google', 'playht']:
                     modalities = ["text"]
                     logger.info(f"[{self.call_uuid}] Using {voice_provider} for TTS - OpenAI text-only mode")
                 elif voice_provider == 'speechmatics':
@@ -7087,6 +10422,10 @@ Provide your analysis."""
 
                 # VAD tuning
                 if voice_provider == 'cartesia':
+                    silence_ms = 150
+                    padding_ms = 80
+                    threshold = 0.5
+                elif voice_provider == 'lemonfox':
                     silence_ms = 150
                     padding_ms = 80
                     threshold = 0.5
@@ -7139,7 +10478,7 @@ Provide your analysis."""
                     tools.append({
                         "type": "function",
                         "name": "book_appointment",
-                        "description": "Book an appointment for the caller. Use this when someone wants to schedule a meeting or appointment.",
+                        "description": "Add a provisional appointment to the calendar (must be confirmed). Use only when the caller requests an appointment, or when it clearly makes sense for business (high intent / likely to proceed). Avoid offering appointments on every call. The system will prevent double-booking and will reject appointments that start within the next hour.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -7310,7 +10649,13 @@ You must use ONLY this information when answering questions about services, area
         energy = float(np.mean(abs_samples)) / 32767.0
         max_sample = int(np.max(abs_samples)) if abs_samples.size > 0 else 0
 
-        speaking_now = energy >= float(self._caller_vad_energy_threshold)
+        # Treat as speech only if we have BOTH sustained energy and a meaningful peak.
+        # This avoids false positives from constant low-level noise.
+        try:
+            max_thr = int(getattr(self, "_caller_vad_max_sample_threshold", 1800) or 1800)
+        except Exception:
+            max_thr = 1800
+        speaking_now = (energy >= float(self._caller_vad_energy_threshold)) and (max_sample >= max_thr)
 
         # Throttled diagnostics so we can tune thresholds in real calls without flooding logs.
         try:
@@ -7318,7 +10663,7 @@ You must use ONLY this information when answering questions about services, area
                 self._last_vad_debug_log_at = now
                 barge_in_threshold = self._get_effective_barge_in_threshold_seconds(now)
                 logger.info(
-                    f"[{self.call_uuid}] VAD dbg: energy={energy:.4f} max_sample={max_sample} vad_thr={float(self._caller_vad_energy_threshold):.4f} "
+                    f"[{self.call_uuid}] VAD dbg: energy={energy:.4f} max_sample={max_sample} max_thr={max_thr} vad_thr={float(self._caller_vad_energy_threshold):.4f} "
                     f"speaking_now={speaking_now} vad_speaking={self._caller_vad_speaking} agent_speaking={self._agent_speaking} "
                     f"barge_in_min={barge_in_threshold:.2f}s audio_bytes={len(audio_data)}"
                 )
@@ -7336,7 +10681,14 @@ You must use ONLY this information when answering questions about services, area
 
             # If the agent is speaking and the caller has sustained speech >= threshold, barge in even
             # if there is no outbound chunk being sent at this exact moment.
-            if self._agent_speaking and self._caller_vad_started_at is not None:
+            # Only allow hard barge-in once assistant audio is actually audible for this turn.
+            # In Speechmatics mode, we may mark `_agent_speaking` slightly before the caller
+            # hears audio; requiring `_assistant_audio_started_for_turn` avoids premature cancels.
+            if (
+                self._agent_speaking
+                and bool(getattr(self, "_assistant_audio_started_for_turn", False))
+                and self._caller_vad_started_at is not None
+            ):
                 threshold = self._get_effective_barge_in_threshold_seconds(now)
                 elapsed = now - float(self._caller_vad_started_at)
                 if elapsed >= threshold:
@@ -7362,6 +10714,10 @@ You must use ONLY this information when answering questions about services, area
                             # HARD STOP: block all outbound audio immediately.
                             self._block_outbound_audio = True
                             try:
+                                self._block_outbound_audio_set_at = now
+                            except Exception:
+                                pass
+                            try:
                                 self._clear_paused_agent_audio()
                             except Exception:
                                 pass
@@ -7382,6 +10738,10 @@ You must use ONLY this information when answering questions about services, area
                 if self._block_outbound_audio:
                     logger.info(f"[{self.call_uuid}] 🔓 VAD: caller stopped - unblocking outbound audio for next response")
                     self._block_outbound_audio = False
+                    try:
+                        self._block_outbound_audio_set_at = None
+                    except Exception:
+                        pass
                 elif self._agent_speaking:
                     logger.info(f"[{self.call_uuid}] 🔇 VAD: caller stopped speaking (energy={energy:.3f})")
 
@@ -7455,9 +10815,16 @@ You must use ONLY this information when answering questions about services, area
                     # Reset filler-per-turn state
                     self._filler_played_for_turn = False
                     self._last_filler_phrase = None
+                    self._post_filler_question_ack_played_for_turn = False
                     # Reset per-turn suppression; we only suppress filler if this becomes a barge-in.
                     self._suppress_filler_for_turn = False
                     self._allow_filler_without_response_for_turn = False
+                    # If ASR never produces a transcript for a turn, we may prompt the caller to repeat.
+                    # Reset the per-turn prompt guard here.
+                    self._asr_repeat_prompted_for_turn = False
+                    # Speechmatics golden rule: reset per-turn brain output tracking.
+                    self._brain_chars_generated_for_turn = 0
+                    self._brain_first_token_at = None
                     # Reset transcript gating for this turn
                     self._last_caller_transcript = ""
                     # Clear "recent transcript" used for VAD backchannel gating so we
@@ -7470,6 +10837,14 @@ You must use ONLY this information when answering questions about services, area
                         pass
                     self._response_triggered_for_turn = False
                     self._response_trigger_time = None
+
+                    # Cancel any timeout test task from previous turn
+                    if self._timeout_test_task and not self._timeout_test_task.done():
+                        try:
+                            self._timeout_test_task.cancel()
+                        except Exception:
+                            pass
+                    self._timeout_test_triggered = False
 
                     # Track which brain we intend to use for this user turn.
                     # Used for provider-specific filler tuning (e.g., OpenRouter can be slower)
@@ -7563,6 +10938,15 @@ You must use ONLY this information when answering questions about services, area
                     # Mark time when user stops speaking for latency tracking (use time.time() for consistency)
                     import time
                     self._speech_stopped_time = time.time()
+                    logger.info(f"[{self.call_uuid}] ⏱️ LATENCY MARKER: Caller stopped speaking at {self._speech_stopped_time:.3f}")
+
+                    # Start a new latency turn window and persist event.
+                    try:
+                        self._latency_turn_index = int(getattr(self, "_latency_turn_index", 0) or 0) + 1
+                    except Exception:
+                        self._latency_turn_index = 1
+                    self._latency_turn_started_at = self._speech_stopped_time
+                    self._record_latency_event("caller_stopped", ms_from_turn_start=0.0)
                     
                     # Optimize conversation history: keep only last 10 messages to reduce token overhead
                     if len(self.transcript_parts) > 10:
@@ -7602,6 +10986,15 @@ You must use ONLY this information when answering questions about services, area
                     t_norm = self._normalize_backchannel_text(last_transcript) if last_transcript else ""
                     is_closing_phrase = t_norm in {"thanks", "thank you", "thankyou", "goodbye", "good bye", "bye"}
 
+                    # Check if caller is leaving/ending the call
+                    is_caller_leaving = self._is_caller_leaving(last_transcript) if last_transcript else False
+                    if is_caller_leaving and not self._agent_speaking:
+                        try:
+                            logger.info(f"[{self.call_uuid}] 👋 Caller leaving detected: playing farewell filler")
+                            await self._speak_text_via_voice_provider("Thanks so much for your call today.")
+                        except Exception as e:
+                            logger.warning(f"[{self.call_uuid}] Failed to play goodbye filler: {e}")
+
                     # If the transcript is just a single 1-character token (rare ASR noise like "a"), treat as non-substantive.
                     is_trivially_short_token = (word_count == 1 and len(t_norm) <= 1)
 
@@ -7635,14 +11028,14 @@ You must use ONLY this information when answering questions about services, area
                             # Provider-specific filler timing: OpenRouter often needs earlier filler.
                             if str(effective_provider or "").strip().lower() == "openrouter":
                                 try:
-                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
+                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "1000"))
                                 except Exception:
-                                    latency_ms = 500.0
+                                    latency_ms = 1000.0
                             else:
                                 try:
-                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
+                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "1000"))
                                 except Exception:
-                                    latency_ms = 650.0
+                                    latency_ms = 1000.0
                             try:
                                 delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                             except Exception:
@@ -7694,11 +11087,11 @@ You must use ONLY this information when answering questions about services, area
                             try:
                                 effective_provider = self._effective_brain_provider()
                                 if str(effective_provider or "").strip().lower() == "openrouter":
-                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
+                                    latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "500"))
                                 else:
-                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
+                                    latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "500"))
                             except Exception:
-                                latency_ms = 300.0
+                                latency_ms = 1000.0
                             delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                             logger.info(
                                 f"[{self.call_uuid}] ⏳ Transcript pending; scheduling filler to cover latency (delay={delay_seconds:.2f}s)"
@@ -7717,10 +11110,57 @@ You must use ONLY this information when answering questions about services, area
                                     if t and not self._is_backchannel_utterance(t):
                                         logger.info(f"[{self.call_uuid}] 🔄 Delayed transcript arrived: triggering response now")
                                         await self._trigger_brain_response("delayed_transcript_after_filler")
+                                    elif (
+                                        (not t)
+                                        and (not getattr(self, "_agent_speaking", False))
+                                        and (not getattr(self, "_caller_speaking", False))
+                                        and (not getattr(self, "_caller_vad_speaking", False))
+                                        and (not getattr(self, "_asr_repeat_prompted_for_turn", False))
+                                        and (float(getattr(self, "_last_speech_duration_seconds", 0.0) or 0.0) >= float(min_turn))
+                                    ):
+                                        # ASR never produced text for a meaningful utterance; don't go silent.
+                                        self._asr_repeat_prompted_for_turn = True
+                                        try:
+                                            import time
+                                            if hasattr(self, "_speech_stopped_time") and self._speech_stopped_time is not None:
+                                                ms = (time.time() - float(self._speech_stopped_time)) * 1000.0
+                                            else:
+                                                ms = 0.0
+                                            self._record_latency_event("asr_missing_transcript_prompt", ms_from_turn_start=float(ms))
+                                        except Exception:
+                                            pass
+                                        logger.info(f"[{self.call_uuid}] 🗣️ No transcript after VAD stop; prompting caller to repeat")
+                                        await self._speak_text_via_voice_provider("Sorry — I didn’t catch that last bit. Could you say it again?")
                                 except Exception as e:
                                     logger.warning(f"[{self.call_uuid}] Delayed transcript check failed: {e}")
                             
                             asyncio.create_task(_delayed_transcript_check())
+                            
+                            # Hard timeout failsafe: if no response is triggered within 3s of speech end,
+                            # and call is still active, force a fallback prompt regardless of VAD flag state.
+                            async def _hard_timeout_failsafe():
+                                try:
+                                    await asyncio.sleep(3.0)
+                                    if not self.is_active or self._response_triggered_for_turn:
+                                        return
+                                    # Double-check transcript hasn't arrived
+                                    t = (getattr(self, "_last_caller_transcript", "") or "").strip()
+                                    if not t:
+                                        logger.warning(f"[{self.call_uuid}] ⚠️ HARD TIMEOUT: No transcript or response after 3s; forcing fallback prompt")
+                                        try:
+                                            import time
+                                            if hasattr(self, "_speech_stopped_time") and self._speech_stopped_time is not None:
+                                                ms = (time.time() - float(self._speech_stopped_time)) * 1000.0
+                                            else:
+                                                ms = 0.0
+                                            self._record_latency_event("hard_timeout_fallback_prompt", ms_from_turn_start=float(ms))
+                                        except Exception:
+                                            pass
+                                        await self._speak_text_via_voice_provider("I'm sorry, I didn't catch that. Could you please repeat?")
+                                except Exception as e:
+                                    logger.error(f"[{self.call_uuid}] Hard timeout failsafe error: {e}")
+                            
+                            asyncio.create_task(_hard_timeout_failsafe())
                         continue
 
                     # Filler is now latency-based and is only scheduled when we actually trigger a response.
@@ -7805,18 +11245,18 @@ You must use ONLY this information when answering questions about services, area
                                     effective_provider = self._effective_brain_provider()
                                     if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "500"))
                                         except Exception:
-                                            latency_ms = 420.0
+                                            latency_ms = 500.0
                                     else:
                                         try:
-                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "500"))
                                         except Exception:
-                                            latency_ms = 650.0
+                                            latency_ms = 500.0
                                     try:
                                         delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                                     except Exception:
-                                        delay_seconds = 0.65
+                                        delay_seconds = 1.0
                                     await self._schedule_latency_filler_for_trigger(min_turn=0.0, delay_seconds=delay_seconds)
 
                     # If the caller is saying something substantive while the agent is speaking,
@@ -7887,18 +11327,18 @@ You must use ONLY this information when answering questions about services, area
                                     effective_provider = self._effective_brain_provider()
                                     if str(effective_provider or "").strip().lower() == "openrouter":
                                         try:
-                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "300"))
+                                            latency_ms = float(os.getenv("OPENROUTER_LATENCY_FILLER_MS", "500"))
                                         except Exception:
-                                            latency_ms = 420.0
+                                            latency_ms = 500.0
                                     else:
                                         try:
-                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "300"))
+                                            latency_ms = float(os.getenv("SPEECHMATICS_LATENCY_FILLER_MS", "500"))
                                         except Exception:
-                                            latency_ms = 650.0
+                                            latency_ms = 500.0
                                     try:
                                         delay_seconds = max(0.0, float(latency_ms) / 1000.0)
                                     except Exception:
-                                        delay_seconds = 0.65
+                                        delay_seconds = 1.0
                                     await self._schedule_latency_filler_for_trigger(min_turn=0.0, delay_seconds=delay_seconds)
 
                     # If the caller is just backchanneling while the agent is talking, ignore it:
@@ -8462,9 +11902,11 @@ You must use ONLY this information when answering questions about services, area
                     
                     # Track response latency if we have a speech_stopped timestamp
                     if self._speech_stopped_time is not None:
-                        response_latency_ms = (asyncio.get_event_loop().time() - self._speech_stopped_time) * 1000
+                        import time
+                        response_latency_ms = (time.time() - self._speech_stopped_time) * 1000
                         self._response_times.append(response_latency_ms)
-                        logger.info(f"[{self.call_uuid}] ⏱️ Response latency: {response_latency_ms:.0f}ms")
+                        logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: First audio from OpenAI in {response_latency_ms:.0f}ms (caller stopped → audio playback)")
+                        self._record_latency_event("first_audio_openai", ms_from_turn_start=float(response_latency_ms))
                         self._speech_stopped_time = None  # Reset for next turn
                     
                     # Get user's voice provider preference
@@ -9040,12 +12482,11 @@ You must use ONLY this information when answering questions about services, area
             first_chunk_time = None
             chunks_sent = 0
             buffered = b""
-            chunk_size = 6400  # ~200ms at 16kHz, 16-bit mono
+            chunk_size = 3200  # ~100ms at 16kHz, 16-bit mono - balance latency and smoothness
             prebuffer = bytearray()
             max_prebuffer = 64000  # ~2s of 16kHz PCM16 audio - reduced to minimize delay after filler
 
-            # Stream bytes as they arrive. If Speechmatics buffers server-side,
-            # this still avoids an extra full-download wait on our side.
+            # Stream bytes as they arrive. Request small chunks for minimal latency.
             async with self._speechmatics_client.stream(
                 "POST",
                 url,
@@ -9068,6 +12509,16 @@ You must use ONLY this information when answering questions about services, area
                         first_chunk_time = time.time()
                         first_chunk_latency = (first_chunk_time - start_time) * 1000
                         logger.info(f"[{self.call_uuid}] ⚡ First Speechmatics audio bytes in {first_chunk_latency:.0f}ms")
+                        
+                        # Also track from caller stop if available
+                        if hasattr(self, '_speech_stopped_time') and self._speech_stopped_time is not None:
+                            total_latency = (first_chunk_time - self._speech_stopped_time) * 1000
+                            logger.info(f"[{self.call_uuid}] ⏱️ LATENCY: First audio byte {total_latency:.0f}ms after caller stopped")
+                            self._record_latency_event(
+                                "first_audio_speechmatics",
+                                ms_from_turn_start=float(total_latency),
+                                meta={"tts_first_chunk_latency_ms": float(first_chunk_latency)},
+                            )
 
                         if not getattr(self, "_speechmatics_audio_bytes_received_for_turn", False):
                             self._speechmatics_audio_bytes_received_for_turn = True
@@ -9100,6 +12551,10 @@ You must use ONLY this information when answering questions about services, area
                         buffered = buffered[chunk_size:]
                         if not getattr(self, "_assistant_audio_started_for_turn", False):
                             self._assistant_audio_started_for_turn = True
+                            try:
+                                self._assistant_audio_started_time = asyncio.get_event_loop().time()
+                            except Exception:
+                                pass
                             try:
                                 self._assistant_audio_started_event.set()
                             except Exception:
@@ -9135,6 +12590,10 @@ You must use ONLY this information when answering questions about services, area
                     if not getattr(self, "_assistant_audio_started_for_turn", False):
                         self._assistant_audio_started_for_turn = True
                         try:
+                            self._assistant_audio_started_time = asyncio.get_event_loop().time()
+                        except Exception:
+                            pass
+                        try:
                             self._assistant_audio_started_event.set()
                         except Exception:
                             pass
@@ -9152,6 +12611,11 @@ You must use ONLY this information when answering questions about services, area
             if hasattr(self, '_speech_stopped_time') and self._speech_stopped_time is not None and self._speech_stopped_time > 0:
                 full_latency = (time.time() - self._speech_stopped_time) * 1000
                 logger.info(f"[{self.call_uuid}] 📊 FULL RESPONSE LATENCY: {full_latency:.0f}ms (user stopped → audio complete)")
+                
+                # Ted monitors response latency
+                if self._ted_monitoring_enabled:
+                    await self._ted_track_response_time(full_latency)
+                
                 self._speech_stopped_time = None
             
             return True
@@ -9192,6 +12656,180 @@ You must use ONLY this information when answering questions about services, area
             pass
         except Exception as e:
             logger.error(f"[{self.call_uuid}] Speechmatics TTS worker error: {e}")
+    
+    async def _ted_track_response_time(self, latency_ms: float) -> None:
+        """Ted tracks response times and auto-adjusts if needed."""
+        try:
+            self._ted_response_times.append(latency_ms)
+            self._ted_performance_data['avg_response_time'] = sum(self._ted_response_times) / len(self._ted_response_times)
+            self._ted_performance_data['max_response_time'] = max(self._ted_response_times)
+            
+            # Ted gets worried if responses are slow (> 3 seconds)
+            if latency_ms > 3000:
+                self._ted_lag_warnings += 1
+                self._ted_performance_data['slow_responses'] += 1
+                logger.warning(f"[{self.call_uuid}] 😰 TED ALERT: Slow response detected! {latency_ms:.0f}ms (threshold: 3000ms)")
+
+                await self._ted_log_performance(
+                    'response_latency',
+                    latency_ms,
+                    issue_detected='slow_response',
+                    action_taken=None,
+                )
+                
+                # Ted tries to fix it by reducing filler delay
+                if self._ted_lag_warnings >= 2:
+                    await self._ted_auto_adjust_settings('reduce_filler', latency_ms)
+            
+            # Ted celebrates fast responses
+            elif latency_ms < 1500:
+                logger.info(f"[{self.call_uuid}] 😊 Ted approves: Fast response! {latency_ms:.0f}ms")
+
+                await self._ted_log_performance(
+                    'response_latency',
+                    latency_ms,
+                    issue_detected='fast_response',
+                    action_taken=None,
+                )
+            
+            # Default performance log (no issue/action)
+            if 1500 <= latency_ms <= 3000:
+                await self._ted_log_performance('response_latency', latency_ms, None, None)
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Ted tracking error: {e}")
+    
+    async def _ted_track_interruption(self, went_off_topic: bool = False) -> None:
+        """Ted tracks when caller interrupts and if AI went off-topic."""
+        try:
+            self._ted_interruption_count += 1
+            self._ted_performance_data['interruptions'] += 1
+            
+            if went_off_topic:
+                self._ted_performance_data['tangents_after_interrupt'] += 1
+                logger.error(f"[{self.call_uuid}] 😱 TED CRISIS: AI went off-topic after interruption! Job at risk!")
+                await self._ted_auto_adjust_settings('fix_tangent', 0)
+                await self._ted_remember_mistake('tangent_after_interrupt', 'Tightened conversation focus and reduced context window')
+            
+            await self._ted_log_performance(
+                'interruption',
+                1.0 if went_off_topic else 0.0,
+                'went_off_topic' if went_off_topic else 'clean_resume',
+                None,
+            )
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Ted interruption tracking error: {e}")
+    
+    async def _ted_auto_adjust_settings(self, issue_type: str, metric_value: float) -> None:
+        """Ted auto-adjusts settings to improve performance and keep his job."""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            _ensure_ted_tables(c)
+            conn.commit()
+            
+            # Get Ted's current settings
+            c.execute("SELECT auto_adjust_enabled, filler_timing_ms, job_security_level FROM ted_settings WHERE id = 1")
+            row = c.fetchone()
+            if not row or row[0] == 0:
+                conn.close()
+                return  # Auto-adjust disabled
+            
+            current_filler_ms, job_security = row[1], row[2]
+            action_taken = None
+            
+            if issue_type == 'reduce_filler':
+                # Ted reduces filler timing to speed up responses
+                new_filler_ms = max(200.0, current_filler_ms - 100.0)  # Don't go below 200ms
+                c.execute("UPDATE ted_settings SET filler_timing_ms = ?, last_adjustment = CURRENT_TIMESTAMP WHERE id = 1", (new_filler_ms,))
+                action_taken = f"Reduced filler timing from {current_filler_ms:.0f}ms to {new_filler_ms:.0f}ms to reduce lag"
+                logger.warning(f"[{self.call_uuid}] 🔧 TED AUTO-ADJUST: {action_taken}")
+            
+            elif issue_type == 'fix_tangent':
+                # Ted tightens settings to keep AI on-topic
+                c.execute("UPDATE global_settings SET ignore_backchannels_always = 1 WHERE id = 1")
+                action_taken = "Enabled strict backchannel filtering to keep AI focused"
+                logger.warning(f"[{self.call_uuid}] 🔧 TED AUTO-ADJUST: {action_taken}")
+            
+            # Log the action
+            if action_taken:
+                await self._ted_log_performance(issue_type, metric_value, issue_type, action_taken)
+
+                # This is what the Super Admin "Ted's Memory" view is for.
+                # Remember every successful adjustment so Ted can repeat it.
+                try:
+                    await self._ted_remember_mistake(issue_type, action_taken)
+                except Exception:
+                    pass
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Ted auto-adjust error: {e}")
+            try:
+                conn.close()
+            except:
+                pass
+    
+    async def _ted_remember_mistake(self, problem: str, solution: str) -> None:
+        """Ted remembers mistakes so he never makes them again."""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            _ensure_ted_tables(c)
+            conn.commit()
+            
+            # Check if Ted has seen this problem before
+            c.execute("SELECT id, times_encountered, success_rate FROM ted_memory WHERE problem_pattern = ?", (problem,))
+            row = c.fetchone()
+            
+            if row:
+                # Ted has seen this before - update his memory
+                times = row[1] + 1
+                c.execute("UPDATE ted_memory SET times_encountered = ?, solution_applied = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+                         (times, solution, row[0]))
+                logger.info(f"[{self.call_uuid}] 🧠 Ted remembers: Seen '{problem}' {times} times now")
+            else:
+                # New problem for Ted - add to memory
+                c.execute("INSERT INTO ted_memory (problem_pattern, solution_applied) VALUES (?, ?)", (problem, solution))
+                logger.info(f"[{self.call_uuid}] 🧠 Ted learned: New problem '{problem}' - will remember solution")
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] Ted memory error: {e}")
+            try:
+                conn.close()
+            except:
+                pass
+    
+    async def _ted_log_performance(
+        self,
+        metric_type: str,
+        metric_value: float,
+        issue_detected: Optional[str],
+        action_taken: Optional[str],
+    ) -> None:
+        """Ted logs performance metrics to his tracking table."""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            _ensure_ted_tables(c)
+            c.execute("""
+                INSERT INTO ted_performance (call_uuid, metric_type, metric_value, issue_detected, action_taken)
+                VALUES (?, ?, ?, ?, ?)
+            """, (self.call_uuid, metric_type, metric_value, issue_detected, action_taken))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.debug(f"[{self.call_uuid}] Ted logging error: {e}")
+            try:
+                conn.close()
+            except:
+                pass
     
     async def _send_google_tts_audio(self, text: str) -> bool:
         """Generate audio using Google Cloud TTS and send to Vonage. Returns True on success."""
@@ -9406,6 +13044,112 @@ You must use ONLY this information when answering questions about services, area
         finally:
             if my_generation == getattr(self, "_tts_output_generation", 0):
                 self._agent_speaking = False
+
+    async def _send_lemonfox_audio(self, text: str) -> bool:
+        """Generate audio using Lemonfox TTS and send to Vonage. Returns True on success."""
+        my_generation = getattr(self, "_tts_output_generation", 0)
+        try:
+            api_key = str(CONFIG.get("LEMONFOX_API_KEY", "") or "").strip()
+            if not api_key:
+                logger.error(f"[{self.call_uuid}] Lemonfox API key not configured!")
+                return False
+
+            # Clean the text like we do for other external TTS providers
+            import re
+            cleaned_text = re.sub(r'\[.*?\]', '', text)
+            cleaned_text = re.sub(r'\([a-z\s]+\)', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'\*.*?\*', '', cleaned_text)
+            cleaned_text = re.sub(r'\*\*|__|~~', '', cleaned_text)
+            cleaned_text = re.sub(r'^(Assistant|AI|Human|User|System):\s*', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'mode:\s*\w+', '', cleaned_text, flags=re.IGNORECASE)
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip().strip('.,;:- ')
+
+            if not cleaned_text:
+                logger.warning(f"[{self.call_uuid}] Lemonfox text became empty after cleaning, skipping TTS")
+                return False
+
+            raw_voice = str(getattr(self, 'lemonfox_voice', None) or 'heart').strip() or 'heart'
+            language = "en-us"
+            voice = raw_voice
+            if '|' in raw_voice:
+                maybe_lang, maybe_voice = raw_voice.split('|', 1)
+                maybe_lang = (maybe_lang or '').strip().lower()
+                maybe_voice = (maybe_voice or '').strip()
+                if maybe_lang in {"en-us", "en-gb"} and maybe_voice:
+                    language = maybe_lang
+                    voice = maybe_voice
+
+            import httpx
+            import io
+            import wave
+            import audioop
+
+            url = "https://api.lemonfox.ai/v1/audio/speech"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "input": cleaned_text,
+                "voice": voice,
+                "language": language,
+                "response_format": "wav",
+                "speed": 1.0,
+            }
+
+            logger.info(f"[{self.call_uuid}] 🍋 Lemonfox TTS generating (voice={voice})")
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, json=payload, timeout=20.0)
+                if response.status_code != 200:
+                    logger.error(f"[{self.call_uuid}] Lemonfox API error: {response.status_code} - {response.text}")
+                    return False
+                wav_bytes = response.content
+
+            if not wav_bytes:
+                logger.error(f"[{self.call_uuid}] Lemonfox returned empty audio")
+                return False
+
+            # Decode WAV and resample to 16kHz mono PCM16 for Vonage.
+            with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+                nchannels = wf.getnchannels()
+                sampwidth = wf.getsampwidth()
+                framerate = wf.getframerate()
+                frames = wf.readframes(wf.getnframes())
+
+            if nchannels != 1:
+                frames = audioop.tomono(frames, sampwidth, 0.5, 0.5)
+                nchannels = 1
+
+            if sampwidth != 2:
+                frames = audioop.lin2lin(frames, sampwidth, 2)
+                sampwidth = 2
+
+            if framerate != 16000:
+                frames, _ = audioop.ratecv(frames, sampwidth, nchannels, framerate, 16000, None)
+
+            # If barge-in happened while generating/transcoding, don't send.
+            if my_generation != getattr(self, "_tts_output_generation", 0) or self._caller_speaking:
+                logger.info(f"[{self.call_uuid}] 🛑 Lemonfox interrupted (barge-in) - skipping send")
+                return True
+
+            self._agent_speaking = True
+            if self.vonage_ws and self.is_active:
+                await self._send_vonage_audio_bytes(frames)
+                logger.info(f"[{self.call_uuid}] ✅ Lemonfox audio sent successfully ({len(frames)} bytes)")
+            else:
+                logger.warning(f"[{self.call_uuid}] Vonage WS disconnected, cannot send audio")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"[{self.call_uuid}] ❌ Error generating/sending Lemonfox audio: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+        finally:
+            if my_generation == getattr(self, "_tts_output_generation", 0):
+                self._agent_speaking = False
     
     async def _handle_book_appointment(self, call_id: str, arguments: dict):
         """Handle appointment booking function call from AI"""
@@ -9437,49 +13181,266 @@ You must use ONLY this information when answering questions about services, area
                     return
             
             # Extract appointment details
-            date = arguments.get("date")
-            time = arguments.get("time")
-            customer_name = arguments.get("customer_name", "")
-            customer_phone = arguments.get("customer_phone", self.caller_number)
-            description = arguments.get("description", "")
+            date = (arguments.get("date") or "").strip()
+            time = (arguments.get("time") or "").strip()
+            customer_name = (arguments.get("customer_name") or "").strip()
+            customer_phone = (arguments.get("customer_phone") or getattr(self, "caller_number", "") or "").strip()
+            description = (arguments.get("description") or "").strip()
+
+            if not date or not time or not customer_name:
+                raise ValueError("Missing required appointment fields (date, time, customer_name)")
+
+            # Enforce at least 1 hour notice before the appointment.
+            # (Prevents booking something that starts too soon.)
+            try:
+                requested_start = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+            except Exception:
+                raise ValueError("Invalid date/time format. Expected date YYYY-MM-DD and time HH:MM (24-hour).")
+
+            min_notice_minutes = 60
+            # Use per-account timezone (best-effort) for "now" comparisons.
+            business_timezone = 'Europe/London'
+            business_hours = _default_business_hours()
+            try:
+                conn_pref = get_db_connection()
+                cur_pref = conn_pref.cursor()
+                cur_pref.execute(
+                    'SELECT business_hours_json, business_timezone FROM account_settings WHERE user_id = ?',
+                    (getattr(self, 'user_id', None),),
+                )
+                pref_row = cur_pref.fetchone()
+                conn_pref.close()
+
+                if pref_row:
+                    raw_hours = pref_row[0]
+                    if raw_hours:
+                        try:
+                            import json as _json
+                            business_hours = _normalize_business_hours(_json.loads(raw_hours))
+                        except Exception:
+                            business_hours = _default_business_hours()
+                    business_timezone = (pref_row[1] or 'Europe/London')
+            except Exception:
+                business_timezone = 'Europe/London'
+                business_hours = _default_business_hours()
+
+            now_dt = _best_effort_local_now_for_timezone(business_timezone)
+            min_allowed_start = now_dt + timedelta(minutes=min_notice_minutes)
+
+            # Business hours window check (appointment must start+end within open hours for that weekday)
+            weekday_key = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][requested_start.weekday()]
+            day_cfg = business_hours.get(weekday_key) or {"open": True, "start": "09:00", "end": "17:00"}
+            is_open_day = bool(day_cfg.get("open", True))
+            day_open_time = str(day_cfg.get("start", "09:00") or "09:00").strip()
+            day_close_time = str(day_cfg.get("end", "17:00") or "17:00").strip()
+            try:
+                open_dt = datetime.strptime(f"{date} {day_open_time}", "%Y-%m-%d %H:%M")
+                close_dt = datetime.strptime(f"{date} {day_close_time}", "%Y-%m-%d %H:%M")
+            except Exception:
+                open_dt = datetime.strptime(f"{date} 09:00", "%Y-%m-%d %H:%M")
+                close_dt = datetime.strptime(f"{date} 17:00", "%Y-%m-%d %H:%M")
             
             conn = sqlite3.connect('call_logs.db')
             cursor = conn.cursor()
             
-            # Check for double bookings
-            cursor.execute('''
-                SELECT time FROM appointments 
-                WHERE date = ? AND status = 'scheduled'
+            # Load existing appointments for overlap checks (treat scheduled/busy/pending as blocking)
+            cursor.execute(
+                """
+                SELECT time, COALESCE(duration, 30) as duration, status
+                FROM appointments
+                WHERE date = ? AND status IN ('scheduled', 'busy', 'pending')
                 ORDER BY time
-            ''', (date,))
-            existing_times = [row[0] for row in cursor.fetchall()]
-            
-            # Check if requested time is already booked
-            if time in existing_times:
-                # Find alternative times (9 AM - 5 PM, on the hour)
-                all_times = [f"{h:02d}:00" for h in range(9, 18)]
-                available_times = [t for t in all_times if t not in existing_times]
-                
-                alternatives = available_times[:3] if len(available_times) >= 3 else available_times
-                
+                """,
+                (date,),
+            )
+            existing_rows = cursor.fetchall() or []
+
+            # Requested appointment window (default 30 minutes)
+            requested_duration_minutes = 30
+            requested_end = requested_start + timedelta(minutes=requested_duration_minutes)
+
+            # Helper: generate on-the-hour times within business hours for this date
+            def _hour_slots_within_business_hours() -> List[str]:
+                if not is_open_day:
+                    return []
+                latest_start = close_dt - timedelta(minutes=requested_duration_minutes)
+                if latest_start < open_dt:
+                    return []
+                slots: List[str] = []
+                # Start on the hour at/after open_dt
+                first_hour = open_dt.replace(minute=0, second=0, microsecond=0)
+                if first_hour < open_dt:
+                    first_hour = first_hour + timedelta(hours=1)
+                t = first_hour
+                while t <= latest_start:
+                    slots.append(t.strftime("%H:%M"))
+                    t += timedelta(hours=1)
+                return slots
+
+            # Detect all-day busy blocks
+            day_fully_busy = False
+            for row in existing_rows:
+                existing_time = (row[0] or "").strip()
+                existing_duration = int(row[1] or 0)
+                existing_status = (row[2] or "").strip().lower()
+                if existing_status == "busy" and existing_duration >= 1440:
+                    day_fully_busy = True
+                    break
+                if existing_status == "busy" and existing_time == "00:00" and existing_duration >= 1440:
+                    day_fully_busy = True
+                    break
+
+            def _compute_alternatives() -> List[str]:
+                # Only offer same-day on-the-hour alternatives for now.
+                slots = _hour_slots_within_business_hours()
+                # Enforce min notice for same-day slots
+                allowed_start = max(min_allowed_start, open_dt)
+                filtered = []
+                for t in slots:
+                    try:
+                        s = datetime.strptime(f"{date} {t}", "%Y-%m-%d %H:%M")
+                    except Exception:
+                        continue
+                    if s < allowed_start:
+                        continue
+                    # Overlap check against existing
+                    e = s + timedelta(minutes=requested_duration_minutes)
+                    conflict = False
+                    for r in existing_rows:
+                        et = (r[0] or "").strip()
+                        try:
+                            es = datetime.strptime(f"{date} {et}", "%Y-%m-%d %H:%M")
+                        except Exception:
+                            continue
+                        ed = es + timedelta(minutes=int(r[1] or 30))
+                        if s < ed and e > es:
+                            conflict = True
+                            break
+                    if not conflict:
+                        filtered.append(t)
+                return filtered[:3]
+
+            # Outside business hours violation
+            if (not is_open_day) or (requested_start < open_dt) or (requested_end > close_dt):
+                alternatives = [] if day_fully_busy else _compute_alternatives()
                 conn.close()
-                
+                logger.warning(
+                    f"[{self.call_uuid}] Booking rejected (outside business hours): date={date} time={time} open={is_open_day} hours={day_open_time}-{day_close_time}"
+                )
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": json.dumps(
+                                    {
+                                        "success": False,
+                                        "error": "outside_business_hours",
+                                        "message": "That time is outside our business hours.",
+                                        "business_hours": {"timezone": business_timezone, "day": weekday_key, **day_cfg},
+                                        "alternatives": alternatives,
+                                    }
+                                ),
+                            },
+                        }
+                    )
+                )
+                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                return
+
+            # Min notice violation
+            if requested_start < min_allowed_start:
+                alternatives = [] if day_fully_busy else _compute_alternatives()
+                conn.close()
+                logger.warning(
+                    f"[{self.call_uuid}] Booking rejected (too soon): requested={requested_start} min_allowed={min_allowed_start}"
+                )
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": json.dumps(
+                                    {
+                                        "success": False,
+                                        "error": "too_soon",
+                                        "message": "That time is too soon to book. Appointments need at least 1 hour notice.",
+                                        "alternatives": alternatives,
+                                    }
+                                ),
+                            },
+                        }
+                    )
+                )
+                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                return
+
+            # Day fully busy
+            if day_fully_busy:
+                conn.close()
+                logger.warning(f"[{self.call_uuid}] Booking rejected (day busy): {date} marked busy")
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": json.dumps(
+                                    {
+                                        "success": False,
+                                        "error": "day_busy",
+                                        "message": f"Sorry, {date} is marked as unavailable.",
+                                        "alternatives": [],
+                                    }
+                                ),
+                            },
+                        }
+                    )
+                )
+                await self.openai_ws.send(json.dumps({"type": "response.create"}))
+                return
+
+            # Overlap-based double booking prevention
+            conflict = False
+            for row in existing_rows:
+                existing_time = (row[0] or "").strip()
+                try:
+                    existing_start = datetime.strptime(f"{date} {existing_time}", "%Y-%m-%d %H:%M")
+                except Exception:
+                    continue
+                existing_end = existing_start + timedelta(minutes=int(row[1] or 30))
+                if requested_start < existing_end and requested_end > existing_start:
+                    conflict = True
+                    break
+
+            if conflict:
+                alternatives = _compute_alternatives()
+                conn.close()
                 logger.warning(f"[{self.call_uuid}] Double booking prevented for {date} at {time}")
-                
-                # Send double booking response
-                await self.openai_ws.send(json.dumps({
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": call_id,
-                        "output": json.dumps({
-                            "success": False,
-                            "error": "double_booking",
-                            "message": f"Sorry, {time} is already booked on {date}",
-                            "alternatives": alternatives
-                        })
-                    }
-                }))
+                await self.openai_ws.send(
+                    json.dumps(
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": json.dumps(
+                                    {
+                                        "success": False,
+                                        "error": "double_booking",
+                                        "message": f"Sorry, {time} is already booked on {date}",
+                                        "alternatives": alternatives,
+                                    }
+                                ),
+                            },
+                        }
+                    )
+                )
                 await self.openai_ws.send(json.dumps({"type": "response.create"}))
                 return
             
@@ -9507,8 +13468,12 @@ You must use ONLY this information when answering questions about services, area
                 logger.error(f"[{self.call_uuid}] Failed to generate call summary: {e}")
                 call_summary = f"Call from {customer_name or 'customer'} regarding: {description}"
             
-            # Add call summary to description
-            full_description = f"{description}\n\n--- Call Summary ---\n{call_summary}" if description else f"--- Call Summary ---\n{call_summary}"
+            # Add call summary to description + mark as provisional
+            provisional_note = "NOTE: Provisional appointment - requires confirmation by the business."
+            if description:
+                full_description = f"{description}\n\n{provisional_note}\n\n--- Call Summary ---\n{call_summary}"
+            else:
+                full_description = f"{provisional_note}\n\n--- Call Summary ---\n{call_summary}"
             
             # Get user_id and voice from session (assigned during call creation)
             user_id = getattr(self, 'user_id', None)
@@ -9516,11 +13481,11 @@ You must use ONLY this information when answering questions about services, area
             # Save appointment to database
             cursor.execute('''
                 INSERT INTO appointments 
-                (date, time, duration, title, description, customer_name, customer_phone, status, created_by, call_uuid, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (date, time, duration, title, description, customer_name, customer_phone, status, created_by, call_uuid, user_id, is_read)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 date, time, 30, "Phone Appointment", full_description,
-                customer_name, customer_phone, "scheduled", "ai_agent", self.call_uuid, user_id
+                customer_name, customer_phone, "pending", "ai_agent", self.call_uuid, user_id, 0
             ))
             appointment_id = cursor.lastrowid
             
@@ -9541,7 +13506,7 @@ You must use ONLY this information when answering questions about services, area
             
             logger.info(f"[{self.call_uuid}] Charged {booking_credits} credits for calendar booking")
             
-            logger.info(f"[{self.call_uuid}] Appointment {appointment_id} booked for {customer_name} on {date} at {time}")
+            logger.info(f"[{self.call_uuid}] Appointment {appointment_id} booked (pending confirmation) for {customer_name} on {date} at {time}")
             
             # Send success response back to AI
             await self.openai_ws.send(json.dumps({
@@ -9552,7 +13517,7 @@ You must use ONLY this information when answering questions about services, area
                     "output": json.dumps({
                         "success": True,
                         "appointment_id": appointment_id,
-                        "message": f"Appointment successfully booked for {date} at {time}"
+                        "message": f"Appointment pencilled in for {date} at {time} (pending confirmation)"
                     })
                 }
             }))
@@ -9826,9 +13791,65 @@ class SessionManager:
     def __init__(self):
         self._sessions: Dict[str, CallSession] = {}
     
-    async def create_session(self, call_uuid: str, caller: str = "", called: str = "", user_id: Optional[int] = None) -> CallSession:
-        """Create a new call session"""
-        session = CallSession(call_uuid, caller, called)
+    async def create_session(self, call_uuid: str, caller: str = "", called: str = "", user_id: Optional[int] = None):
+        """Create a new call session - either Vapi or traditional CallSession"""
+        
+        # First, check if this should be a Vapi session
+        use_vapi = False
+        vapi_voice_id = None
+        vapi_assistant_id = None
+        voice_provider = None
+        
+        if user_id:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT voice_provider, vapi_voice_id, vapi_assistant_id FROM account_settings WHERE user_id = ?', (user_id,))
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    voice_provider = str(row[0] if row[0] else 'openai').strip().lower()
+                    vapi_voice_id = row[1] if row[1] else 'jennifer-playht'
+                    vapi_assistant_id = row[2] if len(row) > 2 and row[2] else None
+                    
+                    logger.info(f"[{call_uuid}] Pre-check: voice_provider='{voice_provider}', vapi_voice_id='{vapi_voice_id}', vapi_assistant_id='{vapi_assistant_id}'")
+                    
+                    if voice_provider == 'vapi' or voice_provider == 'vapi_assistant':
+                        vapi_key = str(CONFIG.get("VAPI_API_KEY", "") or "").strip()
+                        if vapi_key:
+                            # If a user selected "vapi_assistant" but has no assistantId, fall back to
+                            # Vapi voice mode (inline assistant). This avoids surprising fallbacks to
+                            # non-Vapi TTS and ensures the call still uses the configured Vapi voice.
+                            if voice_provider == 'vapi_assistant' and not vapi_assistant_id:
+                                logger.warning(
+                                    f"[{call_uuid}] Vapi assistant selected but no vapi_assistant_id set; falling back to Vapi voice mode (inline assistant)"
+                                )
+                                voice_provider = 'vapi'
+
+                            use_vapi = True
+                            logger.info(f"[{call_uuid}] 🎤 Creating Vapi session (provider={voice_provider}, voice_id={vapi_voice_id})")
+                        else:
+                            logger.warning(f"[{call_uuid}] Vapi selected but API key missing; falling back to regular session")
+                    else:
+                        logger.info(f"[{call_uuid}] Not using Vapi (provider={voice_provider})")
+                else:
+                    logger.warning(f"[{call_uuid}] No database row found for user_id={user_id}")
+            except Exception as e:
+                logger.error(f"[{call_uuid}] Error checking for Vapi: {e}")
+        
+        # Create appropriate session type
+        if use_vapi:
+            session = DailyBotSession(call_uuid, caller, called)
+            session.vapi_voice_id = vapi_voice_id
+            # Ensure assistant selection is available immediately when the websocket connects.
+            if voice_provider:
+                session.voice_provider = voice_provider
+            if vapi_assistant_id:
+                session.vapi_assistant_id = vapi_assistant_id
+        else:
+            session = CallSession(call_uuid, caller, called)
+        
         session.user_id = user_id  # Store user_id in session
         
         # Load user's voice, provider preference, and bundle settings from database
@@ -9842,7 +13863,7 @@ class SessionManager:
                            calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
                            business_info, agent_personality, agent_instructions, agent_name,
                            call_greeting, transfer_number, transfer_people,
-                           call_mode, transfer_instructions
+                           call_mode, transfer_instructions, lemonfox_voice, vapi_voice_id, vapi_assistant_id
                     FROM account_settings WHERE user_id = ?
                     ''',
                     (user_id,),
@@ -9886,23 +13907,31 @@ class SessionManager:
 
                     # Voice provider
                     session.voice_provider = row[3] if row[3] else 'openai'
-                    logger.info(f"[{call_uuid}] Voice provider: {session.voice_provider}")
+                    logger.info(f"[{call_uuid}] Voice provider from DB: {session.voice_provider}")
 
-                    # If an external provider is selected but not configured, fall back to OpenAI audio.
+                    # Choose a safe fallback provider if an external provider is selected but not configured.
+                    safe_fallback_provider = 'speechmatics' if str(CONFIG.get('SPEECHMATICS_API_KEY', '') or '').strip() else 'openai'
+
+                    # If an external provider is selected but not configured, fall back to something that can speak.
                     if session.voice_provider == 'elevenlabs' and not eleven_client:
-                        logger.warning(f"[{call_uuid}] ElevenLabs selected but not configured; falling back to 'openai'")
-                        session.voice_provider = 'openai'
+                        logger.warning(f"[{call_uuid}] ElevenLabs selected but not configured; falling back to {safe_fallback_provider}")
+                        session.voice_provider = safe_fallback_provider
                     if session.voice_provider == 'cartesia' and not cartesia_client:
-                        logger.warning(f"[{call_uuid}] Cartesia selected but not configured; falling back to 'openai'")
-                        session.voice_provider = 'openai'
+                        logger.warning(f"[{call_uuid}] Cartesia selected but not configured; falling back to {safe_fallback_provider}")
+                        session.voice_provider = safe_fallback_provider
                     if session.voice_provider == 'google' and not google_tts_client:
-                        logger.warning(f"[{call_uuid}] Google TTS selected but not configured; falling back to 'openai'")
-                        session.voice_provider = 'openai'
+                        logger.warning(f"[{call_uuid}] Google TTS selected but not configured; falling back to {safe_fallback_provider}")
+                        session.voice_provider = safe_fallback_provider
                     if session.voice_provider == 'playht' and not CONFIG.get('PLAYHT_API_KEY'):
-                        logger.warning(f"[{call_uuid}] PlayHT selected but not configured; falling back to 'openai'")
-                        session.voice_provider = 'openai'
-                    if session.voice_provider == 'speechmatics' and not CONFIG.get('SPEECHMATICS_API_KEY'):
-                        logger.warning(f"[{call_uuid}] Speechmatics selected but not configured; falling back to 'openai'")
+                        logger.warning(f"[{call_uuid}] PlayHT selected but not configured; falling back to {safe_fallback_provider}")
+                        session.voice_provider = safe_fallback_provider
+                    if session.voice_provider == 'lemonfox' and not str(CONFIG.get('LEMONFOX_API_KEY', '') or '').strip():
+                        logger.warning(f"[{call_uuid}] Lemonfox selected but not configured; falling back to {safe_fallback_provider}")
+                        session.voice_provider = safe_fallback_provider
+
+                    # If Speechmatics is selected but missing its key, fall back so we don't produce dead air.
+                    if session.voice_provider == 'speechmatics' and not str(CONFIG.get('SPEECHMATICS_API_KEY', '') or '').strip():
+                        logger.warning(f"[{call_uuid}] Speechmatics selected but API key missing; falling back to openai")
                         session.voice_provider = 'openai'
 
                     # Legacy ElevenLabs toggle (for backwards compatibility)
@@ -9914,6 +13943,15 @@ class SessionManager:
                     session.google_voice = row[5] if row[5] else 'en-GB-Neural2-A'
                     session.playht_voice_id = row[6] if row[6] else 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
                     session.speechmatics_voice_id = 'sarah'
+                    session.lemonfox_voice = row[20] if len(row) > 20 and row[20] else 'heart'
+                    
+                    # Vapi voice ID and assistant ID
+                    if hasattr(session, 'vapi_voice_id'):  # Only for DailyBotSession
+                        session.vapi_voice_id = row[21] if len(row) > 21 and row[21] else 'sarah-elevenlabs'
+                        session.vapi_assistant_id = row[22] if len(row) > 22 and row[22] else None
+                        logger.info(f"[{call_uuid}] Vapi voice ID: {session.vapi_voice_id}")
+                        if session.vapi_assistant_id:
+                            logger.info(f"[{call_uuid}] Vapi assistant ID: {session.vapi_assistant_id}")
 
                     # Bundle settings
                     session.calendar_booking_enabled = bool(row[7]) if len(row) > 7 and row[7] is not None else True
@@ -9925,13 +13963,14 @@ class SessionManager:
                     )
                 else:
                     session.user_voice = 'sarah'
-                    session.voice_provider = 'speechmatics'
+                    session.voice_provider = 'openai'
                     session.use_elevenlabs = False
                     session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                     session.cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
                     session.google_voice = 'en-GB-Neural2-A'
                     session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
                     session.speechmatics_voice_id = 'sarah'
+                    session.lemonfox_voice = 'heart'
                     session.calendar_booking_enabled = True
                     session.tasks_enabled = True
                     session.sales_detector_enabled = False
@@ -9951,10 +13990,12 @@ class SessionManager:
             except Exception as e:
                 logger.error(f"[{call_uuid}] Failed to load preferences: {e}")
                 session.user_voice = 'sarah'
+                session.voice_provider = 'openai'
                 session.use_elevenlabs = False
                 session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
                 session.google_voice = 'en-GB-Neural2-A'
                 session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                session.lemonfox_voice = 'heart'
                 session.business_info = ""
                 session.agent_personality = "Friendly and professional. Keep responses brief and conversational."
                 session.agent_instructions = "Answer questions about the business. Take messages if needed."
@@ -9966,9 +14007,11 @@ class SessionManager:
                     pass
         else:
             session.user_voice = 'sarah'
+            session.voice_provider = 'openai'
             session.use_elevenlabs = False
             session.elevenlabs_voice_id = 'EXAVITQu4vr4xnSDxMaL'
             session.playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+            session.lemonfox_voice = 'heart'
             session.business_info = ""
             session.agent_personality = "Friendly and professional. Keep responses brief and conversational."
             session.agent_instructions = "Answer questions about the business. Take messages if needed."
@@ -10042,6 +14085,26 @@ async def lifespan(app: FastAPI):
     # reach the answer/event webhooks. This is best-effort and must not block startup.
     try:
         if (provider or "").lower() == "cloudflare":
+            # If a permanent Cloudflare tunnel is configured (custom domain + token),
+            # we should never fall back to parsing the temporary trycloudflare log.
+            cloudflare_domain = ""
+            cloudflare_tunnel_token = ""
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT cloudflare_domain, cloudflare_tunnel_token FROM global_settings WHERE id = 1"
+                )
+                row = cursor.fetchone()
+                conn.close()
+                if row:
+                    cloudflare_domain = (row[0] or "").strip()
+                    cloudflare_tunnel_token = (row[1] or "").strip()
+            except Exception:
+                cloudflare_domain = ""
+                cloudflare_tunnel_token = ""
+
+            permanent_cloudflare = bool(cloudflare_domain and cloudflare_tunnel_token)
             running = _is_process_running("cloudflared.exe" if os.name == "nt" else "cloudflared")
             if not running:
                 logger.warning("Cloudflare tunnel selected but not running; attempting to start it...")
@@ -10050,19 +14113,31 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     logger.warning(f"Cloudflare auto-start failed: {e}")
             else:
-                # If it's running but URL isn't in CONFIG yet, refresh from log.
-                url_from_log = ""
-                try:
-                    url_from_log = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
-                except Exception:
+                if permanent_cloudflare:
+                    url = _normalize_public_url(f"https://{cloudflare_domain}")
+                    if url and url != _normalize_public_url(CONFIG.get("PUBLIC_URL") or ""):
+                        CONFIG["PUBLIC_URL"] = url
+                        _persist_public_url(url)
+                        try:
+                            _update_vonage_application_webhooks(url)
+                        except Exception:
+                            pass
+                else:
+                    # If it's running but URL isn't in CONFIG yet, refresh from log.
                     url_from_log = ""
-                if url_from_log and url_from_log != _normalize_public_url(CONFIG.get("PUBLIC_URL") or ""):
-                    CONFIG["PUBLIC_URL"] = url_from_log
-                    _persist_public_url(url_from_log)
                     try:
-                        _update_vonage_application_webhooks(url_from_log)
+                        url_from_log = _normalize_public_url(
+                            _latest_trycloudflare_url_from_log("cloudflared_quick.log") or ""
+                        )
                     except Exception:
-                        pass
+                        url_from_log = ""
+                    if url_from_log and url_from_log != _normalize_public_url(CONFIG.get("PUBLIC_URL") or ""):
+                        CONFIG["PUBLIC_URL"] = url_from_log
+                        _persist_public_url(url_from_log)
+                        try:
+                            _update_vonage_application_webhooks(url_from_log)
+                        except Exception:
+                            pass
     except Exception:
         pass
 
@@ -10128,6 +14203,10 @@ async def serve_admin():
 async def serve_super_admin():
     return FileResponse('static/super-admin_current.html', headers={"Cache-Control": "no-store"})
 
+@app.get("/latency-dashboard.html")
+async def serve_latency_dashboard():
+    return FileResponse('static/latency-dashboard.html', headers={"Cache-Control": "no-store"})
+
 @app.get("/api/public/captcha-config")
 async def public_captcha_config():
     site_key = (os.getenv("TURNSTILE_SITE_KEY") or "").strip()
@@ -10153,6 +14232,16 @@ async def super_admin_security_middleware(request: Request, call_next):
             if request.method.upper() == "OPTIONS":
                 return await call_next(request)
 
+            # Allow read-only tunnel status checks from localhost without a session.
+            # This is used for local troubleshooting; remote access remains protected.
+            if (
+                is_admin_api
+                and path == "/api/admin/ngrok-status"
+                and request.method.upper() in ("GET", "HEAD")
+                and (request.client and request.client.host in ("127.0.0.1", "::1"))
+            ):
+                return await call_next(request)
+
             # Allow bootstrap/status/login/request-otp without an existing session
             if path in ("/api/super-admin/login", "/api/super-admin/status", "/api/super-admin/bootstrap", "/api/super-admin/request-otp"):
                 return await call_next(request)
@@ -10170,7 +14259,7 @@ async def super_admin_security_middleware(request: Request, call_next):
         response = JSONResponse(status_code=500, content={"success": False, "error": "Internal server error"})
 
     # Prevent caching of sensitive endpoints/pages.
-    if path.startswith("/api/super-admin") or path.startswith("/api/admin") or path in ("/super-admin", "/super-admin.html"):
+    if path.startswith("/api/super-admin") or path.startswith("/api/admin") or path in ("/super-admin", "/super-admin.html", "/latency-dashboard", "/latency-dashboard.html"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
     return response
@@ -10494,6 +14583,10 @@ async def get_config(authorization: Optional[str] = Header(None)):
     cartesia_voice_id = 'a0e99841-438c-4a64-b679-ae501e7d6091'
     google_voice = 'en-GB-Neural2-A'
     playht_voice_id = 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+    lemonfox_voice = 'heart'
+    vapi_voice_id = 'jennifer-playht'
+    vapi_assistant_id = None
+    vapi_assistants = '[]'
     phone_number = ''
     response_latency = 300
     agent_name = 'Judie'
@@ -10510,6 +14603,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
     sales_detector_enabled = False
     sms_notifications_enabled = False
     first_login_completed = False
+    business_hours = _default_business_hours()
+    business_timezone = 'Europe/London'
 
     try:
         conn = get_db_connection()
@@ -10520,7 +14615,8 @@ async def get_config(authorization: Optional[str] = Header(None)):
                    agent_name, business_info, agent_personality, agent_instructions,
                    calendar_booking_enabled, tasks_enabled, advanced_voice_enabled, sales_detector_enabled,
                    call_greeting, transfer_number, transfer_people, first_login_completed, sms_notifications_enabled,
-                   transfer_instructions
+                   transfer_instructions, lemonfox_voice, vapi_voice_id, vapi_assistant_id, vapi_assistants,
+                   business_hours_json, business_timezone
             FROM account_settings WHERE user_id = ?
         ''', (user_id,))
         row = cursor.fetchone()
@@ -10544,6 +14640,14 @@ async def get_config(authorization: Optional[str] = Header(None)):
                 google_voice = row[7]
             if row[8]:
                 playht_voice_id = row[8]
+            if len(row) > 23 and row[23]:
+                lemonfox_voice = row[23]
+            if len(row) > 24 and row[24]:
+                vapi_voice_id = row[24]
+            if len(row) > 25 and row[25]:
+                vapi_assistant_id = row[25]
+            if len(row) > 26 and row[26]:
+                vapi_assistants = row[26]
             if row[9]:
                 agent_name = row[9]
                 CONFIG["AGENT_NAME"] = agent_name  # Update in-memory config
@@ -10585,6 +14689,20 @@ async def get_config(authorization: Optional[str] = Header(None)):
 
             transfer_instructions = row[22] if len(row) > 22 and row[22] else ''
             sms_notifications_enabled = bool(row[21]) if len(row) > 21 and row[21] is not None else False
+
+            # Business hours (stored as JSON)
+            try:
+                import json as _json
+                raw_hours = row[27] if len(row) > 27 and row[27] else None
+                if isinstance(raw_hours, str) and raw_hours.strip():
+                    parsed_hours = _json.loads(raw_hours)
+                    business_hours = _normalize_business_hours(parsed_hours)
+                else:
+                    business_hours = _default_business_hours()
+            except Exception:
+                business_hours = _default_business_hours()
+
+            business_timezone = row[28] if len(row) > 28 and row[28] else 'Europe/London'
     except Exception as e:
         logger.error(f"Failed to load user config: {e}")
     
@@ -10623,6 +14741,10 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "CARTESIA_VOICE_ID": cartesia_voice_id,
         "GOOGLE_VOICE": google_voice,
         "PLAYHT_VOICE_ID": playht_voice_id,
+        "VAPI_ASSISTANT_ID": vapi_assistant_id,
+        "VAPI_ASSISTANTS": vapi_assistants,
+        "LEMONFOX_VOICE": lemonfox_voice,
+        "VAPI_VOICE_ID": vapi_voice_id,
         "PHONE_NUMBER": phone_number,
         "RESPONSE_LATENCY": response_latency,
         "CALENDAR_BOOKING_ENABLED": calendar_booking_enabled,
@@ -10639,7 +14761,9 @@ async def get_config(authorization: Optional[str] = Header(None)):
         "SALES_DETECTOR_CREDITS": sales_credits,
         "TRANSFER_NUMBER": transfer_number,
         "TRANSFER_PEOPLE": transfer_people,
-        "FIRST_LOGIN_COMPLETED": first_login_completed
+        "FIRST_LOGIN_COMPLETED": first_login_completed,
+        "BUSINESS_HOURS": business_hours,
+        "BUSINESS_TIMEZONE": business_timezone
     }
 
 
@@ -10964,6 +15088,26 @@ async def update_config(request: Request, authorization: Optional[str] = Header(
             sms_enabled = 1 if data["SMS_NOTIFICATIONS_ENABLED"] else 0
             cursor.execute('UPDATE account_settings SET sms_notifications_enabled = ? WHERE user_id = ?', (sms_enabled, user_id))
             logger.info(f"SMS notifications enabled updated to {data['SMS_NOTIFICATIONS_ENABLED']} for user {user_id}")
+
+        if "BUSINESS_HOURS" in data or "BUSINESS_TIMEZONE" in data:
+            ensure_business_hours_schema()
+
+            tz_name = str(data.get("BUSINESS_TIMEZONE") or "Europe/London").strip() or "Europe/London"
+            # Validate hours payload (or default)
+            hours_obj = _normalize_business_hours(data.get("BUSINESS_HOURS")) if ("BUSINESS_HOURS" in data) else None
+
+            import json as _json
+            if hours_obj is not None:
+                cursor.execute(
+                    'UPDATE account_settings SET business_hours_json = ?, business_timezone = ? WHERE user_id = ?',
+                    (_json.dumps(hours_obj), tz_name, user_id),
+                )
+            else:
+                cursor.execute(
+                    'UPDATE account_settings SET business_timezone = ? WHERE user_id = ?',
+                    (tz_name, user_id),
+                )
+            logger.info(f"Business hours/timezone updated for user {user_id} (tz={tz_name})")
         
         conn.commit()
         conn.close()
@@ -11318,8 +15462,8 @@ async def create_appointment(request: Request, authorization: Optional[str] = He
         
         cursor.execute('''
             INSERT INTO appointments 
-            (date, time, duration, title, description, customer_name, customer_phone, status, created_by, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (date, time, duration, title, description, customer_name, customer_phone, status, created_by, user_id, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('date'),
             data.get('time'),
@@ -11330,7 +15474,8 @@ async def create_appointment(request: Request, authorization: Optional[str] = He
             data.get('customer_phone', ''),
             data.get('status', 'scheduled'),
             data.get('created_by', 'user'),
-            user_id
+            user_id,
+            1,
         ))
         
         appointment_id = cursor.lastrowid
@@ -12116,11 +16261,15 @@ async def get_today_stats(authorization: Optional[str] = Header(None)):
             WHERE DATE(start_time) = ? AND user_id = ? AND transcript IS NOT NULL AND transcript != ''
         ''', (today, user_id))
         messages_today = cursor.fetchone()[0]
-        
-        # Get unread appointments for this user
+
+        # Get unread appointments for this user.
+        # Unread = AI-created + not opened in dashboard yet.
         cursor.execute('''
-            SELECT COUNT(*) FROM appointments 
-            WHERE status = 'scheduled' AND created_by = 'ai_agent' AND user_id = ?
+            SELECT COUNT(*) FROM appointments
+            WHERE user_id = ?
+                AND created_by = 'ai_agent'
+                AND COALESCE(is_read, 0) = 0
+                AND status IN ('pending', 'scheduled')
         ''', (user_id,))
         unread_appointments = cursor.fetchone()[0]
         
@@ -12848,8 +16997,11 @@ async def mark_appointment_read(appointment_id: int, authorization: Optional[str
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE appointments 
-            SET status = 'read'
-            WHERE id = ? AND status = 'scheduled' AND user_id = ?
+                        SET is_read = 1
+                        WHERE id = ?
+                            AND user_id = ?
+                            AND created_by = 'ai_agent'
+                            AND status IN ('pending', 'scheduled')
         ''', (appointment_id, user_id))
         conn.commit()
         conn.close()
@@ -13622,6 +17774,84 @@ async def get_cartesia_voices():
         logger.error(f"Error loading Cartesia voices: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
+
+@app.get("/api/lemonfox-voices")
+async def get_lemonfox_voices(authorization: Optional[str] = Header(None)):
+    """Get a curated list of Lemonfox voices.
+
+    Lemonfox supports many voices, but we keep this list small/fast and avoid
+    relying on any external voice-list endpoint.
+    """
+    # Auth is optional; keep consistent with other voice list routes.
+    try:
+        _ = await get_current_user(authorization)
+    except Exception:
+        pass
+
+    # Note: Lemonfox supports both en-us and en-gb. Their docs show separate
+    # "English (American)" and "English (British)" sections, but don't provide
+    # a simple voice-metadata API for us to fetch.
+    #
+    # To give you an "80% UK" experience without risking unknown voice IDs, we
+    # keep the same known-good voice IDs but offer language variants by encoding
+    # the language into the voice id: "en-gb|heart".
+    # The TTS sender parses this and sets the Lemonfox "language" parameter.
+
+    base_voices = [
+        {"id": "heart", "name": "Heart", "gender": "Neutral"},
+        {"id": "bella", "name": "Bella", "gender": "Female"},
+        {"id": "sarah", "name": "Sarah", "gender": "Female"},
+        {"id": "jessica", "name": "Jessica", "gender": "Female"},
+        {"id": "nicole", "name": "Nicole", "gender": "Female"},
+        {"id": "nova", "name": "Nova", "gender": "Female"},
+        {"id": "michael", "name": "Michael", "gender": "Male"},
+        {"id": "liam", "name": "Liam", "gender": "Male"},
+        {"id": "eric", "name": "Eric", "gender": "Male"},
+        {"id": "adam", "name": "Adam", "gender": "Male"},
+        {"id": "alloy", "name": "Alloy", "gender": "Neutral"},
+        {"id": "aoede", "name": "Aoede", "gender": "Neutral"},
+        {"id": "kore", "name": "Kore", "gender": "Neutral"},
+        {"id": "river", "name": "River", "gender": "Neutral"},
+        {"id": "sky", "name": "Sky", "gender": "Neutral"},
+        {"id": "echo", "name": "Echo", "gender": "Neutral"},
+        {"id": "fenrir", "name": "Fenrir", "gender": "Neutral"},
+        {"id": "onyx", "name": "Onyx", "gender": "Neutral"},
+        {"id": "puck", "name": "Puck", "gender": "Neutral"},
+        {"id": "santa", "name": "Santa", "gender": "Neutral"},
+    ]
+
+    uk_accent = "British (en-GB)"
+    us_accent = "American (en-US)"
+
+    uk_variants = [
+        {
+            "id": f"en-gb|{v['id']}",
+            "name": v["name"],
+            "language": "en-gb",
+            "accent": uk_accent,
+            "gender": v.get("gender", "Neutral"),
+        }
+        for v in base_voices
+    ]
+
+    # Keep a small set of US options (roughly 20%) for comparison.
+    us_keep = {"heart", "bella", "michael", "sarah"}
+    us_variants = [
+        {
+            "id": f"en-us|{v['id']}",
+            "name": v["name"],
+            "language": "en-us",
+            "accent": us_accent,
+            "gender": v.get("gender", "Neutral"),
+        }
+        for v in base_voices
+        if v["id"] in us_keep
+    ]
+
+    voices = uk_variants + us_variants
+
+    return JSONResponse({"success": True, "voices": voices})
+
 @app.post("/api/update-voice-provider")
 async def update_voice_provider(request: Request, authorization: Optional[str] = Header(None)):
     """Update user's voice provider and voice selection"""
@@ -13640,6 +17870,10 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
         cartesia_voice_id = body.get('cartesia_voice_id')
         google_voice = body.get('google_voice')
         playht_voice_id = body.get('playht_voice_id')
+        lemonfox_voice = body.get('lemonfox_voice')
+        vapi_voice_id = body.get('vapi_voice_id')
+        vapi_assistant_id = body.get('vapi_assistant_id')
+        vapi_assistants = body.get('vapi_assistants')
         
         if not user_id:
             logger.error(f"update_voice_provider: No user_id - auth: {authorization}, body: {body}")
@@ -13655,6 +17889,10 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
         logger.info(f"  - elevenlabs_voice_id: {elevenlabs_voice_id}")
         logger.info(f"  - google_voice: {google_voice}")
         logger.info(f"  - playht_voice_id: {playht_voice_id}")
+        logger.info(f"  - lemonfox_voice: {lemonfox_voice}")
+        logger.info(f"  - vapi_voice_id: {vapi_voice_id}")
+        logger.info(f"  - vapi_assistant_id: {vapi_assistant_id}")
+        logger.info(f"  - vapi_assistants: {vapi_assistants}")
         
         # Update voice provider
         cursor.execute('''
@@ -13664,9 +17902,13 @@ async def update_voice_provider(request: Request, authorization: Optional[str] =
                 elevenlabs_voice_id = ?,
                 cartesia_voice_id = ?,
                 google_voice = ?,
-                playht_voice_id = ?
+                playht_voice_id = ?,
+                lemonfox_voice = ?,
+                vapi_voice_id = ?,
+                vapi_assistant_id = ?,
+                vapi_assistants = ?
             WHERE user_id = ?
-        ''', (voice_provider, openai_voice, elevenlabs_voice_id, cartesia_voice_id, google_voice, playht_voice_id, user_id))
+        ''', (voice_provider, openai_voice, elevenlabs_voice_id, cartesia_voice_id, google_voice, playht_voice_id, lemonfox_voice, vapi_voice_id, vapi_assistant_id, vapi_assistants, user_id))
         
         rows_affected = cursor.rowcount
         conn.commit()
@@ -13956,6 +18198,222 @@ async def test_speechmatics_voice(request: Request):
         import traceback
         logger.error(traceback.format_exc())
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/test-lemonfox-voice")
+async def test_lemonfox_voice(request: Request, authorization: Optional[str] = Header(None)):
+    """Generate a sample audio with Lemonfox TTS (returned as WAV for browser playback)."""
+    try:
+        # Auth optional (UI will usually send it)
+        try:
+            user_id = await get_current_user(authorization)
+        except Exception:
+            user_id = None
+
+        body = await request.json()
+        raw_voice_id = body.get('voice_id', 'heart')
+        language = "en-us"
+        voice_id = raw_voice_id
+        if isinstance(raw_voice_id, str) and '|' in raw_voice_id:
+            maybe_lang, maybe_voice = raw_voice_id.split('|', 1)
+            maybe_lang = (maybe_lang or '').strip().lower()
+            maybe_voice = (maybe_voice or '').strip()
+            if maybe_lang in {"en-us", "en-gb"} and maybe_voice:
+                language = maybe_lang
+                voice_id = maybe_voice
+
+        api_key = str(CONFIG.get("LEMONFOX_API_KEY", "") or "").strip()
+        if not api_key:
+            return JSONResponse({"success": False, "error": "Lemonfox API key not configured"}, status_code=400)
+
+        sample_text = body.get('text') or "Hello! This is a preview of my voice. I'm here to help answer calls and assist your customers with a natural, friendly conversation. How does this sound?"
+
+        if user_id:
+            logger.info(f"Lemonfox voice test for user {user_id} (voice_id={voice_id})")
+        logger.info(f"🔊 Testing Lemonfox voice: {voice_id}")
+
+        import httpx
+        import io
+        import wave
+        import audioop
+
+        url = "https://api.lemonfox.ai/v1/audio/speech"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "input": sample_text,
+            "voice": voice_id,
+            "language": language,
+            "response_format": "wav",
+            "speed": 1.0,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Lemonfox API error: {resp.status_code} - {resp.text}")
+                return JSONResponse({"success": False, "error": "Failed to generate voice sample"}, status_code=500)
+            wav_bytes = resp.content
+
+        if not wav_bytes:
+            return JSONResponse({"success": False, "error": "Lemonfox returned empty audio"}, status_code=500)
+
+        # Normalize to 16kHz mono PCM16 WAV (consistent playback across browsers)
+        with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+            nchannels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            framerate = wf.getframerate()
+            frames = wf.readframes(wf.getnframes())
+
+        if nchannels != 1:
+            frames = audioop.tomono(frames, sampwidth, 0.5, 0.5)
+            nchannels = 1
+
+        if sampwidth != 2:
+            frames = audioop.lin2lin(frames, sampwidth, 2)
+            sampwidth = 2
+
+        if framerate != 16000:
+            frames, _ = audioop.ratecv(frames, sampwidth, nchannels, framerate, 16000, None)
+            framerate = 16000
+
+        out = io.BytesIO()
+        with wave.open(out, 'wb') as wav_out:
+            wav_out.setnchannels(1)
+            wav_out.setsampwidth(2)
+            wav_out.setframerate(16000)
+            wav_out.writeframes(frames)
+
+        wav_data = out.getvalue()
+        logger.info(f"✅ Lemonfox test audio generated: {len(wav_data)} bytes")
+
+        return Response(
+            content=wav_data,
+            media_type="audio/wav",
+            headers={"Content-Disposition": "inline; filename=lemonfox_voice_sample.wav"},
+        )
+
+    except Exception as e:
+        logger.error(f"Lemonfox voice test error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/test-vapi-voice")
+async def test_vapi_voice(request: Request, authorization: Optional[str] = Header(None)):
+    """Generate a sample audio preview for Vapi voice using Vapi Web API."""
+    try:
+        # Auth optional
+        try:
+            user_id = await get_current_user(authorization)
+        except Exception:
+            user_id = None
+
+        body = await request.json()
+        voice_id = body.get('voice_id', 'charlotte-uk')
+        
+        # Get the Vapi API key from global settings
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT vapi_api_key FROM global_settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row or not row[0]:
+            return JSONResponse({"success": False, "error": "Vapi API key not configured. Please configure in Super Admin settings."}, status_code=400)
+
+        vapi_api_key = row[0]
+        sample_text = body.get('text') or "Hello! I hope your day is going well. This is a preview of what I sound like."
+
+        if user_id:
+            logger.info(f"Vapi voice test for user {user_id} (voice_id={voice_id})")
+        logger.info(f"🔊 Testing Vapi voice: {voice_id}")
+
+        # Map voice_id to ElevenLabs voice configuration (for Vapi)
+        voice_configs = {
+            # UK Female
+            "charlotte-uk": "XB0fDUnXU5powFXDhCwa",
+            "alice-uk": "Xb7hH8MSUJpSbSDYk0k2",
+            "lily-uk": "pFZP5JQG7iQjIQuC4Bku",
+            "jessica-uk": "cgSgspJ2msm6clMCkdW9",
+            "nicole-uk": "piTKgcLEGmPE4e6mEKli",
+            "emily-uk": "LcfcDJNUP1GQjkzn1xUU",
+            "matilda-uk": "XrExE9yKIg1WjnnlVkGX",
+            "freya-uk": "jsCqWAovK2LkecY7zXl4",
+            # UK Male
+            "george-uk": "JBFqnCBsd6RMkjVDRZzb",
+            "harry-uk": "SOYHLrjzK2X1ezoPC6cr",
+            "james-uk": "ZQe5CZNOzWyzPSCn5a3c",
+            "brian-uk": "nPczCjzI2devNBz1zQrb",
+            "daniel-uk": "onwK4e9ZLuTAKqWW03F9",
+            "thomas-uk": "GBv7mTt0atIp3Br8iCZE",
+            "callum-uk": "N2lVS1w4EtoT3dr4eOWO",
+            "liam-uk": "TX3LPaxmHKxFdv7VOQHJ",
+            # US
+            "sarah-elevenlabs": "EXAVITQu4vr4xnSDxMaL",
+            "adam-elevenlabs": "pNInz6obpgDQGcFmaJgB"
+        }
+        
+        elevenlabs_voice_id = voice_configs.get(voice_id, "XB0fDUnXU5powFXDhCwa")  # Default to charlotte-uk
+        
+        # Get ElevenLabs API key from environment
+        elevenlabs_api_key = CONFIG.get('ELEVENLABS_API_KEY', '')
+        
+        if not elevenlabs_api_key:
+            logger.warning("⚠️ ElevenLabs API key not configured - voice preview unavailable")
+            return JSONResponse(
+                {"success": False, "error": "Voice preview requires ElevenLabs API key. The voice will work perfectly during actual calls using Vapi's integration. To enable preview, add ELEVENLABS_API_KEY to your environment."},
+                status_code=400
+            )
+        
+        # Generate audio using ElevenLabs API directly
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{elevenlabs_voice_id}"
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": elevenlabs_api_key
+        }
+        
+        data = {
+            "text": sample_text,
+            "model_id": "eleven_turbo_v2_5",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75
+            }
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=data, headers=headers)
+            
+            if response.status_code != 200:
+                logger.error(f"ElevenLabs API error: {response.status_code} - {response.text}")
+                return JSONResponse(
+                    {"success": False, "error": f"Voice preview unavailable. The voice will work during calls."},
+                    status_code=400
+                )
+            
+            audio_data = response.content
+            logger.info(f"✅ Voice preview generated: {len(audio_data)} bytes")
+            
+            # Return audio as MP3
+            return Response(
+                content=audio_data,
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Disposition": "inline; filename=vapi_voice_sample.mp3"
+                }
+            )
+
+    except Exception as e:
+        logger.error(f"Vapi voice test error: {e}")
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
 
 
 @app.post("/api/generate-speechmatics-fillers")
@@ -14425,8 +18883,8 @@ async def mark_date_busy(request: Request, authorization: Optional[str] = Header
         
         cursor.execute('''
             INSERT INTO appointments 
-            (date, time, duration, title, status, created_by, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (date, time, duration, title, status, created_by, user_id, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('date'),
             '00:00',
@@ -14434,7 +18892,8 @@ async def mark_date_busy(request: Request, authorization: Optional[str] = Header
             'Busy - All Day',
             'busy',
             'user',
-            user_id
+            user_id,
+            1,
         ))
         
         appointment_id = cursor.lastrowid
@@ -14576,33 +19035,15 @@ async def delete_task(task_id: int, authorization: Optional[str] = Header(None))
 async def ngrok_status():
     """Check tunnel status (ngrok or cloudflare) - FAST version"""
     try:
-        # Quick process check without heavy psutil iteration
-        cloudflare_running = False
+        # Keep this endpoint extremely fast: avoid heavy process iteration.
+        cloudflare_running = _is_process_running("cloudflared.exe") or _is_process_running("cloudflared")
         ngrok_running = False
-        
-        # Fast process check
-        try:
-            import psutil
-            # Use a set for O(1) lookup
-            process_names = set()
-            for proc in psutil.process_iter(['name']):
-                try:
-                    name = (proc.info.get('name') or '').lower()
-                    process_names.add(name)
-                    if len(process_names) > 200:  # Limit iteration for speed
-                        break
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-            
-            cloudflare_running = 'cloudflared.exe' in process_names or 'cloudflared' in process_names
-        except Exception as e:
-            logger.debug(f"Fast process check failed: {e}")
         
         # Quick ngrok check
         ngrok_url = ""
         try:
             import requests
-            response = requests.get("http://localhost:4040/api/tunnels", timeout=1.5)
+            response = requests.get("http://localhost:4040/api/tunnels", timeout=0.8)
             data = response.json()
             if data.get("tunnels"):
                 ngrok_running = True
@@ -14610,30 +19051,42 @@ async def ngrok_status():
         except:
             ngrok_running = False
         
-        # Get cloudflare URL
-        cloudflare_url = ""
-        if cloudflare_running:
-            cloudflare_url = (CONFIG.get("PUBLIC_URL") or "").strip()
-            if "trycloudflare.com" not in cloudflare_url:
-                try:
-                    cloudflare_url = _latest_trycloudflare_url_from_log("cloudflared_quick.log") or ""
-                except:
-                    pass
-        
-        # Get selected provider from DB (quick)
-        provider = 'ngrok'
+        # Get selected provider + stored URL + cloudflare domain/token from DB (quick)
+        provider = "ngrok"
         stored_public_url = ""
+        stored_cloudflare_domain = ""
+        stored_cloudflare_token = ""
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('SELECT tunnel_provider, public_url FROM global_settings WHERE id = 1')
+            cursor.execute(
+                'SELECT tunnel_provider, public_url, cloudflare_domain, cloudflare_tunnel_token FROM global_settings WHERE id = 1'
+            )
             row = cursor.fetchone()
             conn.close()
             if row and row[0]:
                 provider = row[0].lower()
                 stored_public_url = row[1] or ""
+                stored_cloudflare_domain = (row[2] or "").strip()
+                stored_cloudflare_token = (row[3] or "").strip()
         except:
             pass
+
+        # Get cloudflare URL (prefer permanent custom domain if configured)
+        cloudflare_url = ""
+        permanent_cloudflare = bool(stored_cloudflare_domain and stored_cloudflare_token)
+        if provider == "cloudflare" and permanent_cloudflare:
+            cloudflare_url = _normalize_public_url(f"https://{stored_cloudflare_domain}")
+        elif cloudflare_running:
+            cloudflare_url = _normalize_public_url((CONFIG.get("PUBLIC_URL") or "").strip())
+            if not cloudflare_url:
+                try:
+                    cloudflare_url = _normalize_public_url(
+                        _latest_trycloudflare_url_from_log("cloudflared_quick.log") or ""
+                    )
+                except Exception:
+                    cloudflare_url = ""
+            # If CONFIG has a non-trycloudflare URL (e.g., permanent domain), do not override it.
         
         # Use stored URL if no active tunnel
         if not cloudflare_url and provider == "cloudflare":
@@ -14774,11 +19227,147 @@ async def restart_ngrok_only():
             url = data["tunnels"][0]["public_url"]
             CONFIG["PUBLIC_URL"] = url
             logger.info(f"ngrok restarted with new URL: {url}")
-            return {"success": True, "url": url}
+            
+            # Auto-sync Vonage webhooks with new URL
+            if _update_vonage_application_webhooks(url):
+                logger.info("✅ Vonage webhooks automatically synced after ngrok restart")
+                return {"success": True, "url": url, "webhooks_synced": True}
+            else:
+                return {"success": True, "url": url, "webhooks_synced": False, "message": "ngrok restarted but webhook sync failed"}
         
         return {"success": False, "message": "ngrok started but no tunnel found yet. Wait a few seconds and check status."}
     except Exception as e:
         logger.error(f"Failed to restart ngrok: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/admin/sync-vonage-webhooks")
+async def sync_vonage_webhooks():
+    """Manually sync Vonage application webhooks with current tunnel URL"""
+    try:
+        provider, public_url = _get_global_tunnel_settings()
+        
+        # For Cloudflare, try to get URL from log if not in DB
+        if provider == "cloudflare" and not public_url:
+            try:
+                url_from_log = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+                if url_from_log:
+                    public_url = url_from_log
+                    _persist_public_url(url_from_log)
+            except Exception:
+                pass
+        
+        if not public_url:
+            return {"success": False, "message": "No tunnel URL configured in settings"}
+        
+        if _update_vonage_application_webhooks(public_url):
+            return {
+                "success": True,
+                "message": "Vonage webhooks synced successfully",
+                "provider": provider,
+                "answer_url": f"{public_url}/webhooks/answer",
+                "event_url": f"{public_url}/webhooks/events"
+            }
+        else:
+            return {"success": False, "message": "Failed to sync webhooks - check Vonage credentials"}
+    except Exception as e:
+        logger.error(f"Webhook sync error: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/admin/restart-cloudflare")
+async def restart_cloudflare():
+    """Restart Cloudflare tunnel and auto-sync webhooks"""
+    try:
+        # Kill existing cloudflared
+        _kill_process_images(["cloudflared.exe", "cloudflared"])
+        await asyncio.sleep(2)
+        
+        # Find cloudflared
+        if os.name == 'nt':
+            cloudflared_paths = [
+                "cloudflared.exe",
+                "C:\\Windows\\cloudflared.exe",
+                "C:\\cloudflared\\cloudflared.exe",
+                os.path.expanduser("~\\cloudflared\\cloudflared.exe"),
+            ]
+        else:
+            cloudflared_paths = [
+                "cloudflared",
+                "/usr/local/bin/cloudflared",
+                os.path.expanduser("~/cloudflared"),
+            ]
+        
+        cloudflared_path = None
+        for path in cloudflared_paths:
+            try:
+                result = subprocess.run([path, "--version"], capture_output=True, timeout=2)
+                if result.returncode == 0:
+                    cloudflared_path = path
+                    break
+            except Exception:
+                continue
+        
+        if not cloudflared_path:
+            return {"success": False, "message": "cloudflared not found"}
+        
+        # Start cloudflared
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        subprocess.Popen(
+            [
+                cloudflared_path,
+                "tunnel",
+                "--url",
+                "http://localhost:5004",
+                "--logfile",
+                "cloudflared_quick.log",
+                "--loglevel",
+                "info",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+            text=True,
+        )
+        
+        # Wait for URL in log
+        await asyncio.sleep(3)
+        url = ""
+        for _ in range(15):
+            try:
+                url = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+            except Exception:
+                url = ""
+            if url:
+                break
+            await asyncio.sleep(0.5)
+        
+        if url:
+            CONFIG["PUBLIC_URL"] = url
+            _persist_public_url(url)
+            logger.info(f"Cloudflare tunnel restarted: {url}")
+            
+            # Auto-sync Vonage webhooks
+            if _update_vonage_application_webhooks(url):
+                logger.info("✅ Vonage webhooks automatically synced after Cloudflare restart")
+                return {
+                    "success": True,
+                    "url": url,
+                    "webhooks_synced": True,
+                    "answer_url": f"{url}/webhooks/answer",
+                    "event_url": f"{url}/webhooks/events"
+                }
+            else:
+                return {
+                    "success": True,
+                    "url": url,
+                    "webhooks_synced": False,
+                    "message": "Cloudflare restarted but webhook sync failed"
+                }
+        
+        return {"success": False, "message": "Cloudflare started but no URL found in log yet"}
+    except Exception as e:
+        logger.error(f"Failed to restart Cloudflare: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -14797,7 +19386,7 @@ async def get_tunnel_config():
                 "success": True,
                 "provider": row[0] or "ngrok",
                 "cloudflare_domain": row[1] or "",
-                "has_tunnel_token": bool(row[2])
+                "cloudflare_tunnel_token": bool(row[2])  # Return True/False if token exists
             }
         return {"success": False, "message": "No tunnel configuration found"}
     except Exception as e:
@@ -14877,6 +19466,16 @@ async def _start_tunnel_impl(provider: str, force_restart: bool = True) -> Dict[
         await asyncio.sleep(1)
 
     if provider == "cloudflare":
+        # Check if we have a custom domain and token configured
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT cloudflare_domain, cloudflare_tunnel_token FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+        
+        custom_domain = row[0] if row else None
+        tunnel_token = row[1] if row else None
+        
         # Check if cloudflared exists
         if os.name == 'nt':
             cloudflared_paths = [
@@ -14910,6 +19509,52 @@ async def _start_tunnel_impl(provider: str, force_restart: bool = True) -> Dict[
             }
 
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        
+        # If custom domain and token are configured, use permanent tunnel
+        if custom_domain and tunnel_token:
+            logger.info(f"🌐 Starting permanent Cloudflare tunnel with custom domain: {custom_domain}")
+            
+            # Start the tunnel with the token (runs the tunnel you configured in Cloudflare dashboard)
+            subprocess.Popen(
+                [
+                    cloudflared_path,
+                    "tunnel",
+                    "--no-autoupdate",
+                    "run",
+                    "--token",
+                    tunnel_token,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                creationflags=creation_flags,
+                text=True,
+            )
+            
+            # Wait for tunnel to start
+            await asyncio.sleep(3)
+            
+            # Use the custom domain as the public URL
+            url = f"https://{custom_domain}"
+            CONFIG["PUBLIC_URL"] = url
+            _persist_public_url(url)
+            logger.info(f"✅ Permanent Cloudflare tunnel started: {url}")
+            
+            webhook_updated = False
+            try:
+                webhook_updated = bool(_update_vonage_application_webhooks(url))
+            except Exception:
+                webhook_updated = False
+            webhook_msg = " (Vonage webhooks updated)" if webhook_updated else " (Warning: Could not update Vonage webhooks - calls may not work)"
+            return {
+                "success": True,
+                "url": url,
+                "provider": "cloudflare",
+                "message": f"Permanent Cloudflare tunnel active at {url}{webhook_msg}",
+                "webhook_updated": webhook_updated,
+            }
+        
+        # Otherwise, use temporary quick tunnel
+        logger.info("🌐 Starting temporary Cloudflare tunnel (no custom domain configured)")
         subprocess.Popen(
             [
                 cloudflared_path,
@@ -15145,31 +19790,44 @@ def _openrouter_speed_rank(model_id: str) -> int:
     """Heuristic ordering: put typically low-latency providers first.
 
     OpenRouter doesn't publish a universal latency ranking. This is a best-effort heuristic
-    based on common provider performance.
+    based on common provider performance for real-time voice applications.
+    
+    Speed ranking (fastest to slowest):
+    1. Google (Gemini Flash) - 200-400ms
+    2. Groq - 300-500ms
+    3. Cerebras - 400-600ms
+    4. Meta Llama (via Together/Fireworks) - 400-700ms
+    5. Anthropic Claude Haiku - 400-600ms
+    6. Mistral - 600-900ms
+    7. OpenAI - 800-1200ms
+    8. DeepSeek - 1000-3000ms (cheap but SLOW for voice)
     """
     mid = (model_id or "").strip().lower()
     if not mid:
         return 10_000
 
     # Provider prefix hints (OpenRouter model IDs often look like "provider/model").
-    if mid.startswith("groq/"):
-        base = 0
-    elif mid.startswith("cerebras/"):
+    # Ordered by actual real-time voice performance
+    if mid.startswith("google/"):
+        base = 0  # Gemini Flash is fastest
+    elif mid.startswith("groq/"):
         base = 1
-    elif mid.startswith("fireworks/"):
+    elif mid.startswith("cerebras/"):
         base = 2
-    elif mid.startswith("together/"):
+    elif mid.startswith("meta-llama/"):
         base = 3
-    elif mid.startswith("deepseek/"):
+    elif mid.startswith("fireworks/"):
         base = 4
-    elif mid.startswith("openai/"):
+    elif mid.startswith("together/"):
         base = 5
-    elif mid.startswith("mistralai/") or mid.startswith("mistral/"):
-        base = 6
-    elif mid.startswith("google/"):
-        base = 7
     elif mid.startswith("anthropic/"):
+        base = 6
+    elif mid.startswith("mistralai/") or mid.startswith("mistral/"):
+        base = 7
+    elif mid.startswith("openai/"):
         base = 8
+    elif mid.startswith("deepseek/"):
+        base = 20  # DeepSeek is cheap but very slow for real-time voice
     else:
         base = 50
 
@@ -15257,6 +19915,284 @@ async def save_openrouter_model(request: Request):
         return {"success": True, "message": f"OpenRouter model set to {model}", "model": model}
     except Exception as e:
         logger.error(f"Failed to save OpenRouter model: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/racing-settings")
+async def get_racing_settings():
+    """Get racing mode configuration."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT racing_enabled, openrouter_model_2, openrouter_model_3 FROM global_settings WHERE id = 1')
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            racing_enabled = int(row[0] or 0)
+            model_2 = str(row[1] or "").strip()
+            model_3 = str(row[2] or "").strip()
+        else:
+            racing_enabled = 0
+            model_2 = ""
+            model_3 = ""
+
+        return {
+            "success": True,
+            "racing_enabled": racing_enabled,
+            "model_2": model_2,
+            "model_3": model_3
+        }
+    except Exception as e:
+        logger.error(f"Failed to get racing settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/racing-settings")
+async def save_racing_settings(request: Request):
+    """Save racing mode configuration."""
+    try:
+        body = await request.json()
+        racing_enabled = int(body.get('racing_enabled', 0))
+        model_2 = str(body.get('model_2', '') or '').strip()
+        model_3 = str(body.get('model_3', '') or '').strip()
+        updated_by = str(body.get('updated_by', 'admin') or 'admin').strip()
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Ensure columns exist
+        _ensure_column(cursor, "global_settings", "racing_enabled", "INTEGER DEFAULT 0")
+        _ensure_column(cursor, "global_settings", "openrouter_model_2", "TEXT DEFAULT NULL")
+        _ensure_column(cursor, "global_settings", "openrouter_model_3", "TEXT DEFAULT NULL")
+        
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET racing_enabled = ?,
+                openrouter_model_2 = ?,
+                openrouter_model_3 = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (racing_enabled, model_2 if model_2 else None, model_3 if model_3 else None, updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["RACING_ENABLED"] = racing_enabled
+        if model_2:
+            CONFIG["OPENROUTER_MODEL_2"] = model_2
+        if model_3:
+            CONFIG["OPENROUTER_MODEL_3"] = model_3
+        
+        logger.info(f"✅ Racing settings updated: enabled={racing_enabled}, model_2={model_2}, model_3={model_3}")
+        return {"success": True, "message": "Racing settings saved"}
+    except Exception as e:
+        logger.error(f"Failed to save racing settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/ted-status")
+async def get_ted_status():
+    """Get Ted's current performance and job security status."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Ensure Ted schema exists in the active DB.
+        _ensure_ted_tables(cursor)
+        conn.commit()
+        
+        # Get Ted's settings and status
+        cursor.execute('''
+            SELECT performance_score, job_security_level, negative_feedback_count,
+                   auto_adjust_enabled, filler_timing_ms, ted_mood, last_adjustment
+            FROM ted_settings WHERE id = 1
+        ''')
+        row = cursor.fetchone()
+        
+        if row:
+            ted_status = {
+                "performance_score": float(row[0]),
+                "job_security": float(row[1]),
+                "negative_feedback_count": int(row[2]),
+                "auto_adjust_enabled": int(row[3]),
+                "current_filler_ms": float(row[4]) if row[4] else 500.0,
+                "mood": str(row[5]) if row[5] else "confident",
+                "last_adjustment": str(row[6]) if row[6] else None
+            }
+        else:
+            ted_status = {
+                "performance_score": 100.0,
+                "job_security": 100.0,
+                "negative_feedback_count": 0,
+                "auto_adjust_enabled": 1,
+                "current_filler_ms": 500.0,
+                "mood": "confident",
+                "last_adjustment": None
+            }
+        
+        # Get recent performance metrics
+        cursor.execute('''
+            SELECT metric_type, AVG(metric_value), COUNT(*)
+            FROM ted_performance
+            WHERE timestamp > datetime('now', '-1 hour')
+            GROUP BY metric_type
+        ''')
+        metrics = {}
+        for m_row in cursor.fetchall():
+            metrics[m_row[0]] = {"avg": float(m_row[1]), "count": int(m_row[2])}
+        
+        # Get Ted's memory (learned problems)
+        cursor.execute('''
+            SELECT problem_pattern, solution_applied, times_encountered, success_rate
+            FROM ted_memory
+            ORDER BY last_seen DESC
+            LIMIT 10
+        ''')
+        memory = []
+        for m_row in cursor.fetchall():
+            memory.append({
+                "problem": m_row[0],
+                "solution": m_row[1],
+                "times_seen": int(m_row[2]),
+                "success_rate": float(m_row[3])
+            })
+        
+        conn.close()
+        
+        return {
+            "success": True,
+            "ted": ted_status,
+            "metrics": metrics,
+            "memory": memory
+        }
+    except Exception as e:
+        logger.error(f"Failed to get Ted status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/ted-feedback")
+async def give_ted_feedback(request: Request):
+    """Super admin gives Ted negative feedback (double-click on Ted icon)."""
+    try:
+        body = await request.json()
+        feedback_type = body.get('type', 'negative')  # 'negative' or 'positive'
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Ensure Ted schema exists in the active DB.
+        _ensure_ted_tables(cursor)
+        conn.commit()
+        
+        if feedback_type == 'negative':
+            # Ted receives negative feedback - he needs to improve!
+            cursor.execute('''
+                UPDATE ted_settings
+                SET negative_feedback_count = negative_feedback_count + 1,
+                    performance_score = MAX(0, performance_score - 10),
+                    job_security_level = MAX(0, job_security_level - 15),
+                    ted_mood = CASE
+                        WHEN job_security_level - 15 < 30 THEN 'panicking'
+                        WHEN job_security_level - 15 < 60 THEN 'worried'
+                        ELSE 'concerned'
+                    END
+                WHERE id = 1
+            ''')
+            
+            logger.warning("⚠️ TED RECEIVED NEGATIVE FEEDBACK! Performance score and job security decreased.")
+            logger.warning("😰 Ted is worried and will try harder to improve call quality!")
+            
+            # Ted automatically tightens settings when worried
+            cursor.execute("SELECT job_security_level FROM ted_settings WHERE id = 1")
+            js_row = cursor.fetchone()
+            job_security = float(js_row[0]) if js_row and js_row[0] is not None else 100.0
+            
+            if job_security < 50:
+                # Ted is really worried - aggressive optimization
+                cursor.execute('''
+                    UPDATE ted_settings
+                    SET filler_timing_ms = MAX(200, filler_timing_ms - 150)
+                    WHERE id = 1
+                ''')
+                logger.warning("🔧 Ted is panicking! Aggressively reducing filler timing to improve speed.")
+
+            # Store a learning entry so Ted's Memory isn't empty.
+            # (This also lets you verify the feature without waiting for a rare tangent event.)
+            try:
+                problem = "admin_negative_feedback"
+                solution = "Received negative feedback; will prioritize speed + on-topic interruptions (reduce filler timing, tighten turn-taking)"
+                cursor.execute("SELECT id, times_encountered FROM ted_memory WHERE problem_pattern = ?", (problem,))
+                m_row = cursor.fetchone()
+                if m_row:
+                    cursor.execute(
+                        "UPDATE ted_memory SET times_encountered = ?, solution_applied = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+                        (int(m_row[1] or 0) + 1, solution, int(m_row[0])),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO ted_memory (problem_pattern, solution_applied) VALUES (?, ?)",
+                        (problem, solution),
+                    )
+            except Exception:
+                pass
+        
+        else:
+            # Positive feedback - Ted is doing well!
+            cursor.execute('''
+                UPDATE ted_settings
+                SET performance_score = MIN(100, performance_score + 5),
+                    job_security_level = MIN(100, job_security_level + 10),
+                    ted_mood = CASE
+                        WHEN job_security_level + 10 > 80 THEN 'confident'
+                        ELSE 'motivated'
+                    END
+                WHERE id = 1
+            ''')
+            logger.info("✅ TED RECEIVED POSITIVE FEEDBACK! Ted is happy and confident.")
+
+            # Optional: remember what worked.
+            try:
+                problem = "admin_positive_feedback"
+                solution = "Received positive feedback; keep current tuning (maintain speed and caller satisfaction)"
+                cursor.execute("SELECT id, times_encountered FROM ted_memory WHERE problem_pattern = ?", (problem,))
+                m_row = cursor.fetchone()
+                if m_row:
+                    cursor.execute(
+                        "UPDATE ted_memory SET times_encountered = ?, solution_applied = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+                        (int(m_row[1] or 0) + 1, solution, int(m_row[0])),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO ted_memory (problem_pattern, solution_applied) VALUES (?, ?)",
+                        (problem, solution),
+                    )
+            except Exception:
+                pass
+        
+        conn.commit()
+        
+        # Return updated status
+        cursor.execute("SELECT performance_score, job_security_level, ted_mood FROM ted_settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return JSONResponse({"success": False, "error": "Ted settings row missing (id=1)"}, status_code=500)
+        
+        return {
+            "success": True,
+            "message": f"Ted received {feedback_type} feedback",
+            "performance_score": float(row[0]),
+            "job_security": float(row[1]),
+            "mood": str(row[2])
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to give Ted feedback: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -16473,29 +21409,54 @@ async def answer_call(request: Request):
         session.public_base_url = _public_base_url_from_request(request)
     except Exception:
         pass
+
+    # Pre-create the Vapi call NOW so it's ready when the websocket connects.
+    # This is critical for immediate greeting - the call must exist before audio flows.
+    if isinstance(session, DailyBotSession):
+        try:
+            await session.prepare_vapi_call()
+            logger.info(f"[{call_uuid}] ✅ Vapi call pre-created and ready")
+        except Exception as e:
+            logger.error(f"[{call_uuid}] ❌ Failed to pre-create Vapi call: {e}")
     
     # Build WebSocket URL from the incoming webhook host.
     # This avoids mismatches when switching tunnels (ngrok <-> Cloudflare).
     ws_url = _public_ws_url_from_request(request, f"/socket/{call_uuid}")
     
-    # Return NCCO to connect audio via WebSocket
-    # The AI agent will handle the greeting
-    ncco = [
-        {
-            "action": "connect",
-            "endpoint": [
-                {
-                    "type": "websocket",
-                    "uri": ws_url,
-                    "content-type": "audio/l16;rate=16000"
-                }
-            ]
-        }
-    ]
+    # Return NCCO to connect audio via WebSocket.
+    # IMPORTANT: Vonage NCCO actions run sequentially; a leading "record" action can
+    # delay the subsequent "connect" action, which delays the Vapi greeting.
+    connect_action = {
+        "action": "connect",
+        "endpoint": [
+            {
+                "type": "websocket",
+                "uri": ws_url,
+                "content-type": "audio/l16;rate=16000",
+            }
+        ],
+    }
 
-    _record_last_ncco(request, call_uuid, ncco, ws_url=ws_url, note="connect_websocket")
-    
-    logger.info(f"[{call_uuid}] Returning NCCO with WebSocket: {ws_url}")
+    if isinstance(session, DailyBotSession):
+        # Vapi provides its own recording/transcript via webhook; prioritize fast connect.
+        ncco = [connect_action]
+        _record_last_ncco(request, call_uuid, ncco, ws_url=ws_url, note="connect_websocket_vapi")
+        logger.info(f"[{call_uuid}] Returning NCCO with WebSocket (Vapi; no Vonage recording): {ws_url}")
+    else:
+        record_action = {
+            "action": "record",
+            "eventUrl": [f"{_public_base_url_from_request(request)}/webhooks/recording"],
+            "format": "wav",
+            "split": "conversation",
+            "endOnSilence": 3,
+            "endOnKey": "#",
+            "timeOut": 7200,  # 2 hours max
+            "beepStart": False,  # Don't beep when recording starts
+        }
+        ncco = [record_action, connect_action]
+        _record_last_ncco(request, call_uuid, ncco, ws_url=ws_url, note="record_and_connect_websocket")
+        logger.info(f"[{call_uuid}] Returning NCCO with recording + WebSocket: {ws_url}")
+
     return JSONResponse(ncco)
 
 
@@ -16644,6 +21605,444 @@ async def transfer_event_webhook(request: Request):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
+@app.post("/webhooks/recording")
+async def recording_webhook(request: Request):
+    """
+    Vonage Recording Webhook
+    -------------------------
+    Called when a call recording is ready.
+    Stores the recording URL in the database.
+    """
+    try:
+        # Vonage may send JSON or form-encoded payloads depending on configuration.
+        try:
+            if (request.headers.get("content-type") or "").lower().startswith("application/json"):
+                data = await request.json()
+            else:
+                form = await request.form()
+                data = dict(form)
+        except Exception:
+            data = dict(request.query_params)
+
+        call_uuid = data.get("conversation_uuid", data.get("uuid", ""))
+        recording_url = data.get("recording_url", "")
+        recording_uuid = data.get("recording_uuid", "")
+        
+        logger.info(f"📼 Recording webhook for {call_uuid}: {recording_url}")
+        
+        if call_uuid and recording_url:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE calls SET recording_url = ? WHERE call_uuid = ?', (recording_url, call_uuid))
+            conn.commit()
+            conn.close()
+            logger.info(f"✅ Recording URL saved for {call_uuid}")
+        
+        return JSONResponse({"status": "received"})
+    except Exception as e:
+        logger.error(f"❌ Error processing recording webhook: {e}")
+        return JSONResponse({"status": "error"}, status_code=500)
+
+
+@app.post("/webhooks/vapi-end-of-call")
+async def vapi_end_of_call_webhook(request: Request):
+    """
+    Vapi End-of-Call Webhook
+    -------------------------
+    Receives call data from Vapi including transcript, recording URLs, and call metadata.
+    Configure this URL in Vapi Dashboard: Server URL (end-of-call callback)
+    """
+    try:
+        data = await request.json()
+        logger.info(f"📞 Vapi end-of-call webhook received: {str(data)[:500]}")
+        
+        # Extract call metadata
+        call_data = data.get("call", {})
+        call_id = call_data.get("id", "")
+        caller_number = call_data.get("customer", {}).get("number", "Unknown")
+        called_number = (
+            (call_data.get("phoneNumber") or {}).get("number")
+            or (call_data.get("to") or "")
+            or (call_data.get("destination") or "")
+            or ""
+        )
+        started_at = call_data.get("startedAt", "")
+        ended_at = call_data.get("endedAt", "")
+        
+        # Get transcript if available
+        transcript_text = ""
+        messages = data.get("messages", []) or call_data.get("messages", [])
+        if messages:
+            for msg in messages:
+                role = msg.get("role", "")
+                content = msg.get("content", "") or msg.get("message", "")
+                if role == "user":
+                    transcript_text += f"Caller: {content}\n"
+                elif role == "assistant":
+                    transcript_text += f"Assistant: {content}\n"
+        
+        # Get transcript object if available (newer Vapi format)
+        transcript_obj = call_data.get("transcript", "")
+        if transcript_obj and not transcript_text:
+            transcript_text = transcript_obj
+        
+        # Get recording URL if available
+        recording_url = call_data.get("recordingUrl", "") or call_data.get("recording_url", "")
+        artifact = call_data.get("artifact", {})
+        if not recording_url and artifact:
+            recording_url = artifact.get("recordingUrl", "") or artifact.get("recording_url", "")
+        
+        # Get stereo recording URL (separate channels for customer/assistant)
+        stereo_recording_url = call_data.get("stereoRecordingUrl", "")
+        
+        # Calculate duration
+        duration = 0
+        if started_at and ended_at:
+            try:
+                start = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                end = datetime.fromisoformat(ended_at.replace('Z', '+00:00'))
+                duration = int((end - start).total_seconds())
+            except:
+                pass
+        
+        # Try to match with existing call by phone number and timestamp
+        # For Vapi calls, the call_uuid might be in phoneCallId or we need to match by timing
+        phone_call_id = call_data.get("phoneCallId", "")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Resolve user_id for multi-tenant call logs.
+        resolved_user_id = None
+        try:
+            # Prefer matching by called_number (your provisioned business number)
+            candidates = []
+            for raw in [called_number, (called_number or "").lstrip("+")]:
+                v = (raw or "").strip()
+                if v and v not in candidates:
+                    candidates.append(v)
+            digits = "".join(ch for ch in (called_number or "") if ch.isdigit())
+            if digits and digits not in candidates:
+                candidates.append(digits)
+            if digits and ("+" + digits) not in candidates:
+                candidates.append("+" + digits)
+            while len(candidates) < 4:
+                candidates.append(candidates[-1] if candidates else "")
+
+            cursor.execute(
+                "SELECT user_id FROM account_settings WHERE phone_number IN (?, ?, ?, ?) LIMIT 1",
+                tuple(candidates[:4]),
+            )
+            row = cursor.fetchone()
+            if row:
+                resolved_user_id = row[0]
+        except Exception:
+            resolved_user_id = None
+        
+        # Try to find matching call record (by phoneCallId or recent call from this number)
+        call_uuid = None
+        if phone_call_id:
+            cursor.execute('SELECT call_uuid FROM calls WHERE call_uuid = ?', (phone_call_id,))
+            result = cursor.fetchone()
+            if result:
+                call_uuid = result[0]
+        
+        if not call_uuid and caller_number:
+            # Best-effort: find most recent call from this caller within 30 minutes.
+            # Use created_at for SQLite datetime comparisons (start_time is ISO text).
+            cursor.execute(
+                '''
+                SELECT call_uuid FROM calls
+                WHERE caller_number = ?
+                  AND created_at > datetime('now', '-30 minutes')
+                ORDER BY created_at DESC
+                LIMIT 1
+                ''',
+                (caller_number,),
+            )
+            result = cursor.fetchone()
+            if result:
+                call_uuid = result[0]
+        
+        if call_uuid:
+            # Update existing call with Vapi data
+            logger.info(f"[{call_uuid}] Updating call with Vapi transcript and recording")
+            
+            update_fields = []
+            update_values = []
+            
+            if transcript_text:
+                update_fields.append("transcript = ?")
+                update_values.append(transcript_text)
+            
+            if recording_url or stereo_recording_url:
+                update_fields.append("recording_url = ?")
+                update_values.append(stereo_recording_url or recording_url)
+            
+            if duration > 0:
+                update_fields.append("duration = ?")
+                update_values.append(duration)
+            
+            if ended_at:
+                update_fields.append("end_time = ?")
+                update_values.append(ended_at)
+
+            if called_number:
+                update_fields.append("called_number = COALESCE(called_number, ?)")
+                update_values.append(called_number)
+
+            if resolved_user_id is not None:
+                update_fields.append("user_id = COALESCE(user_id, ?)")
+                update_values.append(resolved_user_id)
+            
+            if update_fields:
+                update_values.append(call_uuid)
+                cursor.execute(f'''
+                    UPDATE calls 
+                    SET {", ".join(update_fields)}
+                    WHERE call_uuid = ?
+                ''', update_values)
+                conn.commit()
+                
+                # Generate AI summary if transcript available
+                if transcript_text:
+                    asyncio.create_task(CallLogger.generate_summary(call_uuid))
+        else:
+            # Create new call record from Vapi data
+            logger.info(f"📞 Creating new call record from Vapi webhook: {call_id}")
+            call_uuid = phone_call_id or call_id or f"vapi_{int(time.time())}"
+            
+            cursor.execute(
+                '''
+                INSERT INTO calls (call_uuid, caller_number, called_number, start_time, end_time, duration, transcript, recording_url, summary, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    call_uuid,
+                    caller_number,
+                    called_number or None,
+                    started_at or datetime.now().isoformat(),
+                    ended_at or datetime.now().isoformat(),
+                    duration,
+                    transcript_text,
+                    stereo_recording_url or recording_url,
+                    "Processing...",
+                    resolved_user_id,
+                ),
+            )
+            conn.commit()
+            
+            # Generate AI summary
+            if transcript_text:
+                asyncio.create_task(CallLogger.generate_summary(call_uuid))
+        
+        conn.close()
+        logger.info(f"✅ Vapi call data saved for {call_uuid}")
+        
+        return JSONResponse({"status": "success", "call_uuid": call_uuid})
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing Vapi end-of-call webhook: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
+
+
+@app.post("/webhooks/vapi/book-appointment")
+async def vapi_book_appointment(request: Request):
+    """Vapi tool endpoint: create a provisional appointment.
+
+    Auth:
+    - token query string (?token=...) OR header X-Vapi-Tool-Token
+    The token is generated per-call and registered in-memory.
+    """
+    try:
+        token = (
+            (request.query_params.get("token") or "").strip()
+            or (request.headers.get("x-vapi-tool-token") or "").strip()
+        )
+        ctx = _get_vapi_tool_context(token)
+        if not ctx:
+            # Return 200 with structured error so tool-call LLM can react.
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "unauthorized",
+                    "message": "Invalid or expired booking token.",
+                }
+            )
+
+        logger.info(f"📅 Vapi booking tool called (call_uuid={ctx.get('call_uuid')}, user_id={ctx.get('user_id')})")
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        date_in = (body.get("date") or "").strip()
+        time_in = (body.get("time") or body.get("time_str") or "").strip()
+        date, time_str, norm_notes = _normalize_appointment_date_time_inputs(body)
+        customer_name = (body.get("customer_name") or body.get("customerName") or "").strip()
+        customer_phone = (body.get("customer_phone") or body.get("customerPhone") or "").strip()
+        description = (body.get("description") or "").strip()
+
+        if not date or not time_str:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "invalid_datetime",
+                    "message": "Invalid or missing date/time. Please provide date as YYYY-MM-DD and time as HH:MM (24-hour).",
+                    "received": {
+                        "date": date_in,
+                        "time": time_in,
+                        "datetime": body.get("datetime") or body.get("dateTime") or body.get("start") or body.get("start_time"),
+                    },
+                }
+            )
+
+        try:
+            logger.info(f"📅 Vapi booking normalized datetime: date={date} time={time_str} notes={norm_notes}")
+        except Exception:
+            pass
+
+        user_id = ctx.get("user_id")
+        call_uuid = (ctx.get("call_uuid") or "").strip() or (body.get("call_uuid") or "").strip()
+
+        caller_number = ""
+        try:
+            if call_uuid:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT caller_number FROM calls WHERE call_uuid = ? LIMIT 1', (call_uuid,))
+                row = cursor.fetchone()
+                conn.close()
+                if row and row[0]:
+                    caller_number = str(row[0])
+        except Exception:
+            caller_number = ""
+
+        result = _book_provisional_appointment_db(
+            call_uuid=call_uuid or "",
+            user_id=int(user_id) if user_id is not None else None,
+            caller_number=caller_number,
+            date=date,
+            time_str=time_str,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            description=description,
+            transcript_text="",
+        )
+
+        try:
+            logger.info(f"📅 Vapi booking result: success={bool(result.get('success'))} error={result.get('error')}")
+        except Exception:
+            pass
+
+        return JSONResponse(result)
+    except Exception as e:
+        logger.error(f"❌ Vapi booking webhook error: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": "server_error", "message": "Booking failed."})
+
+
+@app.post("/webhooks/vapi/check-availability")
+async def vapi_check_availability(request: Request):
+    """Vapi tool endpoint: check available slots for a given date."""
+    try:
+        token = (
+            (request.query_params.get("token") or "").strip()
+            or (request.headers.get("x-vapi-tool-token") or "").strip()
+        )
+        ctx = _get_vapi_tool_context(token)
+        if not ctx:
+            return JSONResponse(
+                {"success": False, "error": "unauthorized", "message": "Invalid or expired token."}
+            )
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        date_in = (body.get("date") or "").strip()
+        date, _time_unused, norm_notes = _normalize_appointment_date_time_inputs(body)
+        user_id = ctx.get("user_id")
+
+        if not date:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "invalid_date",
+                    "message": "Invalid or missing date. Please provide YYYY-MM-DD (e.g. 2026-01-16).",
+                    "received": {
+                        "date": date_in,
+                        "datetime": body.get("datetime") or body.get("dateTime") or body.get("start") or body.get("start_time"),
+                    },
+                }
+            )
+
+        try:
+            logger.info(
+                f"📅 Vapi availability tool called (call_uuid={ctx.get('call_uuid')}, user_id={user_id}, date={date} notes={norm_notes})"
+            )
+        except Exception:
+            pass
+
+        result = _compute_availability_slots_db(
+            user_id=int(user_id) if user_id is not None else None,
+            date=date,
+        )
+
+        try:
+            logger.info(
+                f"📅 Vapi availability result: requested={result.get('requested_date') or result.get('date')} returned_date={result.get('date')} slots={len(result.get('slots') or [])}"
+            )
+        except Exception:
+            pass
+
+        return JSONResponse(result)
+    except Exception as e:
+        logger.error(f"❌ Vapi availability webhook error: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": "server_error", "message": "Availability check failed."})
+
+
+@app.post("/webhooks/vapi-status")
+async def vapi_status_webhook(request: Request):
+    """
+    Vapi Status Webhook
+    -------------------
+    Receives real-time status updates from Vapi (call started, ended, etc.)
+    Configure this URL in Vapi Dashboard: Status Callback URL
+    """
+    try:
+        data = await request.json()
+        message_type = data.get("type", data.get("message", {}).get("type", "unknown"))
+        logger.info(f"📊 Vapi status: {message_type} - {str(data)[:300]}")
+        
+        # Extract call info
+        call = data.get("call", {})
+        call_id = call.get("id", "")
+        phone_call_id = call.get("phoneCallId", "")
+        
+        # Log different event types
+        if message_type == "status-update":
+            status = data.get("status", "unknown")
+            logger.info(f"📞 Vapi call {call_id}: status={status}")
+        elif message_type == "transcript":
+            # Real-time transcript update
+            transcript_type = data.get("transcriptType", "")
+            transcript_text = data.get("transcript", "")
+            logger.info(f"📝 Vapi transcript ({transcript_type}): {transcript_text[:100]}")
+        elif message_type == "end-of-call-report":
+            # This is handled by /webhooks/vapi-end-of-call instead
+            logger.info(f"📊 Vapi end-of-call report received (redirecting to dedicated endpoint)")
+        
+        return JSONResponse({"status": "received"})
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing Vapi status webhook: {e}")
+        return JSONResponse({"status": "error"}, status_code=500)
+
+
 @app.api_route("/webhooks/events", methods=["GET", "POST"])
 async def call_events(request: Request):
     """
@@ -16702,6 +22101,137 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
     
     session.vonage_ws = websocket
 
+    # ==== VAPI WEBSOCKET BRIDGE HANDLING ====
+    if isinstance(session, DailyBotSession):
+        logger.info(f"[{call_uuid}] 🌉 Using Vapi websocket bridge")
+
+        provider_mode = str(getattr(session, 'voice_provider', '') or '').strip().lower()
+
+        # Start Vapi websocket bridge (with a couple of retries for transient Vapi/websocket issues)
+        bot_started = False
+        for attempt in range(1, 4):
+            bot_started = await session.start()
+            if bot_started:
+                break
+            logger.warning(f"[{call_uuid}] ⚠️ Vapi websocket bridge start failed (attempt {attempt}/3)")
+            await asyncio.sleep(0.35 * attempt)
+
+        if not bot_started:
+            # If the account is configured for Vapi, do NOT silently switch providers.
+            # The user explicitly wants Vapi voice and does not want Speechmatics fallback.
+            if provider_mode in {"vapi", "vapi_assistant"}:
+                logger.error(f"[{call_uuid}] ❌ Failed to start Vapi websocket bridge; not falling back to Speechmatics (Vapi is required)")
+                try:
+                    await session.cleanup(log_call_end=True)
+                except Exception:
+                    pass
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+                return
+
+            # Otherwise, fall back to the existing pipeline.
+            logger.error(f"[{call_uuid}] ❌ Failed to start Vapi websocket bridge; falling back to Speechmatics")
+            try:
+                await session.cleanup(log_call_end=False)
+            except Exception:
+                pass
+
+            fallback = CallSession(call_uuid, getattr(session, 'caller', '') or '', getattr(session, 'called', '') or '')
+            # Carry over loaded config so the call still behaves like the user's settings.
+            for attr in [
+                'user_id',
+                'user_voice',
+                'use_elevenlabs',
+                'elevenlabs_voice_id',
+                'cartesia_voice_id',
+                'google_voice',
+                'playht_voice_id',
+                'speechmatics_voice_id',
+                'lemonfox_voice',
+                'business_info',
+                'agent_personality',
+                'agent_instructions',
+                'agent_name',
+                'call_greeting',
+                'transfer_number',
+                'transfer_people',
+                'transfer_instructions',
+                'call_mode',
+                'calendar_booking_enabled',
+                'tasks_enabled',
+                'advanced_voice_enabled',
+                'sales_detector_enabled',
+            ]:
+                if hasattr(session, attr):
+                    try:
+                        setattr(fallback, attr, getattr(session, attr))
+                    except Exception:
+                        pass
+
+            # Force a speak-capable provider for fallback so we don't get dead air.
+            safe_fallback_provider = 'speechmatics' if str(CONFIG.get('SPEECHMATICS_API_KEY', '') or '').strip() else 'openai'
+            fallback.voice_provider = safe_fallback_provider
+
+            try:
+                fallback.lock_brain_provider_for_call()
+            except Exception:
+                pass
+
+            try:
+                sessions._sessions[call_uuid] = fallback
+            except Exception:
+                pass
+
+            # Important: the fallback session must keep the active Vonage WebSocket.
+            fallback.vonage_ws = websocket
+            session = fallback
+        else:
+            # Vapi bridge is now handling audio bridging in background tasks.
+            # IMPORTANT: do not read from the Vonage websocket here, or we'll
+            # conflict with the bridge task (double recv) and crash.
+            try:
+                from starlette.websockets import WebSocketState
+
+                while session.is_active and websocket.client_state == WebSocketState.CONNECTED:
+                    await asyncio.sleep(1.0)
+            except Exception as e:
+                logger.error(f"[{call_uuid}] ❌ Vapi websocket bridge loop error: {e}")
+            finally:
+                await session.cleanup()
+                await websocket.close()
+
+            return
+    
+    # ==== TRADITIONAL SESSION HANDLING (OpenAI/Speechmatics) ====
+    
+    # FAST-PATH GREETING: Send greeting BEFORE OpenAI connection to eliminate 14-second delay
+    # This gives immediate response to caller while OpenAI connects in parallel
+    try:
+        strict_greeting = getattr(session, 'call_greeting', '') or ''
+        voice_provider = str(getattr(session, 'voice_provider', 'openai') or 'openai').strip().lower()
+
+        # Only use fast-path greeting for providers that can speak without OpenAI.
+        # Never do this for Vapi providers (Vapi will handle the first message in its own voice).
+        can_fast_greet = (voice_provider != 'openai') and (not voice_provider.startswith('vapi'))
+        if can_fast_greet:
+            if strict_greeting.strip():
+                fast_greeting = strict_greeting.strip()
+            else:
+                agent_name = getattr(session, 'agent_name', None) or CONFIG.get('AGENT_NAME', 'Hello')
+                fast_greeting = f"Hello, this is {agent_name}. How can I help you today?"
+            
+            logger.info(f"[{call_uuid}] ⚡ FAST GREETING (before OpenAI connect): {fast_greeting}")
+            await session._speak_text_via_voice_provider(fast_greeting)
+            session.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {fast_greeting}")
+            try:
+                session._fast_greeting_sent = True
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"[{call_uuid}] Fast greeting failed (non-critical): {e}")
+    
     # Ensure OpenAI is connected BEFORE we start consuming caller audio.
     if not session.openai_ws:
         openai_connect_start = time.time()
@@ -16717,32 +22247,39 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
         session.start_openai_listener()
         session.start_credit_monitor()
     
-    # Trigger the greeting immediately.
+    # Trigger the greeting immediately (or skip if fast greeting already sent).
     # If the call is locked to a non-OpenAI brain, do NOT use OpenAI to generate the greeting,
     # otherwise the call will be recorded as OpenAI usage and may start producing OpenAI turns.
+    greeting_already_sent = False
     try:
-        brain_provider = "openai"
+        greeting_already_sent = bool(getattr(session, '_fast_greeting_sent', False))
+        if greeting_already_sent:
+            logger.info(f"[{call_uuid}] ⚡ Skipping duplicate greeting (already sent via fast path)")
+    except Exception:
+        pass
+    
+    if not greeting_already_sent:
         try:
-            brain_provider = str(session._effective_brain_provider() or "openai").strip().lower()
-        except Exception:
-            brain_provider = "openai"
+            # Ensure we don't start the call in a permanently-blocked audio state due to VAD misfires.
+            try:
+                session._block_outbound_audio = False
+                session._caller_vad_speaking = False
+                session._caller_speaking = False
+                session._agent_audio_pause_started_at = None
+                session._clear_paused_agent_audio()
+                session._bypass_vad_audio_until = asyncio.get_event_loop().time() + 2.5
+            except Exception:
+                pass
 
-        strict_greeting = getattr(session, 'call_greeting', '') or ''
-        logger.info(f"[{call_uuid}] ⭐ GREETING CONFIG: strict_greeting = '{strict_greeting}'")
+            try:
+                brain_provider = str(session._effective_brain_provider() or "openai").strip().lower()
+            except Exception:
+                brain_provider = "openai"
 
-        if brain_provider != "openai":
-            # Fast, deterministic greeting (low latency) without invoking OpenAI.
-            if strict_greeting.strip():
-                greeting_text = strict_greeting.strip()
-                logger.info(f"[{call_uuid}] ⭐ Using STRICT greeting (non-OpenAI brain): {greeting_text}")
-            else:
-                agent_name = getattr(session, 'agent_name', None) or CONFIG.get('AGENT_NAME', 'Hello')
-                greeting_text = f"Hello, this is {agent_name}. How can I help you today?"
-                logger.info(f"[{call_uuid}] ⭐ Using DEFAULT greeting (non-OpenAI brain)")
+            strict_greeting = getattr(session, 'call_greeting', '') or ''
+            logger.info(f"[{call_uuid}] ⭐ GREETING CONFIG: strict_greeting = '{strict_greeting}'")
 
-            await session._speak_text_via_voice_provider(greeting_text)
-            session.transcript_parts.append(f"{CONFIG['AGENT_NAME']}: {greeting_text}")
-        else:
+            # OpenAI brain greeting (generates the greeting via OpenAI).
             if session.openai_ws:
                 if strict_greeting.strip():
                     greet_instructions = (
@@ -16765,8 +22302,8 @@ async def websocket_endpoint(websocket: WebSocket, call_uuid: str):
                 logger.info(f"[{call_uuid}] ✅ Greeting triggered successfully")
             else:
                 logger.error(f"[{call_uuid}] ❌ OpenAI WebSocket not connected!")
-    except Exception as e:
-        logger.error(f"[{call_uuid}] ❌ Failed to trigger greeting: {e}")
+        except Exception as e:
+            logger.error(f"[{call_uuid}] ❌ Failed to trigger greeting: {e}")
     
     try:
         while True:
@@ -17124,7 +22661,13 @@ async def get_account_config(user_id: int):
                 u.name,
                 COALESCE(a.phone_number, '') as phone_number,
                 COALESCE(a.business_info, '') as business_info,
-                COALESCE(a.call_greeting, '') as call_greeting
+                COALESCE(a.call_greeting, '') as call_greeting,
+                COALESCE(a.voice_provider, 'openai') as voice_provider,
+                COALESCE(a.voice, 'shimmer') as openai_voice,
+                COALESCE(a.google_voice, 'en-GB-Standard-A') as google_voice,
+                COALESCE(a.speechmatics_voice_id, 'sarah') as speechmatics_voice_id,
+                COALESCE(a.cartesia_voice_id, 'a0e99841-438c-4a64-b679-ae501e7d6091') as cartesia_voice_id,
+                COALESCE(a.lemonfox_voice, 'heart') as lemonfox_voice
             FROM users u
             LEFT JOIN account_settings a ON u.id = a.user_id
             WHERE u.id = ?
@@ -17146,11 +22689,78 @@ async def get_account_config(user_id: int):
                 "PHONE_NUMBER": row[2],
                 "BUSINESS_INFO": row[3],
                 "CALL_GREETING": row[4],
+                "VOICE_PROVIDER": row[5],
+                "VOICE": row[6],
+                "GOOGLE_VOICE": row[7],
+                "SPEECHMATICS_VOICE_ID": row[8],
+                "CARTESIA_VOICE_ID": row[9],
+                "LEMONFOX_VOICE": row[10],
             },
         }
     except Exception as e:
         logger.error(f"Failed to get account config for user {user_id}: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/account-voice-settings")
+async def super_admin_update_account_voice_settings(request: Request):
+    """Update an account's voice provider + voice ids (super-admin tool).
+
+    This endpoint is intentionally narrow: it only updates voice-related fields
+    and does not touch other account settings.
+    """
+    try:
+        body = await request.json()
+
+        user_id = body.get("user_id")
+        if not user_id:
+            return JSONResponse({"success": False, "error": "user_id is required"}, status_code=400)
+
+        voice_provider = (body.get("voice_provider") or "openai").strip().lower()
+        openai_voice = body.get("openai_voice")
+        google_voice = body.get("google_voice")
+        speechmatics_voice_id = body.get("speechmatics_voice_id")
+        cartesia_voice_id = body.get("cartesia_voice_id")
+        lemonfox_voice = body.get("lemonfox_voice")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE account_settings
+            SET voice_provider = ?,
+                voice = ?,
+                google_voice = ?,
+                speechmatics_voice_id = ?,
+                cartesia_voice_id = ?,
+                lemonfox_voice = ?
+            WHERE user_id = ?
+            ''',
+            (
+                voice_provider,
+                openai_voice,
+                google_voice,
+                speechmatics_voice_id,
+                cartesia_voice_id,
+                lemonfox_voice,
+                user_id,
+            ),
+        )
+
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        return JSONResponse(
+            {
+                "success": True,
+                "message": "Account voice settings updated",
+                "rows_affected": rows_affected,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to update account voice settings (super-admin): {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 @app.post("/api/super-admin/unsuspend-account")
@@ -17737,6 +23347,56 @@ async def update_global_instructions(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/vapi-assistants")
+async def get_vapi_assistants():
+    """Get global Vapi assistants list"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT value FROM global_config WHERE key = ?', ('vapi_assistants',))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            assistants = json.loads(result[0])
+            return {"success": True, "assistants": assistants}
+        else:
+            return {"success": True, "assistants": []}
+    except Exception as e:
+        logger.error(f"Failed to get Vapi assistants: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/vapi-assistants")
+async def update_vapi_assistants(request: Request):
+    """Update global Vapi assistants list"""
+    try:
+        body = await request.json()
+        assistants = body.get('assistants', [])
+        
+        logger.info(f"📝 Updating Vapi assistants (count: {len(assistants)})")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert or update in global_config
+        cursor.execute('''
+            INSERT INTO global_config (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        ''', ('vapi_assistants', json.dumps(assistants)))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Vapi assistants updated successfully")
+        
+        return {"success": True, "message": "Vapi assistants saved successfully!"}
+    except Exception as e:
+        logger.error(f"Failed to update Vapi assistants: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/filler-words")
 async def get_filler_words():
     """Get global filler words/phrases (newline-separated)."""
@@ -18050,6 +23710,104 @@ async def update_backchannel_settings(request: Request):
         }
     except Exception as e:
         logger.error(f"Failed to update backchannel settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/timeout-test-settings")
+async def get_timeout_test_settings():
+    """Get current timeout test settings for development/testing."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT timeout_test_enabled, timeout_test_seconds, last_updated, updated_by '
+            'FROM global_settings WHERE id = 1'
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return {
+                "success": True,
+                "settings": {
+                    "timeout_test_enabled": False,
+                    "timeout_test_seconds": 2.0,
+                },
+                "last_updated": None,
+                "updated_by": None,
+            }
+
+        (
+            timeout_test_enabled,
+            timeout_test_seconds,
+            last_updated,
+            updated_by,
+        ) = row
+
+        return {
+            "success": True,
+            "settings": {
+                "timeout_test_enabled": bool(timeout_test_enabled) if timeout_test_enabled is not None else False,
+                "timeout_test_seconds": float(timeout_test_seconds) if timeout_test_seconds is not None else 2.0,
+            },
+            "last_updated": last_updated,
+            "updated_by": updated_by,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get timeout test settings: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/timeout-test-settings")
+async def update_timeout_test_settings(request: Request):
+    """Update timeout test settings for development/testing."""
+    try:
+        body = await request.json()
+        updated_by = body.get("updated_by", "admin")
+        settings = body.get("settings") if isinstance(body.get("settings"), dict) else body
+
+        timeout_test_enabled = 1 if bool(settings.get("timeout_test_enabled", False)) else 0
+
+        try:
+            timeout_test_seconds = float(settings.get("timeout_test_seconds", 2.0))
+        except Exception:
+            timeout_test_seconds = 2.0
+        timeout_test_seconds = max(0.5, min(10.0, timeout_test_seconds))
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET timeout_test_enabled = ?,
+                timeout_test_seconds = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (
+                timeout_test_enabled,
+                timeout_test_seconds,
+                updated_by,
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        # Update CONFIG immediately
+        CONFIG["TIMEOUT_TEST_ENABLED"] = bool(timeout_test_enabled)
+        CONFIG["TIMEOUT_TEST_SECONDS"] = timeout_test_seconds
+
+        return {
+            "success": True,
+            "message": "Timeout test settings updated",
+            "settings": {
+                "timeout_test_enabled": bool(timeout_test_enabled),
+                "timeout_test_seconds": timeout_test_seconds,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to update timeout test settings: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -18434,6 +24192,215 @@ async def save_vonage_keys_route(request: Request):
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
+@app.get("/api/super-admin/cartesia-key")
+async def get_cartesia_key_status():
+    """Check if Cartesia API key is configured"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT cartesia_api_key FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
+        return {
+            "success": True,
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else "",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get Cartesia key status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/cartesia-key")
+async def save_cartesia_key(request: Request):
+    """Save Cartesia API key globally"""
+    try:
+        body = await request.json()
+        api_key = body.get('api_key', '').strip()
+        updated_by = body.get('updated_by', 'admin')
+
+        if not api_key:
+            return JSONResponse({"success": False, "error": "API key is required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET cartesia_api_key = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (_encrypt_secret(api_key), updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["CARTESIA_API_KEY"] = api_key
+        _init_cartesia_client()
+
+        logger.info(f"✅ Cartesia API key updated by {updated_by}")
+        return {"success": True, "message": "Cartesia API key saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to save Cartesia API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/lemonfox-key")
+async def get_lemonfox_key_status():
+    """Check if Lemonfox API key is configured"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT lemonfox_api_key FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
+        return {
+            "success": True,
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else "",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get Lemonfox key status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/lemonfox-key")
+async def save_lemonfox_key(request: Request):
+    """Save Lemonfox API key globally"""
+    try:
+        body = await request.json()
+        api_key = body.get('api_key', '').strip()
+        updated_by = body.get('updated_by', 'admin')
+
+        if not api_key:
+            return JSONResponse({"success": False, "error": "API key is required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET lemonfox_api_key = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (_encrypt_secret(api_key), updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["LEMONFOX_API_KEY"] = api_key
+
+        logger.info(f"✅ Lemonfox API key updated by {updated_by}")
+        return {"success": True, "message": "Lemonfox API key saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to save Lemonfox API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/vapi-key")
+async def get_vapi_key_status():
+    """Check if Vapi API key is configured"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT vapi_api_key FROM global_settings WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+
+        decrypted = _decrypt_secret(result[0] if result else None)
+        configured = bool(decrypted)
+        return {
+            "success": True,
+            "key_set": configured,
+            "configured": configured,
+            "api_key_preview": _secret_preview(decrypted) if configured else "",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get Vapi key status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/vapi-key")
+async def save_vapi_key(request: Request):
+    """Save Vapi API key globally"""
+    try:
+        body = await request.json()
+        api_key = body.get('api_key', '').strip()
+        updated_by = body.get('updated_by', 'admin')
+
+        if not api_key:
+            return JSONResponse({"success": False, "error": "API key is required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET vapi_api_key = ?,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (_encrypt_secret(api_key), updated_by),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["VAPI_API_KEY"] = api_key
+
+        logger.info(f"✅ Vapi API key updated by {updated_by}")
+        return {"success": True, "message": "Vapi API key saved successfully"}
+    except Exception as e:
+        logger.error(f"Failed to save Vapi API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/super-admin/vapi-key")
+async def delete_vapi_key(request: Request):
+    """Delete (clear) the globally saved Vapi API key."""
+    try:
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        updated_by = str(body.get('updated_by', 'admin') or 'admin').strip() or 'admin'
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE global_settings
+            SET vapi_api_key = NULL,
+                last_updated = CURRENT_TIMESTAMP,
+                updated_by = ?
+            WHERE id = 1
+            ''',
+            (updated_by,),
+        )
+        conn.commit()
+        conn.close()
+
+        CONFIG["VAPI_API_KEY"] = ""
+
+        logger.info(f"🗑️ Vapi API key deleted by {updated_by}")
+        return {"success": True, "message": "Vapi API key deleted"}
+    except Exception as e:
+        logger.error(f"Failed to delete Vapi API key: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/super-admin/vonage-app")
 async def get_vonage_app_status():
     """Check if Vonage application JWT config is present (application id + private key)."""
@@ -18648,17 +24615,18 @@ async def save_brain_provider(request: Request):
 
 @app.get("/api/super-admin/recent-calls")
 async def get_recent_calls_analysis():
-    """Get last 5 calls with basic info for analysis selection"""
+    """Get last 20 calls with basic info for latency analysis selection"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Backward-compatible: ensure auditing columns exist.
+        # Backward-compatible: ensure columns exist.
         _ensure_column(cursor, "calls", "selected_brain_provider", "TEXT")
         _ensure_column(cursor, "calls", "effective_brain_provider", "TEXT")
         _ensure_column(cursor, "calls", "brain_gating_reasons", "TEXT")
         _ensure_column(cursor, "calls", "openai_fallback_turns", "INTEGER DEFAULT 0")
         _ensure_column(cursor, "calls", "openai_fallback_reasons", "TEXT")
+        _ensure_column(cursor, "calls", "call_label", "TEXT")
         
         cursor.execute('''
             SELECT 
@@ -18675,12 +24643,13 @@ async def get_recent_calls_analysis():
                 c.effective_brain_provider,
                 c.brain_gating_reasons,
                 c.openai_fallback_turns,
-                c.openai_fallback_reasons
+                c.openai_fallback_reasons,
+                c.call_label
             FROM calls c
             LEFT JOIN users u ON c.user_id = u.id
             WHERE c.end_time IS NOT NULL
             ORDER BY c.start_time DESC
-            LIMIT 5
+            LIMIT 20
         ''')
         
         calls = []
@@ -18700,12 +24669,111 @@ async def get_recent_calls_analysis():
                 "brain_gating_reasons": row[11],
                 "openai_fallback_turns": row[12],
                 "openai_fallback_reasons": row[13],
+                "call_label": row[14],
             })
         
         conn.close()
         return {"success": True, "calls": calls}
     except Exception as e:
         logger.error(f"Failed to get recent calls: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/call-latency-events/{call_uuid}")
+async def get_call_latency_events(call_uuid: str):
+    """Get detailed latency events for a specific call (for diagnostics UI)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get call basic info
+        cursor.execute('''
+            SELECT 
+                call_uuid,
+                caller_number,
+                start_time,
+                end_time,
+                duration,
+                call_label
+            FROM calls
+            WHERE call_uuid = ?
+        ''', (call_uuid,))
+        
+        call_info = cursor.fetchone()
+        if not call_info:
+            conn.close()
+            return JSONResponse({"success": False, "error": "Call not found"}, status_code=404)
+        
+        # Get latency events
+        cursor.execute('''
+            SELECT 
+                turn_index,
+                ts_epoch,
+                event_name,
+                ms_from_turn_start,
+                meta_json,
+                created_at
+            FROM call_latency_events
+            WHERE call_uuid = ?
+            ORDER BY turn_index ASC, ts_epoch ASC
+        ''', (call_uuid,))
+        
+        events = []
+        for row in cursor.fetchall():
+            meta = None
+            if row[4]:
+                try:
+                    import json
+                    meta = json.loads(row[4])
+                except Exception:
+                    meta = None
+            events.append({
+                "turn_index": row[0],
+                "ts_epoch": row[1],
+                "event_name": row[2],
+                "ms_from_turn_start": row[3],
+                "meta": meta,
+                "created_at": row[5],
+            })
+        
+        conn.close()
+        return {
+            "success": True,
+            "call_info": {
+                "call_uuid": call_info[0],
+                "caller_number": call_info[1],
+                "start_time": call_info[2],
+                "end_time": call_info[3],
+                "duration": call_info[4],
+                "call_label": call_info[5] or "",
+            },
+            "events": events
+        }
+    except Exception as e:
+        logger.error(f"Failed to get call latency events: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/super-admin/update-call-label")
+async def update_call_label(request: Request):
+    """Update the label for a call (e.g., \"Test 1\", \"Test 2\") for easier identification"""
+    try:
+        body = await request.json()
+        call_uuid = body.get("call_uuid", "").strip()
+        label = body.get("label", "").strip()
+        
+        if not call_uuid:
+            return JSONResponse({"success": False, "error": "call_uuid required"}, status_code=400)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE calls SET call_label = ? WHERE call_uuid = ?", (label, call_uuid))
+        conn.commit()
+        conn.close()
+        
+        return {"success": True, "call_uuid": call_uuid, "label": label}
+    except Exception as e:
+        logger.error(f"Failed to update call label: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -19019,6 +25087,32 @@ if __name__ == "__main__":
     
     print(f"Starting server on http://{CONFIG['HOST']}:{CONFIG['PORT']}")
     print()
+    
+    # Auto-sync Vonage webhooks with current tunnel URL
+    try:
+        provider, public_url = _get_global_tunnel_settings()
+        
+        # For Cloudflare, check log file for latest URL if DB is empty/old
+        if provider == "cloudflare" and not public_url:
+            try:
+                url_from_log = _normalize_public_url(_latest_trycloudflare_url_from_log("cloudflared_quick.log") or "")
+                if url_from_log:
+                    public_url = url_from_log
+                    _persist_public_url(url_from_log)
+                    logger.info(f"📋 Detected Cloudflare URL from log: {url_from_log}")
+            except Exception:
+                pass
+        
+        if public_url and public_url != "https://unfasciate-unsurlily-suzanna.ngrok-free.dev":
+            logger.info(f"🔄 Syncing Vonage webhooks with tunnel URL ({provider}): {public_url}")
+            if _update_vonage_application_webhooks(public_url):
+                logger.info("✅ Vonage webhooks automatically synced on startup")
+            else:
+                logger.warning("⚠️ Could not auto-sync Vonage webhooks - check credentials")
+        else:
+            logger.info("ℹ️ No tunnel URL configured - skipping webhook auto-sync")
+    except Exception as e:
+        logger.warning(f"Webhook auto-sync failed: {e}")
     
     uvicorn.run(
         app,

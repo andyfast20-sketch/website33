@@ -689,6 +689,52 @@
                 </div>
             </div>
 
+            <!-- Vapi Assistants -->
+            <div class="panel">
+                <h2>🎙️ Vapi Assistants (Pre-configured)</h2>
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">
+                    Manage pre-configured Vapi assistants that users can select. Create assistants at 
+                    <a href="https://dashboard.vapi.ai" target="_blank" style="color: #6495ed;">dashboard.vapi.ai</a> 
+                    and add them here for all users to access.
+                </p>
+                
+                <div style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">➕ Add New Assistant</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: end;">
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,0.9);">Name</label>
+                            <input type="text" id="vapiAssistantName" placeholder="e.g., Fast Customer Service" 
+                                style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,0.9);">Assistant ID (from Vapi)</label>
+                            <input type="text" id="vapiAssistantId" placeholder="e.g., 677f4245-ef59-4d95-a877-e037e97b8bfe" 
+                                style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="addVapiAssistant()" style="padding: 10px 20px;">
+                            ➕ Add
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">📋 Current Assistants</h3>
+                    <div id="vapiAssistantsList" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 15px; min-height: 100px;">
+                        <p style="color: rgba(255,255,255,0.5); text-align: center;">No assistants added yet</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn btn-primary" onclick="saveVapiAssistants()">
+                        💾 Save Assistants
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadVapiAssistants()">
+                        🔄 Reload
+                    </button>
+                    <span id="vapiAssistantsStatus" style="color: rgba(255,255,255,0.6); font-size: 14px;"></span>
+                </div>
+            </div>
+
             <!-- Filler Words -->
             <div class="panel">
                 <h2>🗣️ Filler Words</h2>
@@ -865,6 +911,7 @@
             loadApiKeys(); // Load API keys
             loadVonageKeys(); // Load vonage keys
             loadGlobalInstructions(); // Load global instructions
+            loadVapiAssistants(); // Load Vapi assistants
             loadFillerWords(); // Load filler words
             setInterval(refreshDashboard, 30000); // Auto-refresh every 30 seconds
         });
@@ -1860,6 +1907,107 @@
                 console.error('Failed to save global instructions:', error);
                 showMessage('❌ Failed to save global instructions', 'error');
                 document.getElementById('globalInstructionsStatus').textContent = '❌ Error';
+            }
+        }
+
+        // Vapi Assistants Management
+        let globalVapiAssistants = [];
+
+        async function loadVapiAssistants() {
+            try {
+                const response = await fetch('/api/super-admin/vapi-assistants');
+                const data = await response.json();
+                
+                if (data.success) {
+                    globalVapiAssistants = data.assistants || [];
+                    renderVapiAssistantsList();
+                    document.getElementById('vapiAssistantsStatus').textContent = '';
+                } else {
+                    document.getElementById('vapiAssistantsStatus').textContent = '❌ Failed to load';
+                }
+            } catch (error) {
+                console.error('Failed to load Vapi assistants:', error);
+                document.getElementById('vapiAssistantsStatus').textContent = '❌ Failed to load';
+            }
+        }
+
+        function renderVapiAssistantsList() {
+            const container = document.getElementById('vapiAssistantsList');
+            
+            if (globalVapiAssistants.length === 0) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">No assistants added yet</p>';
+                return;
+            }
+            
+            container.innerHTML = globalVapiAssistants.map((assistant, index) => `
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">${assistant.name}</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.6); font-family: monospace;">${assistant.id}</div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="removeVapiAssistant(${index})" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.3);">
+                        🗑️ Remove
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function addVapiAssistant() {
+            const name = document.getElementById('vapiAssistantName').value.trim();
+            const id = document.getElementById('vapiAssistantId').value.trim();
+            
+            if (!name || !id) {
+                alert('Please enter both name and assistant ID');
+                return;
+            }
+            
+            // Check for duplicates
+            if (globalVapiAssistants.some(a => a.id === id)) {
+                alert('An assistant with this ID already exists');
+                return;
+            }
+            
+            globalVapiAssistants.push({ name, id });
+            renderVapiAssistantsList();
+            
+            // Clear inputs
+            document.getElementById('vapiAssistantName').value = '';
+            document.getElementById('vapiAssistantId').value = '';
+            
+            document.getElementById('vapiAssistantsStatus').textContent = '⚠️ Unsaved changes';
+        }
+
+        function removeVapiAssistant(index) {
+            if (confirm(`Remove "${globalVapiAssistants[index].name}"?`)) {
+                globalVapiAssistants.splice(index, 1);
+                renderVapiAssistantsList();
+                document.getElementById('vapiAssistantsStatus').textContent = '⚠️ Unsaved changes';
+            }
+        }
+
+        async function saveVapiAssistants() {
+            try {
+                document.getElementById('vapiAssistantsStatus').textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/super-admin/vapi-assistants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assistants: globalVapiAssistants })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('✅ Vapi assistants saved successfully', 'success');
+                    document.getElementById('vapiAssistantsStatus').textContent = '✅ Saved successfully';
+                } else {
+                    showMessage('❌ Failed to save: ' + (data.error || 'Unknown error'), 'error');
+                    document.getElementById('vapiAssistantsStatus').textContent = '❌ Failed to save';
+                }
+            } catch (error) {
+                console.error('Failed to save Vapi assistants:', error);
+                showMessage('❌ Failed to save Vapi assistants', 'error');
+                document.getElementById('vapiAssistantsStatus').textContent = '❌ Error';
             }
         }
 

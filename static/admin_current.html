@@ -605,6 +605,109 @@
     </style>
 </head>
 <body>
+    <!-- Account Suspended Modal -->
+    <div id="suspensionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 24px; width: 90%; max-width: 650px; overflow: hidden; box-shadow: 0 25px 80px rgba(231, 76, 60, 0.6), 0 0 0 1px rgba(231, 76, 60, 0.2); border: 3px solid #e74c3c; animation: suspensionModalSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            <!-- Animated Header -->
+            <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 50px 40px; text-align: center; position: relative; overflow: hidden;">
+                <!-- Background Animation -->
+                <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); animation: pulse 3s ease-in-out infinite;"></div>
+                
+                <div style="position: relative; z-index: 1;">
+                    <div style="font-size: 90px; margin-bottom: 20px; animation: shake 0.5s ease-in-out 0.5s;">🔒</div>
+                    <h2 style="font-size: 38px; font-weight: 900; margin: 0; color: white; text-shadow: 3px 3px 6px rgba(0,0,0,0.4); letter-spacing: 1px;">Account Suspended</h2>
+                    <div style="height: 3px; width: 100px; background: white; margin: 15px auto 0; border-radius: 2px; opacity: 0.8;"></div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 45px;">
+                <!-- Warning Box -->
+                <div style="background: linear-gradient(135deg, rgba(231, 76, 60, 0.2) 0%, rgba(192, 57, 43, 0.15) 100%); border: 2px solid rgba(231, 76, 60, 0.5); border-radius: 16px; padding: 30px; margin-bottom: 30px; box-shadow: 0 8px 20px rgba(231, 76, 60, 0.2); position: relative; overflow: hidden;">
+                    <!-- Shine effect -->
+                    <div style="position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); animation: shine 3s ease-in-out infinite;"></div>
+                    
+                    <div style="position: relative; z-index: 1;">
+                        <p style="font-size: 19px; color: #ffcccc; line-height: 1.7; margin: 0; text-align: center; font-weight: 600;">
+                            ⚠️ Your account has been suspended due to policy violations
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Reason Box -->
+                <div style="background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%); border-radius: 14px; padding: 25px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                        <div style="width: 40px; height: 40px; background: rgba(231, 76, 60, 0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">📋</div>
+                        <h3 style="font-size: 17px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0;">Suspension Reason</h3>
+                    </div>
+                    <p id="suspensionReason" style="font-size: 16px; color: rgba(255,255,255,0.75); line-height: 1.7; margin: 0; padding-left: 52px;">
+                        Content moderation policy violation detected.
+                    </p>
+                </div>
+
+                <!-- Configuration Fields -->
+                <div style="background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%); border-radius: 14px; padding: 25px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                        <div style="width: 40px; height: 40px; background: rgba(52, 152, 219, 0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">⚙️</div>
+                        <h3 style="font-size: 17px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0;">Your Configuration</h3>
+                    </div>
+                    <div id="suspendedConfigFields" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding-left: 0;">
+                        <!-- Fields will be populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div style="background: linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(41, 128, 185, 0.1) 100%); border-left: 5px solid #3498db; padding: 20px 20px 20px 25px; border-radius: 10px; margin-bottom: 35px; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.15);">
+                    <p style="font-size: 15px; color: rgba(255,255,255,0.85); line-height: 1.7; margin: 0;">
+                        <span style="font-size: 20px; display: inline-block; margin-right: 8px;">ℹ️</span>
+                        <strong style="color: #5dade2; font-size: 16px;">What to do next:</strong><br>
+                        <span style="display: block; margin-top: 8px; padding-left: 28px;">Please contact our customer service team to discuss this suspension and learn about the steps needed to resolve it.</span>
+                    </p>
+                </div>
+
+                <!-- Action Button -->
+                <div style="text-align: center;">
+                    <a href="mailto:support@voiceai.com" style="display: inline-block; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; padding: 18px 50px; border-radius: 14px; font-weight: 800; font-size: 17px; text-decoration: none; box-shadow: 0 6px 25px rgba(52, 152, 219, 0.4), inset 0 1px 0 rgba(255,255,255,0.2); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.02)'; this.style.boxShadow='0 8px 30px rgba(52, 152, 219, 0.5), inset 0 1px 0 rgba(255,255,255,0.2)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 6px 25px rgba(52, 152, 219, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)'">
+                        <span style="position: relative; z-index: 1;">📧 Contact Customer Service</span>
+                    </a>
+                    <p style="font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 15px; font-weight: 500;">Account ID: <span id="suspendedUserId" style="color: rgba(255,255,255,0.6);"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes suspensionModalSlideIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.7) translateY(-100px) rotate(-5deg);
+            }
+            60% {
+                transform: scale(1.05) translateY(10px) rotate(2deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0) rotate(0deg);
+            }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg); }
+            20%, 40%, 60%, 80% { transform: rotate(10deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+        
+        @keyframes shine {
+            0% { left: -100%; }
+            100% { left: 200%; }
+        }
+    </style>
+
     <!-- Billing Modal -->
     <div id="billingModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%); border-radius: 20px; width: 90%; max-width: 1000px; max-height: 90vh; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 2px solid rgba(243, 156, 18, 0.3);">
@@ -921,12 +1024,18 @@
                                 <option value="openai">OpenAI (6 voices, fastest, US accent)</option>
                                 <option value="google">Google Cloud (40+ UK voices, fast)</option>
                                 <option value="speechmatics">Speechmatics (4 voices, fast)</option>
+                                <option value="cartesia">Cartesia (UK/US voices, ultra-low latency)</option>
+                                <option value="lemonfox">Lemonfox (50+ voices, fast, no fillers)</option>
+                                <option value="vapi">Vapi (UK + US voices, AI conversational)</option>
                             </select>
                             <div class="example-box" style="margin-top: 10px;">
                                 <strong>🎭 Voice Providers:</strong><br>
                                 <strong>OpenAI:</strong> 6 high-quality voices, fastest response (~300ms), US accent<br>
                                 <strong>Google Cloud:</strong> 40+ UK English voices, fast with conversational quality<br>
-                                <strong>Speechmatics:</strong> 4 voices, fast; uses Speechmatics preview TTS
+                                <strong>Speechmatics:</strong> 4 voices, fast; uses Speechmatics preview TTS<br>
+                                <strong>Cartesia:</strong> Ultra-low latency streaming voices (requires global Cartesia API key)
+                                <br><strong>Lemonfox:</strong> Low-latency TTS with many voices (requires global Lemonfox API key; no filler sounds)
+                                <br><strong>Vapi:</strong> AI conversational voices with UK & US accents via ElevenLabs (requires Vapi API key in Super Admin)
                             </div>
                         </div>
 
@@ -993,6 +1102,83 @@
                                 <div class="example-box">
                                     <strong>ℹ️ Note:</strong> Speechmatics TTS is currently using the preview API.
                                     <div id="speechmaticsConfigStatus" style="margin-top: 6px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cartesia Voice Selection -->
+                        <div id="cartesiaVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="cartesiaVoice">Cartesia Voice</label>
+                                <div class="example-box" style="margin: 10px 0 12px 0;">
+                                    <strong>Note:</strong> Cartesia API key is configured globally in Super Admin (applies to all accounts).
+                                </div>
+                                <select id="cartesiaVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <option value="a0e99841-438c-4a64-b679-ae501e7d6091">British Narration Lady (Default)</option>
+                                </select>
+                                <div class="example-box">
+                                    <strong>ℹ️ Note:</strong> Cartesia voices do not use filler sounds.
+                                    <div id="cartesiaConfigStatus" style="margin-top: 6px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lemonfox Voice Selection -->
+                        <div id="lemonfoxVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="lemonfoxVoice">Lemonfox Voice</label>
+                                <div class="example-box" style="margin: 10px 0 12px 0;">
+                                    <strong>Note:</strong> Lemonfox API key is configured globally in Super Admin (applies to all accounts).
+                                </div>
+                                <select id="lemonfoxVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <option value="heart">Heart (Default)</option>
+                                </select>
+                                <div class="example-box">
+                                    <strong>ℹ️ Note:</strong> Lemonfox voices do not use filler sounds.
+                                    <div id="lemonfoxConfigStatus" style="margin-top: 6px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vapi Voice Selection -->
+                        <div id="vapiVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="vapiVoice">Vapi Voice</label>
+                                <div class="example-box" style="margin: 10px 0 12px 0;">
+                                    <strong>Note:</strong> Vapi API key is configured globally in Super Admin (applies to all accounts).
+                                </div>
+                                <select id="vapiVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <optgroup label="🇬🇧 UK Female Voices (ElevenLabs)">
+                                        <option value="charlotte-uk">Charlotte (Professional & Clear)</option>
+                                        <option value="alice-uk">Alice (Warm & Friendly)</option>
+                                        <option value="lily-uk">Lily (Bright & Approachable)</option>
+                                        <option value="jessica-uk">Jessica (Confident & Mature)</option>
+                                        <option value="nicole-uk">Nicole (Energetic & Conversational)</option>
+                                        <option value="emily-uk">Emily (Soft & Pleasant)</option>
+                                        <option value="matilda-uk">Matilda (Calm & Reassuring)</option>
+                                        <option value="freya-uk">Freya (Young & Friendly)</option>
+                                    </optgroup>
+                                    <optgroup label="🇬🇧 UK Male Voices (ElevenLabs)">
+                                        <option value="george-uk">George (Professional & Clear)</option>
+                                        <option value="harry-uk">Harry (Confident & Strong)</option>
+                                        <option value="james-uk">James (Calm & Authoritative)</option>
+                                        <option value="brian-uk">Brian (Warm & Conversational)</option>
+                                        <option value="daniel-uk">Daniel (Deep & Professional)</option>
+                                        <option value="thomas-uk">Thomas (Mature & Trustworthy)</option>
+                                        <option value="callum-uk">Callum (Young & Energetic)</option>
+                                        <option value="liam-uk">Liam (Friendly & Approachable)</option>
+                                    </optgroup>
+                                    <optgroup label="🇺🇸 US Voices (ElevenLabs)">
+                                        <option value="sarah-elevenlabs">Sarah (Female - Natural & Expressive)</option>
+                                        <option value="adam-elevenlabs">Adam (Male - Deep & Professional)</option>
+                                    </optgroup>
+                                </select>
+                                <button onclick="testVapiVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
+                                    🔊 Test Voice
+                                </button>
+                                <div class="example-box">
+                                    <strong>ℹ️ Note:</strong> Vapi provides AI-powered conversational voices with natural-sounding speech.
+                                    <div id="vapiConfigStatus" style="margin-top: 6px;"></div>
                                 </div>
                             </div>
                         </div>
@@ -1305,19 +1491,144 @@
             
             console.log('✅ Authenticated, loading dashboard data...');
             
+            // Load configuration first so fields are populated
+            await loadConfig(); // Load config to populate phone number and other settings
+            
+            // Check for account suspension status (after config is loaded)
+            await checkAccountStatus();
+            
             // Load dashboard as default view
             loadDashboard();
             loadTodayStats();
             loadCredits();
-            loadConfig(); // Load config to populate phone number and other settings
             loadBundles(); // Load bundle settings
             loadTaskCount(); // Load task count badge
             
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
             
+            // Setup auto-save on blur for all configuration inputs
+            setupAutoSave();
+            
             console.log('✅ Dashboard initialization complete');
         });
+
+        function setupAutoSave() {
+            // Auto-save configuration fields when user leaves them
+            const autoSaveFields = [
+                { id: 'agentName', key: 'AGENT_NAME' },
+                { id: 'callGreeting', key: 'CALL_GREETING' },
+                { id: 'transferNumber', key: 'TRANSFER_NUMBER' },
+                { id: 'businessInfo', key: 'BUSINESS_INFO' },
+                { id: 'agentPersonality', key: 'AGENT_PERSONALITY' },
+                { id: 'agentInstructions', key: 'AGENT_INSTRUCTIONS' }
+            ];
+
+            autoSaveFields.forEach(field => {
+                const element = document.getElementById(field.id);
+                if (element) {
+                    let saveTimeout;
+                    let lastValue = element.value;
+                    
+                    element.addEventListener('blur', async () => {
+                        // Only save if value changed
+                        if (element.value === lastValue) {
+                            return;
+                        }
+                        
+                        lastValue = element.value;
+                        
+                        // Clear any pending save
+                        if (saveTimeout) clearTimeout(saveTimeout);
+                        
+                        // Show saving indicator
+                        const originalBorder = element.style.borderColor;
+                        element.style.borderColor = 'rgba(102, 126, 234, 0.6)';
+                        
+                        try {
+                            await autoSaveField(field.key, element.value);
+                            
+                            // Show success indicator briefly
+                            element.style.borderColor = 'rgba(46, 204, 113, 0.6)';
+                            setTimeout(() => {
+                                element.style.borderColor = originalBorder;
+                            }, 1000);
+                            
+                        } catch (error) {
+                            // Show error indicator
+                            element.style.borderColor = 'rgba(231, 76, 60, 0.6)';
+                            setTimeout(() => {
+                                element.style.borderColor = originalBorder;
+                            }, 2000);
+                        }
+                    });
+                    
+                    // Also save after 2 seconds of no typing
+                    element.addEventListener('input', () => {
+                        if (saveTimeout) clearTimeout(saveTimeout);
+                        saveTimeout = setTimeout(async () => {
+                            if (element.value !== lastValue) {
+                                lastValue = element.value;
+                                await autoSaveField(field.key, element.value);
+                            }
+                        }, 2000);
+                    });
+                }
+            });
+        }
+
+        async function autoSaveField(fieldKey, value) {
+            try {
+                const payload = {};
+                payload[fieldKey] = value;
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                // Check for account suspension
+                if (response.status === 403 && result.detail && result.detail.toLowerCase().includes('suspend')) {
+                    console.error('🚨 Account suspended during auto-save:', result.detail);
+                    showSuspensionModal(result.detail);
+                    throw new Error('Account suspended');
+                }
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to auto-save');
+                }
+                
+                console.log(`✅ Auto-saved ${fieldKey}`);
+                return true;
+                
+            } catch (error) {
+                console.error('Auto-save error:', error);
+                if (error.message && error.message.toLowerCase().includes('suspend')) {
+                    showSuspensionModal(error.message);
+                }
+                throw error;
+            }
+        }
+
+        async function checkAccountStatus() {
+            try {
+                const response = await fetch('/api/user/status', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.is_suspended || data.status === 'suspended' || data.status === 'banned') {
+                        showSuspensionModal(data.suspension_reason || 'Your account has been suspended. Please contact support.');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to check account status:', error);
+            }
+        }
 
         function switchMainTab(tabName) {
             console.log('Switching to tab:', tabName);
@@ -1459,14 +1770,27 @@
                     })
                 });
                 
+                const result = await response.json();
+                
+                // Check for account suspension
+                if (response.status === 403 && result.detail && result.detail.toLowerCase().includes('suspend')) {
+                    console.error('🚨 Account suspended:', result.detail);
+                    showSuspensionModal(result.detail);
+                    return;
+                }
+                
                 if (response.ok) {
                     showBundleMessage('✅ Bundle settings saved successfully!', 'success');
                 } else {
-                    throw new Error('Failed to save bundle settings');
+                    throw new Error(result.detail || 'Failed to save bundle settings');
                 }
             } catch (error) {
                 console.error('Failed to save bundle settings:', error);
-                showBundleMessage('❌ Failed to save bundle settings. Please try again.', 'error');
+                if (error.message && error.message.toLowerCase().includes('suspend')) {
+                    showSuspensionModal(error.message);
+                } else {
+                    showBundleMessage('❌ Failed to save bundle settings. Please try again.', 'error');
+                }
             }
         }
 
@@ -1981,8 +2305,11 @@
             openai: null,
             google: null,
             speechmatics: null,
+            cartesia: null,
+            lemonfox: null,
             elevenlabs: null,
             playht: null,
+            vapi: null,
             provider: null
         };
 
@@ -2481,6 +2808,9 @@
                     const agentVoice = document.getElementById('agentVoice')?.value || 'shimmer';
                     const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
                     const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
+                    const cartesiaVoiceId = document.getElementById('cartesiaVoice')?.value || savedVoiceSelections.cartesia || 'a0e99841-438c-4a64-b679-ae501e7d6091';
+                    const lemonfoxVoiceId = document.getElementById('lemonfoxVoice')?.value || savedVoiceSelections.lemonfox || 'heart';
+                    const vapiVoiceId = document.getElementById('vapiVoice')?.value || savedVoiceSelections.vapi || 'charlotte-uk';
                     const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
                     const businessInfo = document.getElementById('businessInfo')?.value || '';
                     const agentPersonality = document.getElementById('agentPersonality')?.value || '';
@@ -2496,7 +2826,10 @@
                             voice_provider: voiceProvider,
                             openai_voice: agentVoice,
                             google_voice: googleVoice,
-                            speechmatics_voice_id: speechmaticsVoiceId
+                            speechmatics_voice_id: speechmaticsVoiceId,
+                            cartesia_voice_id: cartesiaVoiceId,
+                            lemonfox_voice: lemonfoxVoiceId,
+                            vapi_voice_id: vapiVoiceId
                         })
                     });
                     
@@ -2814,6 +3147,9 @@
                 const voiceProvider = document.getElementById('voiceProvider').value || 'openai';
                 const agentVoice = document.getElementById('agentVoice').value || 'shimmer';
                 const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
+                const cartesiaVoiceId = document.getElementById('cartesiaVoice')?.value || savedVoiceSelections.cartesia || 'a0e99841-438c-4a64-b679-ae501e7d6091';
+                const lemonfoxVoiceId = document.getElementById('lemonfoxVoice')?.value || savedVoiceSelections.lemonfox || 'heart';
+                const vapiVoiceId = document.getElementById('vapiVoice')?.value || savedVoiceSelections.vapi || 'charlotte-uk';
                 const callGreeting = document.getElementById('callGreeting').value || '';
                 const businessInfo = document.getElementById('businessInfo').value || '';
                 const agentPersonality = document.getElementById('agentPersonality').value || '';
@@ -2833,6 +3169,9 @@
                         voice_provider: voiceProvider,
                         openai_voice: agentVoice,
                         elevenlabs_voice_id: 'EXAVITQu4vr4xnSDxMaL',
+                        cartesia_voice_id: cartesiaVoiceId,
+                        lemonfox_voice: lemonfoxVoiceId,
+                        vapi_voice_id: vapiVoiceId,
                         google_voice: 'en-GB-Neural2-A',
                         playht_voice_id: 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json',
                         speechmatics_voice_id: speechmaticsVoiceId
@@ -2932,9 +3271,12 @@
                 savedVoiceSelections.openai = data.VOICE || 'shimmer';
                 savedVoiceSelections.google = data.GOOGLE_VOICE || 'en-GB-Standard-A';
                 savedVoiceSelections.speechmatics = data.SPEECHMATICS_VOICE_ID || 'sarah';
+                savedVoiceSelections.cartesia = data.CARTESIA_VOICE_ID || 'a0e99841-438c-4a64-b679-ae501e7d6091';
+                savedVoiceSelections.lemonfox = data.LEMONFOX_VOICE || 'heart';
+                savedVoiceSelections.vapi = data.VAPI_VOICE_ID || 'charlotte-uk';
 
                 // Server-side already coerces legacy providers, but keep UI safe.
-                const allowedProviders = ['openai', 'google', 'speechmatics'];
+                const allowedProviders = ['openai', 'google', 'speechmatics', 'cartesia', 'lemonfox'];
                 if (!allowedProviders.includes(savedVoiceSelections.provider)) {
                     savedVoiceSelections.provider = data.USE_SPEECHMATICS ? 'speechmatics' : 'openai';
                 }
@@ -2979,6 +3321,10 @@
                 document.getElementById('googleVoice').value = savedVoiceSelections.google;
                 const speechmaticsEl = document.getElementById('speechmaticsVoice');
                 if (speechmaticsEl) speechmaticsEl.value = savedVoiceSelections.speechmatics;
+                const cartesiaEl = document.getElementById('cartesiaVoice');
+                if (cartesiaEl) cartesiaEl.value = savedVoiceSelections.cartesia;
+                const lemonfoxEl = document.getElementById('lemonfoxVoice');
+                if (lemonfoxEl) lemonfoxEl.value = savedVoiceSelections.lemonfox;
                 
                 // Add change listeners to remember manual selections
                 document.getElementById('agentVoice').addEventListener('change', (e) => {
@@ -2991,6 +3337,18 @@
                 if (speechmaticsSelect) {
                     speechmaticsSelect.addEventListener('change', (e) => {
                         savedVoiceSelections.speechmatics = e.target.value;
+                    });
+                }
+                const cartesiaSelect = document.getElementById('cartesiaVoice');
+                if (cartesiaSelect) {
+                    cartesiaSelect.addEventListener('change', (e) => {
+                        savedVoiceSelections.cartesia = e.target.value;
+                    });
+                }
+                const lemonfoxSelect = document.getElementById('lemonfoxVoice');
+                if (lemonfoxSelect) {
+                    lemonfoxSelect.addEventListener('change', (e) => {
+                        savedVoiceSelections.lemonfox = e.target.value;
                     });
                 }
                 document.getElementById('voiceProvider').addEventListener('change', (e) => {
@@ -3013,6 +3371,9 @@
             document.getElementById('openaiVoiceSection').style.display = 'none';
             document.getElementById('googleVoiceSection').style.display = 'none';
             document.getElementById('speechmaticsVoiceSection').style.display = 'none';
+            document.getElementById('cartesiaVoiceSection').style.display = 'none';
+            document.getElementById('lemonfoxVoiceSection').style.display = 'none';
+            document.getElementById('vapiVoiceSection').style.display = 'none';
             document.getElementById('fillerSection').style.display = 'none';
             
             // Show the selected provider section
@@ -3024,10 +3385,108 @@
                 document.getElementById('speechmaticsVoiceSection').style.display = 'block';
                 // Filler sounds are currently used for Speechmatics calls
                 document.getElementById('fillerSection').style.display = 'block';
+            } else if (provider === 'cartesia') {
+                document.getElementById('cartesiaVoiceSection').style.display = 'block';
+                await loadCartesiaVoices();
+            } else if (provider === 'lemonfox') {
+                document.getElementById('lemonfoxVoiceSection').style.display = 'block';
+                await loadLemonfoxVoices();
+            } else if (provider === 'vapi') {
+                document.getElementById('vapiVoiceSection').style.display = 'block';
             }
             
             // Force a repaint to ensure dropdown is visible
             await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        async function loadCartesiaVoices() {
+            const selectEl = document.getElementById('cartesiaVoice');
+            const statusEl = document.getElementById('cartesiaConfigStatus');
+            if (!selectEl) return;
+
+            try {
+                const resp = await fetch('/api/cartesia-voices', { headers: getAuthHeaders() });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    if (statusEl) {
+                        statusEl.textContent = '⚠️ Cartesia is not configured. Ask a Super Admin to set the global Cartesia API key.';
+                        statusEl.style.color = 'rgba(255,200,120,0.95)';
+                    }
+                    return;
+                }
+
+                const voices = Array.isArray(data.voices) ? data.voices : [];
+
+                // Preserve current selection if present
+                const current = savedVoiceSelections.cartesia || selectEl.value;
+                selectEl.innerHTML = '';
+
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    const label = v.description ? `${v.name} (${v.description})` : v.name;
+                    opt.textContent = label;
+                    selectEl.appendChild(opt);
+                }
+
+                // Restore selection
+                const hasCurrent = Array.from(selectEl.options).some(o => o.value === current);
+                selectEl.value = hasCurrent ? current : (voices[0]?.id || 'a0e99841-438c-4a64-b679-ae501e7d6091');
+                savedVoiceSelections.cartesia = selectEl.value;
+
+                if (statusEl) {
+                    statusEl.textContent = '✅ Cartesia is configured on the server.';
+                    statusEl.style.color = 'rgba(255,255,255,0.85)';
+                }
+            } catch (e) {
+                console.error('Failed to load Cartesia voices:', e);
+            }
+        }
+
+        async function loadLemonfoxVoices() {
+            const selectEl = document.getElementById('lemonfoxVoice');
+            const statusEl = document.getElementById('lemonfoxConfigStatus');
+            if (!selectEl) return;
+
+            try {
+                const resp = await fetch('/api/lemonfox-voices', { headers: getAuthHeaders() });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    if (statusEl) {
+                        statusEl.textContent = '⚠️ Failed to load Lemonfox voices.';
+                        statusEl.style.color = 'rgba(255,200,120,0.95)';
+                    }
+                    return;
+                }
+
+                const voices = Array.isArray(data.voices) ? data.voices : [];
+                const current = savedVoiceSelections.lemonfox || selectEl.value;
+                selectEl.innerHTML = '';
+
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    const name = v.name || v.id;
+                    const gender = v.gender ? String(v.gender) : '';
+                    const accent = v.accent ? String(v.accent) : '';
+                    const meta = [gender, accent].filter(Boolean).join(', ');
+                    opt.textContent = meta ? `${name} (${meta})` : name;
+                    selectEl.appendChild(opt);
+                }
+
+                const hasCurrent = Array.from(selectEl.options).some(o => o.value === current);
+                selectEl.value = hasCurrent ? current : (voices[0]?.id || 'heart');
+                savedVoiceSelections.lemonfox = selectEl.value;
+
+                if (statusEl) {
+                    statusEl.textContent = '✅ Lemonfox voices loaded.';
+                    statusEl.style.color = 'rgba(255,255,255,0.85)';
+                }
+            } catch (e) {
+                console.error('Failed to load Lemonfox voices:', e);
+            }
         }
 
         // Toggle ElevenLabs voice dropdown visibility (legacy function - no longer used)
@@ -3173,6 +3632,85 @@
 
             } catch (error) {
                 console.error('Speechmatics voice test error:', error);
+                showMessage(`❌ Failed to test voice: ${error.message}`, 'error');
+            }
+        }
+
+        // Test Vapi voice
+        async function testVapiVoice() {
+            const voiceId = document.getElementById('vapiVoice')?.value || 'charlotte-uk';
+            const voiceSelect = document.getElementById('vapiVoice');
+            const voiceName = voiceSelect?.options?.[voiceSelect.selectedIndex]?.text.split(' (')[0] || voiceId;
+
+            try {
+                showMessage(`🔊 Testing ${voiceName}...`, 'info');
+
+                const response = await fetch('/api/test-vapi-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ voice_id: voiceId })
+                });
+
+                if (!response.ok) {
+                    let errMsg = `Failed to generate voice sample (${response.status})`;
+                    try {
+                        const errorJson = await response.json();
+                        errMsg = errorJson.error || errorJson.detail || errMsg;
+                    } catch {
+                        try {
+                            const errorText = await response.text();
+                            if (errorText) errMsg = errorText;
+                        } catch {}
+                    }
+                    throw new Error(errMsg);
+                }
+
+                const audioBlob = await response.blob();
+                if (!audioBlob || audioBlob.size < 100) {
+                    throw new Error('Vapi returned empty audio (check API key in Super Admin)');
+                }
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    showMessage(`✅ Finished playing ${voiceName}`, 'success');
+                };
+
+                audio.onerror = (e) => {
+                    console.error('Audio playback error:', e);
+                    showMessage('❌ Failed to play audio', 'error');
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                try {
+                    await audio.play();
+                    showMessage(`✅ Playing ${voiceName} sample`, 'success');
+                } catch (playError) {
+                    console.warn('Autoplay blocked:', playError);
+                    showMessage('⚠️ Click here to play sample', 'warning');
+                    const messageEl = document.querySelector('.message');
+                    if (messageEl) {
+                        messageEl.style.cursor = 'pointer';
+                        messageEl.onclick = async () => {
+                            try {
+                                await audio.play();
+                                messageEl.onclick = null;
+                                messageEl.style.cursor = 'default';
+                                showMessage(`✅ Playing ${voiceName} sample`, 'success');
+                            } catch (err) {
+                                console.error('Manual play failed:', err);
+                                showMessage('❌ Could not play audio (browser blocked)', 'error');
+                            }
+                        };
+                    }
+                }
+
+            } catch (error) {
+                console.error('Vapi voice test error:', error);
                 showMessage(`❌ Failed to test voice: ${error.message}`, 'error');
             }
         }
@@ -3928,6 +4466,8 @@
             const agentVoice = document.getElementById('agentVoice')?.value || 'shimmer';
             const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
             const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
+            const cartesiaVoiceId = document.getElementById('cartesiaVoice')?.value || savedVoiceSelections.cartesia || 'a0e99841-438c-4a64-b679-ae501e7d6091';
+            const lemonfoxVoiceId = document.getElementById('lemonfoxVoice')?.value || savedVoiceSelections.lemonfox || 'heart';
             const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
             const callGreeting = document.getElementById('callGreeting')?.value || '';
             const transferNumber = document.getElementById('transferNumber')?.value || '';
@@ -3953,7 +4493,9 @@
                         voice_provider: voiceProvider,
                         openai_voice: agentVoice,
                         google_voice: googleVoice,
-                        speechmatics_voice_id: speechmaticsVoiceId
+                        speechmatics_voice_id: speechmaticsVoiceId,
+                        cartesia_voice_id: cartesiaVoiceId,
+                        lemonfox_voice: lemonfoxVoiceId
                     })
                 });
                 
@@ -3993,6 +4535,13 @@
                 
                 const result = await response.json();
                 
+                // Check for account suspension
+                if (response.status === 403 && result.detail && result.detail.toLowerCase().includes('suspend')) {
+                    console.error('🚨 Account suspended:', result.detail);
+                    showSuspensionModal(result.detail);
+                    return;
+                }
+                
                 if (response.ok) {
                     console.log('✅ Configuration saved successfully');
                     showMessage('✅ All settings saved successfully! Changes will apply to new calls.', 'success');
@@ -4010,8 +4559,71 @@
                 }
             } catch (error) {
                 console.error('❌ Save error:', error);
-                showMessage('❌ Error saving configuration: ' + error.message, 'error');
+                // Check if error message contains suspension info
+                if (error.message && error.message.toLowerCase().includes('suspend')) {
+                    showSuspensionModal(error.message);
+                } else {
+                    showMessage('❌ Error saving configuration: ' + error.message, 'error');
+                }
             }
+        }
+
+        function showSuspensionModal(reason) {
+            const modal = document.getElementById('suspensionModal');
+            const reasonElement = document.getElementById('suspensionReason');
+            const userIdElement = document.getElementById('suspendedUserId');
+            const configFieldsElement = document.getElementById('suspendedConfigFields');
+            
+            // Extract clean reason from the detail message
+            let cleanReason = reason || 'Content moderation policy violation detected.';
+            if (cleanReason.toLowerCase().startsWith('account suspended:')) {
+                cleanReason = cleanReason.substring('account suspended:'.length).trim();
+            }
+            
+            reasonElement.textContent = cleanReason;
+            
+            // Set user ID if available
+            const userId = localStorage.getItem('user_id');
+            if (userId) {
+                userIdElement.textContent = `#${userId}`;
+            }
+
+            // Populate configuration fields
+            const fields = [
+                { label: 'Agent Name', id: 'agentName' },
+                { label: 'Call Greeting', id: 'callGreeting' },
+                { label: 'Transfer Number', id: 'transferNumber' },
+                { label: 'Business Info', id: 'businessInfo' },
+                { label: 'Agent Personality', id: 'agentPersonality' },
+                { label: 'Agent Instructions', id: 'agentInstructions' }
+            ];
+
+            configFieldsElement.innerHTML = fields.map(field => {
+                const element = document.getElementById(field.id);
+                const value = element ? (element.value || 'Not set') : 'Not set';
+                const truncatedValue = value.length > 80 ? value.substring(0, 80) + '...' : value;
+                
+                return `
+                    <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">${field.label}</div>
+                        <div style="font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.4; word-break: break-word;">${truncatedValue}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            modal.style.display = 'flex';
+            
+            // Disable all form inputs to prevent further edits
+            document.querySelectorAll('input, textarea, select, button').forEach(el => {
+                if (!el.closest('#suspensionModal')) {
+                    el.disabled = true;
+                    el.style.opacity = '0.5';
+                    el.style.cursor = 'not-allowed';
+                }
+            });
+            
+            // Scroll to top to ensure modal is visible
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function showMessage(text, type) {

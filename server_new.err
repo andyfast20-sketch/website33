@@ -1,0 +1,1310 @@
+C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+2026-01-05 21:29:28,439 - VonageAgent - INFO - ElevenLabs client initialized
+2026-01-05 21:29:28,495 - VonageAgent - INFO - Google Cloud TTS client initialized
+2026-01-05 21:29:28,498 - VonageAgent - INFO - PlayHT TTS configured with API key
+2026-01-05 21:29:28,513 - VonageAgent - INFO - \u2705 Loaded Speechmatics API key from database
+2026-01-05 21:29:28,514 - VonageAgent - INFO - \u2705 Loaded OpenAI API key from database
+2026-01-05 21:29:28,514 - VonageAgent - INFO - \u2705 Loaded DeepSeek API key from database
+2026-01-05 21:29:28,514 - VonageAgent - INFO - \u2705 Loaded Groq API key from database
+2026-01-05 21:29:28,514 - VonageAgent - INFO - \u2705 Loaded OpenRouter API key from database
+2026-01-05 21:29:28,515 - VonageAgent - INFO - \u2705 Loaded OpenRouter model from database: deepseek/deepseek-chat
+2026-01-05 21:29:28,515 - VonageAgent - INFO - \u2705 Loaded Vonage API key from database
+2026-01-05 21:29:28,515 - VonageAgent - INFO - \u2705 Loaded Vonage API secret from database
+2026-01-05 21:29:28,516 - VonageAgent - INFO - \u2705 Loaded Vonage Application ID from database
+2026-01-05 21:29:28,516 - VonageAgent - INFO - \u2705 Loaded Vonage private key (PEM) from database
+2026-01-05 21:29:28,516 - VonageAgent - INFO - \u2705 AI Brain Provider set to: openrouter
+2026-01-05 21:29:28,517 - VonageAgent - INFO - \u2705 Performance: History parts = 4
+2026-01-05 21:29:28,517 - VonageAgent - INFO - \u2705 Performance: Max tokens = 100
+2026-01-05 21:29:28,517 - VonageAgent - INFO - \u2705 Performance: Max message chars = 250
+2026-01-05 21:29:28,518 - VonageAgent - INFO - \u2705 Performance: Request timeout = 8.0s
+2026-01-05 21:29:28,518 - VonageAgent - INFO - \u2705 Performance: System max chars = 3500
+2026-01-05 21:29:28,518 - VonageAgent - INFO - \u2705 Performance: Total prompt max chars = 5000
+INFO:     Started server process [36756]
+INFO:     Waiting for application startup.
+2026-01-05 21:29:28,583 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
+2026-01-05 21:29:28,586 - VonageAgent - INFO - \U0001f310 Tunnel provider (DB): cloudflare
+2026-01-05 21:29:28,587 - VonageAgent - INFO - \U0001f4de Answer URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/answer
+2026-01-05 21:29:28,587 - VonageAgent - INFO - \U0001f4cb Event URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/events
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5004 (Press CTRL+C to quit)
+2026-01-05 21:29:49,443 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474290 (UUID: 80b303e3a0d7c0858e01dff1acfa1efb)
+2026-01-05 21:29:49,446 - VonageAgent - INFO - \U0001f4de Call assigned to andy roberts (user_id: 21)
+2026-01-05 21:29:49,447 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f534 BARGE-IN THRESHOLD SET TO: 0.30 seconds (CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3)
+2026-01-05 21:29:49,825 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Loaded voice preference: shimmer
+2026-01-05 21:29:49,827 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 Transfer number configured: 447958968621
+2026-01-05 21:29:49,827 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Voice provider: speechmatics
+2026-01-05 21:29:49,828 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Bundle settings - Calendar: False, Tasks: False, AdvancedVoice: False, SalesDetector: False
+2026-01-05 21:29:49,828 - VonageAgent - WARNING - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f9e0 Brain locked selected=openrouter effective=openrouter reasons=realtime_mode_uses_openai_asr_only
+2026-01-05 21:29:49,857 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f9e0 Brain routing selected=openrouter effective=openrouter call_mode=realtime reasons=realtime_mode_uses_openai_asr_only
+2026-01-05 21:29:49,872 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Returning NCCO with WebSocket: wss://anticipated-travelling-hint-millions.trycloudflare.com/socket/80b303e3a0d7c0858e01dff1acfa1efb
+2026-01-05 21:29:49,890 - VonageAgent - INFO - \U0001f4cb Event [80b303e3a0d7c0858e01dff1acfa1efb]: started
+2026-01-05 21:29:49,906 - VonageAgent - INFO - \U0001f4cb Event [80b303e3a0d7c0858e01dff1acfa1efb]: ringing
+INFO:     216.147.2.84:0 - "WebSocket /socket/80b303e3a0d7c0858e01dff1acfa1efb" [accepted]
+2026-01-05 21:29:50,283 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50c WebSocket connected at 1767648590.2813985
+2026-01-05 21:29:50,283 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f1\ufe0f Starting OpenAI connection at 0.002s after WS connect
+2026-01-05 21:29:50,283 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:29:50,284 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:29:50,744 - VonageAgent - INFO - \U0001f4cb Event [144f4a1e-02de-4fab-ab57-7d910f6e7a57]: ringing
+2026-01-05 21:29:50,764 - VonageAgent - INFO - \U0001f4cb Event [80b303e3a0d7c0858e01dff1acfa1efb]: answered
+2026-01-05 21:29:50,853 - VonageAgent - INFO - \U0001f4cb Event [144f4a1e-02de-4fab-ab57-7d910f6e7a57]: started
+2026-01-05 21:29:50,888 - VonageAgent - INFO - \U0001f4cb Event [144f4a1e-02de-4fab-ab57-7d910f6e7a57]: answered
+2026-01-05 21:29:51,453 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f1\ufe0f OpenAI WebSocket connection took 1.169s
+2026-01-05 21:29:51,463 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f1\ufe0f Global instructions DB query took 0.008s
+2026-01-05 21:29:51,464 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Applied global instructions
+2026-01-05 21:29:51,464 - VonageAgent - WARNING - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a0\ufe0f No business info found for this user
+2026-01-05 21:29:51,465 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Applied user-specific personality
+2026-01-05 21:29:51,465 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Applied user-specific instructions
+2026-01-05 21:29:51,466 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Applied transfer instructions with function calling
+2026-01-05 21:29:51,466 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:29:51,472 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:29:51,472 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using OpenAI voice: shimmer
+2026-01-05 21:29:51,473 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:29:51,473 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:29:51,473 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:29:51,474 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:29:51,479 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:29:51,479 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Connected to OpenAI successfully
+2026-01-05 21:29:51,480 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f1\ufe0f OpenAI connection took 1.197s
+2026-01-05 21:29:51,480 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2b50 GREETING CONFIG: strict_greeting = 'Hi this is the Learning school of driving, how can i help you ?'
+2026-01-05 21:29:51,481 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi this is the Learning school of driving, how can i help you ?
+2026-01-05 21:29:51,481 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Vonage audio mode: bytes
+2026-01-05 21:29:51,490 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI session created
+2026-01-05 21:29:51,490 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Hi this is the Learning school of driving, how can...
+2026-01-05 21:29:51,491 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:29:51,491 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Hi this is the Learning school of driving, how can...
+2026-01-05 21:29:51,492 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:29:51,609 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI session configured
+2026-01-05 21:29:51,794 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:29:51,795 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 304ms
+2026-01-05 21:29:52,012 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:29:52,512 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:29:53,023 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0021 max_sample=281 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:29:53,051 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1560ms (16 chunks)
+2026-01-05 21:29:56,243 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:29:59,978 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:29:59,980 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 Quick acknowledgment: 'Thank you for calling today' (after caller finished speaking)
+2026-01-05 21:29:59,985 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Thank you for calling today....
+2026-01-05 21:29:59,989 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:29:59,992 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Thank you for calling today....
+2026-01-05 21:29:59,996 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=13 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:00,289 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:00,291 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 300ms
+2026-01-05 21:30:00,497 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:00,619 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 627ms (6 chunks)
+2026-01-05 21:30:00,639 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4ca FULL RESPONSE LATENCY: 654ms (user stopped \u2192 audio complete)
+2026-01-05 21:30:01,120 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:30:01,125 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:30:01,125 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4de Caller: Oh, I'm just looking to see if I can book some driving lessons, please.
+2026-01-05 21:30:01,125 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:30:01,126 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Transfer check: transfer_number='447958968621', transcript='Oh, I'm just looking to see if I can book some driving lessons, please.'
+2026-01-05 21:30:01,793 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:02,185 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:30:02,186 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenRouter stream start latency=0.66s msgs=3 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:30:03,182 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Sure, I’d be happy to help with that!...
+2026-01-05 21:30:03,192 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:03,215 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Sure, I’d be happy to help with that!...
+2026-01-05 21:30:03,241 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:03,471 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:03,575 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 359ms
+2026-01-05 21:30:03,751 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:03,981 - VonageAgent - WARNING - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a0\ufe0f Cut off AI role-playing caller at: 'vailability and any specific preferences you have?'
+2026-01-05 21:30:03,984 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f916 Judie (OpenRouter): Sure, I’d be happy to help with that! We offer driving lessons for beginners and experienced drivers alike. Could you let me know your availability and any specific preferences you have?
+2026-01-05 21:30:04,246 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1030ms (9 chunks)
+2026-01-05 21:30:04,250 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: We offer driving lessons for beginners and experie...
+2026-01-05 21:30:04,254 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:04,263 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: We offer driving lessons for beginners and experie...
+2026-01-05 21:30:04,269 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:04,498 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:04,502 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 239ms
+2026-01-05 21:30:04,771 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:05,290 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:05,792 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1529ms (17 chunks)
+2026-01-05 21:30:05,793 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Could you let me know your availability and any sp...
+2026-01-05 21:30:05,797 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:05,798 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Could you let me know your availability and any sp...
+2026-01-05 21:30:05,802 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:06,032 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:06,117 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 319ms
+2026-01-05 21:30:06,310 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:06,815 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:07,320 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:07,636 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1839ms (20 chunks)
+2026-01-05 21:30:07,638 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: I’ll check our schedule and find the best options ...
+2026-01-05 21:30:07,638 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:07,639 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I’ll check our schedule and find the best options ...
+2026-01-05 21:30:07,837 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:07,868 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:07,868 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 230ms
+2026-01-05 21:30:08,411 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:11,693 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:11,821 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 4182ms (13 chunks)
+2026-01-05 21:30:11,823 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: \U0001f60a...
+2026-01-05 21:30:11,823 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:11,823 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: \U0001f60a...
+2026-01-05 21:30:14,884 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:14,891 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f VAD: caller started speaking during agent audio (energy=0.014)
+2026-01-05 21:30:15,061 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:15,061 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 3238ms
+2026-01-05 21:30:15,064 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 3241ms (2 chunks)
+2026-01-05 21:30:15,150 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:15,285 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:15,546 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4a4 Ignoring very short utterance (0.13s) - no filler/response
+2026-01-05 21:30:15,625 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4a4 Ignoring backchannel: 'OK.'
+2026-01-05 21:30:15,808 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:16,386 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:21,128 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:21,983 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:30:22,753 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:30:22,755 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:30:22,756 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4de Caller: Yeah if you could just tell me the sort of prices that would be great, I'd be interested in that.
+2026-01-05 21:30:22,757 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:30:22,758 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Transfer check: transfer_number='447958968621', transcript='Yeah if you could just tell me the sort of prices that would be great, I'd be interested in that.'
+2026-01-05 21:30:22,938 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:23,302 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:30:23,304 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenRouter stream start latency=0.54s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:30:23,546 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3b5 Playing filler: Alright...
+2026-01-05 21:30:23,548 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Agent started speaking
+2026-01-05 21:30:23,549 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:24,059 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:24,145 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Our standard driving lessons are £30 per hour,...
+2026-01-05 21:30:24,146 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:24,146 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Our standard driving lessons are £30 per hour,...
+2026-01-05 21:30:24,445 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:24,447 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 301ms
+2026-01-05 21:30:24,571 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:25,071 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:25,516 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1370ms (14 chunks)
+2026-01-05 21:30:25,518 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4ca FULL RESPONSE LATENCY: 4388ms (user stopped \u2192 audio complete)
+2026-01-05 21:30:25,519 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: and we also offer packages for multiple lessons, w...
+2026-01-05 21:30:25,519 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:25,519 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: and we also offer packages for multiple lessons, w...
+2026-01-05 21:30:25,579 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:25,667 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f916 Judie (OpenRouter): Of course! Our standard driving lessons are £30 per hour, and we also offer packages for multiple lessons, which can save you some money. For example, a block of 10 lessons is £280. Does that sound like what you're looking for?
+2026-01-05 21:30:25,754 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:25,756 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 236ms
+2026-01-05 21:30:26,097 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:26,613 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:27,313 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:27,499 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1979ms (21 chunks)
+2026-01-05 21:30:27,500 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: For example, a block of 10 lessons is £280....
+2026-01-05 21:30:27,500 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:27,501 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: For example, a block of 10 lessons is £280....
+2026-01-05 21:30:27,725 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:27,727 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 226ms
+2026-01-05 21:30:27,823 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:28,171 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f VAD: caller started speaking during agent audio (energy=0.006)
+2026-01-05 21:30:28,336 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0859 max_sample=13864 vad_thr=0.0050 speaking_now=True vad_speaking=True agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:28,388 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=True)
+2026-01-05 21:30:28,389 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3a4 BARGE-IN TRACKING STARTED - caller speaking during agent turn (threshold: 0.3s)
+2026-01-05 21:30:28,510 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f6d1\U0001f6d1\U0001f6d1 VAD BARGE-IN: caller spoke 0.34s >= threshold 0.30s - BLOCKING ALL OUTBOUND AUDIO
+2026-01-05 21:30:28,512 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Debug: _barge_in_min_speech_seconds=0.30, CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3
+2026-01-05 21:30:28,523 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:30:28,658 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:30,430 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f513 VAD: caller stopped - unblocking outbound audio for next response
+2026-01-05 21:30:30,770 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:31,632 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:30:31,634 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:30:31,634 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4de Caller: Oh, £30 seems quite a lot.
+2026-01-05 21:30:31,634 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:30:31,635 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Transfer check: transfer_number='447958968621', transcript='Oh, £30 seems quite a lot.'
+2026-01-05 21:30:31,772 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:31,912 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:30:31,913 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenRouter stream start latency=0.28s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:30:32,323 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: I understand that pricing is important....
+2026-01-05 21:30:32,325 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:32,326 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I understand that pricing is important....
+2026-01-05 21:30:32,335 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:32,622 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:32,625 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 299ms
+2026-01-05 21:30:32,845 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:33,270 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 944ms (10 chunks)
+2026-01-05 21:30:33,272 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4ca FULL RESPONSE LATENCY: 2501ms (user stopped \u2192 audio complete)
+2026-01-05 21:30:33,481 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: We aim to provide high-quality instruction with ex...
+2026-01-05 21:30:33,483 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:33,483 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: We aim to provide high-quality instruction with ex...
+2026-01-05 21:30:33,489 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:33,713 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:33,715 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 232ms
+2026-01-05 21:30:33,991 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:34,292 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f916 Judie (OpenRouter): I understand that pricing is important. We aim to provide high-quality instruction with experienced instructors to ensure you get the best possible learning experience. If you're interested, we can discuss booking a block of lessons to make it more cost-effective. Would you like to explore that option?
+2026-01-05 21:30:34,494 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:35,017 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:35,530 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:36,039 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=15 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:36,298 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 2815ms (30 chunks)
+2026-01-05 21:30:36,300 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: If you're interested, we can discuss booking a blo...
+2026-01-05 21:30:36,301 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:36,302 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: If you're interested, we can discuss booking a blo...
+2026-01-05 21:30:36,536 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:36,537 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 235ms
+2026-01-05 21:30:36,551 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:37,053 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:37,561 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:38,061 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:38,279 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1977ms (22 chunks)
+2026-01-05 21:30:38,281 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Would you like to explore that option?...
+2026-01-05 21:30:38,281 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:38,281 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Would you like to explore that option?...
+2026-01-05 21:30:38,508 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:38,509 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 228ms
+2026-01-05 21:30:38,575 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:38,929 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 648ms (7 chunks)
+2026-01-05 21:30:47,288 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:49,727 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:50,596 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:30:50,598 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:30:50,598 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:30:50,598 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4de Caller: Just tell me a bit more about your company.
+2026-01-05 21:30:50,599 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:30:50,599 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Transfer check: transfer_number='447958968621', transcript='Just tell me a bit more about your company.'
+2026-01-05 21:30:50,729 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:50,842 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:30:50,844 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenRouter stream start latency=0.24s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:30:51,324 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: We’re a trusted driving school with experienced...
+2026-01-05 21:30:51,325 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:51,326 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: We’re a trusted driving school with experienced...
+2026-01-05 21:30:51,332 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:51,618 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:51,620 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 294ms
+2026-01-05 21:30:51,851 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:52,381 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:52,438 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1112ms (11 chunks)
+2026-01-05 21:30:52,438 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4ca FULL RESPONSE LATENCY: 2709ms (user stopped \u2192 audio complete)
+2026-01-05 21:30:52,438 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: instructors who are dedicated to helping learners ...
+2026-01-05 21:30:52,438 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:52,439 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: instructors who are dedicated to helping learners ...
+2026-01-05 21:30:52,668 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:52,669 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 231ms
+2026-01-05 21:30:52,882 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:53,390 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:53,625 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f916 Judie (OpenRouter): Of course! We’re a trusted driving school with experienced instructors who are dedicated to helping learners become safe, confident drivers. We offer flexible lesson schedules, tailored teaching methods, and competitive pricing. Whether you’re a complete beginner or looking to brush up on your skills, we’re here to support you every step of the way. Let me know if you’d like more details or want to book a lesson!
+2026-01-05 21:30:53,909 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:54,425 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1986ms (22 chunks)
+2026-01-05 21:30:54,426 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: We offer flexible lesson schedules, tailored teach...
+2026-01-05 21:30:54,426 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:54,427 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: We offer flexible lesson schedules, tailored teach...
+2026-01-05 21:30:54,430 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:54,470 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f VAD: caller started speaking during agent audio (energy=0.007)
+2026-01-05 21:30:54,661 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:54,663 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 236ms
+2026-01-05 21:30:54,771 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f6d1\U0001f6d1\U0001f6d1 VAD BARGE-IN: caller spoke 0.30s >= threshold 0.30s - BLOCKING ALL OUTBOUND AUDIO
+2026-01-05 21:30:54,773 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Debug: _barge_in_min_speech_seconds=0.30, CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3
+2026-01-05 21:30:54,790 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:30:54,843 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:54,913 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:57,332 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f513 VAD: caller stopped - unblocking outbound audio for next response
+2026-01-05 21:30:57,653 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:30:58,511 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:30:58,521 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:30:58,524 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:30:58,558 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4de Caller: Do you think you could tell me the prices?
+2026-01-05 21:30:58,562 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:30:58,585 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Transfer check: transfer_number='447958968621', transcript='Do you think you could tell me the prices?'
+2026-01-05 21:30:58,728 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:30:59,147 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:30:59,159 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] OpenRouter stream start latency=0.56s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:30:59,521 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f3b5 Playing filler: One sec...
+2026-01-05 21:30:59,531 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Agent started speaking
+2026-01-05 21:30:59,599 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:30:59,613 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: Our pricing depends on the type of lesson and the...
+2026-01-05 21:30:59,614 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:30:59,619 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Our pricing depends on the type of lesson and the...
+2026-01-05 21:30:59,920 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:30:59,935 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 317ms
+2026-01-05 21:31:00,110 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:00,611 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:00,991 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u2705 Speechmatics complete: 1373ms (14 chunks)
+2026-01-05 21:31:00,994 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f4ca FULL RESPONSE LATENCY: 3341ms (user stopped \u2192 audio complete)
+2026-01-05 21:31:00,999 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Starting Speechmatics TTS for: For example, individual lessons typically start at...
+2026-01-05 21:31:01,004 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using Speechmatics voice: sarah
+2026-01-05 21:31:01,011 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: For example, individual lessons typically start at...
+2026-01-05 21:31:01,113 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:01,247 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:31:01,249 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \u26a1 First Speechmatics audio bytes in 238ms
+2026-01-05 21:31:01,640 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:02,159 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:02,190 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f916 Judie (OpenRouter): Of course! Our pricing depends on the type of lesson and the package you choose. For example, individual lessons typically start at £30 per hour, while block bookings (like 5 or 10 lessons) can offer discounts. Group lessons are also available at a lower rate per person. Let me know your preferences, and I can give you a more tailored quote!
+2026-01-05 21:31:02,674 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:03,177 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] VAD dbg: energy=0.0003 max_sample=55 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:31:03,214 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f5e3\ufe0f VAD: caller started speaking during agent audio (energy=0.005)
+2026-01-05 21:31:03,530 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f6d1\U0001f6d1\U0001f6d1 VAD BARGE-IN: caller spoke 0.32s >= threshold 0.30s - BLOCKING ALL OUTBOUND AUDIO
+2026-01-05 21:31:03,534 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f50d Debug: _barge_in_min_speech_seconds=0.30, CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3
+2026-01-05 21:31:03,567 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:31:03,682 - VonageAgent - ERROR - [80b303e3a0d7c0858e01dff1acfa1efb] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:31:04,092 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] \U0001f513 VAD: caller stopped - unblocking outbound audio for next response
+INFO:     connection closed
+2026-01-05 21:31:04,304 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Credit monitoring cancelled
+2026-01-05 21:31:04,498 - VonageAgent - INFO - \U0001f4cb Event [80b303e3a0d7c0858e01dff1acfa1efb]: completed
+2026-01-05 21:31:05,092 - VonageAgent - INFO - \U0001f4cb Event [144f4a1e-02de-4fab-ab57-7d910f6e7a57]: completed
+2026-01-05 21:31:05,097 - VonageAgent - INFO - [144f4a1e-02de-4fab-ab57-7d910f6e7a57] Call ended - session cleaned up
+2026-01-05 21:31:05,657 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Call ended - transcript length: 1909 chars, will generate summary
+2026-01-05 21:31:05,741 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Deducted 3.50 credits from user 21 (connection: 1.0, duration: 2.50, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:31:05,878 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Session closed
+2026-01-05 21:31:05,910 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Call ended - transcript length: 1909 chars, will generate summary
+2026-01-05 21:31:05,924 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Deducted 3.53 credits from user 21 (connection: 1.0, duration: 2.53, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:31:05,954 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Session closed
+2026-01-05 21:31:05,958 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Call ended - session cleaned up
+2026-01-05 21:31:05,962 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] *** STARTING generate_summary function ***
+2026-01-05 21:31:05,970 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Database query result: True
+2026-01-05 21:31:05,975 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Transcript length: 1909 chars, user_id: 21
+2026-01-05 21:31:06,357 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using DeepSeek API for summary
+2026-01-05 21:31:06,680 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:31:09,973 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Summary generated using deepseek/deepseek-chat: The caller inquired about booking driving lessons and was primarily interested in pricing. Judie provided details on standard rates (£30 per hour) and discounted packages, such as 10 lessons for £280. The caller expressed concern about the cost, so Judie highlighted the school's experienced instructors and flexible options. The conversation ended with Judie offering to provide a tailored quote based on the caller's preferences.
+2026-01-05 21:31:09,985 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Generated summary: The caller inquired about booking driving lessons and was primarily interested in pricing. Judie provided details on standard rates (£30 per hour) and discounted packages, such as 10 lessons for £280. The caller expressed concern about the cost, so Judie highlighted the school's experienced instructors and flexible options. The conversation ended with Judie offering to provide a tailored quote based on the caller's preferences.
+2026-01-05 21:31:09,987 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Tasks disabled - skipping task extraction (user turned off bundle)
+2026-01-05 21:31:09,993 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] SMS notification not sent: disabled
+2026-01-05 21:31:10,000 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] *** STARTING generate_summary function ***
+2026-01-05 21:31:10,004 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Database query result: True
+2026-01-05 21:31:10,005 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Transcript length: 1909 chars, user_id: 21
+2026-01-05 21:31:10,571 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Using DeepSeek API for summary
+2026-01-05 21:31:10,982 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:31:13,850 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Summary generated using deepseek/deepseek-chat: The caller inquired about booking driving lessons and primarily asked for pricing details. Judie provided information on standard rates (£30 per hour) and discounted packages, and also described the driving school's services, including experienced instructors and flexible scheduling. The conversation focused on cost and company background, but no booking was finalized.
+2026-01-05 21:31:13,860 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Generated summary: The caller inquired about booking driving lessons and primarily asked for pricing details. Judie provided information on standard rates (£30 per hour) and discounted packages, and also described the driving school's services, including experienced instructors and flexible scheduling. The conversation focused on cost and company background, but no booking was finalized.
+2026-01-05 21:31:13,861 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] Tasks disabled - skipping task extraction (user turned off bundle)
+2026-01-05 21:31:13,864 - VonageAgent - INFO - [80b303e3a0d7c0858e01dff1acfa1efb] SMS notification not sent: disabled
+2026-01-05 21:31:56,576 - VonageAgent - INFO - \u26d4 Trial expired for user 21 - credits zeroed
+2026-01-05 21:31:57,081 - VonageAgent - INFO - \u26d4 Trial expired for user 21 - credits zeroed
+2026-01-05 21:32:00,627 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:32:00,641 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:32:00,643 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:32:01,341 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:32:01,344 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:32:01,345 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:32:14,919 - VonageAgent - INFO - \u2705 AI Brain Provider set to openrouter by super-admin
+2026-01-05 21:32:29,235 - VonageAgent - INFO - Added 60 minutes to user 21
+2026-01-05 21:32:29,385 - httpx - INFO - HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+2026-01-05 21:32:42,653 - VonageAgent - INFO - \u26d4 Trial expired for user 21 - credits zeroed
+2026-01-05 21:32:43,337 - VonageAgent - INFO - \u26d4 Trial expired for user 21 - credits zeroed
+2026-01-05 21:32:49,897 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:32:49,921 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:32:49,922 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:32:54,064 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:32:54,066 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:32:54,066 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:33:12,876 - VonageAgent - INFO - \U0001f4cb Event [449657152b1e20922a70fada9b21d039]: started
+2026-01-05 21:33:12,894 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474290 (UUID: 449657152b1e20922a70fada9b21d039)
+2026-01-05 21:33:12,898 - VonageAgent - WARNING - \u26a0\ufe0f Call rejected - User andy roberts has no credits remaining
+2026-01-05 21:33:12,961 - VonageAgent - INFO - \U0001f4cb Event [449657152b1e20922a70fada9b21d039]: ringing
+2026-01-05 21:33:13,241 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474290 (UUID: 449657152b1e20922a70fada9b21d039)
+2026-01-05 21:33:13,244 - VonageAgent - WARNING - \u26a0\ufe0f Call rejected - User andy roberts has no credits remaining
+2026-01-05 21:33:13,626 - VonageAgent - INFO - \U0001f4cb Event [CON-61b7cbc5-3c82-44dd-b8c2-eddf5980f9ba]: unknown
+2026-01-05 21:33:14,280 - VonageAgent - INFO - \U0001f4cb Event [449657152b1e20922a70fada9b21d039]: completed
+2026-01-05 21:33:14,280 - VonageAgent - INFO - [449657152b1e20922a70fada9b21d039] Call ended - session cleaned up
+2026-01-05 21:33:24,151 - VonageAgent - INFO - \U0001f4cb Event [239ed960b952b14e9752c729aa2553ab]: started
+2026-01-05 21:33:24,176 - VonageAgent - INFO - \U0001f4cb Event [239ed960b952b14e9752c729aa2553ab]: ringing
+2026-01-05 21:33:24,415 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474290 (UUID: 239ed960b952b14e9752c729aa2553ab)
+2026-01-05 21:33:24,419 - VonageAgent - WARNING - \u26a0\ufe0f Call rejected - User andy roberts has no credits remaining
+2026-01-05 21:33:24,648 - VonageAgent - INFO - \U0001f4cb Event [CON-e32daed0-c44f-4b70-83a0-c358899996ca]: unknown
+2026-01-05 21:33:25,484 - VonageAgent - INFO - \U0001f4cb Event [239ed960b952b14e9752c729aa2553ab]: completed
+2026-01-05 21:33:25,489 - VonageAgent - INFO - [239ed960b952b14e9752c729aa2553ab] Call ended - session cleaned up
+2026-01-05 21:34:38,941 - VonageAgent - INFO - \U0001f4f1 Attempting to send verification code to +447595289669 (masked: ********9669)
+2026-01-05 21:34:38,941 - VonageAgent - INFO - \U0001f4f2 Sending SMS to +447595289669 from VoiceAI
+2026-01-05 21:34:39,489 - VonageAgent - INFO - \u2705 SMS accepted by Vonage for +447595289669 (message-id=2beb78f6-e0a7-488d-b851-a5217d9db089, remaining-balance=9.51328129)
+2026-01-05 21:34:39,494 - VonageAgent - INFO - \u2705 Signup started successfully for towser2977 (jeulesricha53@email.com), SMS sent to +447595289669
+2026-01-05 21:34:54,485 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:34:54,493 - VonageAgent - INFO - New user verified signup: towser2977 (ID: 25)
+2026-01-05 21:35:06,743 - VonageAgent - INFO - \u2705 AI Brain Provider set to openrouter by super-admin
+2026-01-05 21:35:25,104 - httpx - INFO - HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+2026-01-05 21:35:33,754 - VonageAgent - INFO - User signed in: Julie Richardson (ID: 25)
+2026-01-05 21:35:42,544 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:35:42,548 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:35:42,548 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:35:43,522 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:35:43,524 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:35:43,524 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:37:30,744 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 21:37:30,746 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 21:37:30,746 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 21:37:30,747 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 21:37:30,747 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 21:37:30,747 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 21:37:30,759 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 21:37:30,771 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 21:37:33,921 - VonageAgent - INFO - \u2705 Content approved for user 25 (confidence: 0.95)
+2026-01-05 21:37:33,925 - VonageAgent - INFO - Business info updated for user 25
+2026-01-05 21:37:33,926 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 21:37:33,927 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 21:37:33,928 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 21:37:33,929 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 21:37:33,930 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 21:37:33,931 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 21:37:33,932 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 21:37:33,933 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 21:37:33,934 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 21:37:33,935 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 21:37:33,949 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 21:37:47,826 - VonageAgent - INFO - \U0001f4cb Event [a783a1ee38954169ceb86e07162329fa]: ringing
+2026-01-05 21:37:47,928 - VonageAgent - INFO - \U0001f4cb Event [a783a1ee38954169ceb86e07162329fa]: started
+2026-01-05 21:37:47,970 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474491 (UUID: a783a1ee38954169ceb86e07162329fa)
+2026-01-05 21:37:47,973 - VonageAgent - INFO - \U0001f4de Call assigned to Julie Richardson (user_id: 25)
+2026-01-05 21:37:47,974 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f534 BARGE-IN THRESHOLD SET TO: 0.30 seconds (CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3)
+2026-01-05 21:37:48,357 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Loaded voice preference: shimmer
+2026-01-05 21:37:48,357 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 Transfer number configured: 07595289669
+2026-01-05 21:37:48,358 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Voice provider: speechmatics
+2026-01-05 21:37:48,358 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Bundle settings - Calendar: True, Tasks: True, AdvancedVoice: False, SalesDetector: False
+2026-01-05 21:37:48,358 - VonageAgent - WARNING - [a783a1ee38954169ceb86e07162329fa] \U0001f9e0 Brain locked selected=openrouter effective=openrouter reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:37:48,456 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f9e0 Brain routing selected=openrouter effective=openrouter call_mode=realtime reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:37:48,480 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Returning NCCO with WebSocket: wss://anticipated-travelling-hint-millions.trycloudflare.com/socket/a783a1ee38954169ceb86e07162329fa
+INFO:     216.147.2.120:0 - "WebSocket /socket/a783a1ee38954169ceb86e07162329fa" [accepted]
+2026-01-05 21:37:48,935 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f50c WebSocket connected at 1767649068.93285
+2026-01-05 21:37:48,936 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f Starting OpenAI connection at 0.003s after WS connect
+2026-01-05 21:37:48,937 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:37:48,937 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:37:49,481 - VonageAgent - INFO - \U0001f4cb Event [a783a1ee38954169ceb86e07162329fa]: answered
+2026-01-05 21:37:49,551 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f OpenAI WebSocket connection took 0.613s
+2026-01-05 21:37:49,555 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f Global instructions DB query took 0.003s
+2026-01-05 21:37:49,556 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied global instructions
+2026-01-05 21:37:49,556 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Applied business info (69 chars): We supply cards for all occassions.
+Open only on a Monday 9 am to 5pm...
+2026-01-05 21:37:49,556 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied user-specific personality
+2026-01-05 21:37:49,557 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied user-specific instructions
+2026-01-05 21:37:49,557 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied transfer instructions with function calling
+2026-01-05 21:37:49,557 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:37:49,560 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:37:49,560 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using OpenAI voice: shimmer
+2026-01-05 21:37:49,560 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:37:49,561 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:37:49,561 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:37:49,561 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:37:49,564 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:37:49,565 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Injected business context into conversation
+2026-01-05 21:37:49,566 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Connected to OpenAI successfully
+2026-01-05 21:37:49,566 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f OpenAI connection took 0.630s
+2026-01-05 21:37:49,566 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2b50 GREETING CONFIG: strict_greeting = 'Hi Thanks for calling Cards Are Us, how can I help you?'
+2026-01-05 21:37:49,567 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi Thanks for calling Cards Are Us, how can I help you?
+2026-01-05 21:37:49,567 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Vonage audio mode: bytes
+2026-01-05 21:37:49,571 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:37:49,571 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:37:49,571 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:37:49,572 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] OpenAI session created
+2026-01-05 21:37:49,573 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:49,596 - VonageAgent - INFO - \U0001f4cb Event [70fff210-e0a0-40cf-82ad-f2bec9c62310]: answered
+2026-01-05 21:37:49,630 - VonageAgent - INFO - \U0001f4cb Event [70fff210-e0a0-40cf-82ad-f2bec9c62310]: ringing
+2026-01-05 21:37:49,651 - VonageAgent - INFO - \U0001f4cb Event [70fff210-e0a0-40cf-82ad-f2bec9c62310]: started
+2026-01-05 21:37:49,701 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] OpenAI session configured
+2026-01-05 21:37:49,886 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:37:49,888 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 316ms
+2026-01-05 21:37:50,083 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:50,588 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:50,919 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Speechmatics complete: 1347ms (14 chunks)
+2026-01-05 21:37:53,904 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:37:57,435 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:37:57,436 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 Quick acknowledgment: 'Thank you for calling today' (after caller finished speaking)
+2026-01-05 21:37:57,437 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: Thank you for calling today....
+2026-01-05 21:37:57,437 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:37:57,437 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Thank you for calling today....
+2026-01-05 21:37:57,448 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=14 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:57,717 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:37:57,718 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 281ms
+2026-01-05 21:37:57,959 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:57,984 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f6d1 Barge-in (caller interrupting) - stopping agent: 'Oh, hello. Can I speak to Julie, please?'
+2026-01-05 21:37:57,988 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 OpenRouter brain triggered (post_barge_in_transcript)
+2026-01-05 21:37:57,989 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 AI response triggered (post-barge-in transcript)
+2026-01-05 21:37:57,989 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4de Caller: Oh, hello. Can I speak to Julie, please?
+2026-01-05 21:37:57,989 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f50d Transfer check: transfer_number='07595289669', transcript='Oh, hello. Can I speak to Julie, please?'
+2026-01-05 21:37:57,990 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f525\U0001f525\U0001f525 CALLER REQUESTED TRANSFER: 'Oh, hello. Can I speak to Julie, please?'
+2026-01-05 21:37:57,990 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f525 USING TRANSFER NUMBER: 07595289669
+2026-01-05 21:37:57,990 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f525 STOPPING OPENAI and executing transfer to 07595289669
+2026-01-05 21:37:57,992 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Cancelled OpenAI response
+2026-01-05 21:37:57,998 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f3af =================================
+2026-01-05 21:37:58,003 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f3af AUTO-TRANSFER EXECUTION STARTING
+2026-01-05 21:37:58,006 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f3af Original transfer number: 07595289669
+2026-01-05 21:37:58,009 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f3af Detected sentence: Caller requested: Oh, hello. Can I speak to Julie, please?
+2026-01-05 21:37:58,011 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f3af =================================
+2026-01-05 21:37:58,022 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4de Normalized transfer number: 07595289669 \u2192 447595289669
+2026-01-05 21:37:58,025 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f50a Playing transfer message: OK, I'll try and transfer you to them. Please hold a moment.
+2026-01-05 21:37:58,026 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f504 Marked session as transferring
+2026-01-05 21:37:58,030 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:37:58,118 - VonageAgent - ERROR - [a783a1ee38954169ceb86e07162329fa] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:37:58,179 - VonageAgent - ERROR - [a783a1ee38954169ceb86e07162329fa] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:37:58,185 - VonageAgent - ERROR - [a783a1ee38954169ceb86e07162329fa] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:37:58,442 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:37:58,447 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] OpenRouter stream start latency=0.45s msgs=3 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:37:59,214 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: Julie isn’t available right now—would you like me...
+2026-01-05 21:37:59,278 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:37:59,282 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Julie isn’t available right now—would you like me...
+2026-01-05 21:37:59,286 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:37:59,615 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:37:59,623 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 341ms
+2026-01-05 21:37:59,638 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f916 Judie (OpenRouter): Hi there! Julie isn’t available right now—would you like me to take a message for her? Or is there something I can assist you with today? \U0001f60a
+2026-01-05 21:37:59,735 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4fb Received 102912 bytes of transfer message audio
+2026-01-05 21:37:59,757 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Transfer message played successfully
+2026-01-05 21:37:59,787 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:38:00,292 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:38:00,560 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Speechmatics complete: 1278ms (12 chunks)
+2026-01-05 21:38:00,560 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4ca FULL RESPONSE LATENCY: 3124ms (user stopped \u2192 audio complete)
+2026-01-05 21:38:00,561 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: to take a message for her?...
+2026-01-05 21:38:00,563 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:38:00,564 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: to take a message for her?...
+2026-01-05 21:38:00,794 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:38:00,800 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:38:00,804 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 240ms
+2026-01-05 21:38:01,113 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Speechmatics complete: 549ms (6 chunks)
+2026-01-05 21:38:01,116 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: Or is there something I can assist you with today?...
+2026-01-05 21:38:01,123 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:38:01,126 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Or is there something I can assist you with today?...
+2026-01-05 21:38:01,310 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:38:01,361 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:38:01,363 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 236ms
+2026-01-05 21:38:01,763 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4de Executing Vonage transfer to 447595289669
+2026-01-05 21:38:01,900 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 JWT Payload: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649081, 'exp': 1767652681, 'jti': 'c8728010-e99f-449e-b3df-a5d55de71ec0'}
+2026-01-05 21:38:01,900 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 Application ID: d115408a-221d-4004-873c-b4282efac8e5
+2026-01-05 21:38:01,900 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 Private Key Length: 1703 chars
+2026-01-05 21:38:01,901 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 Private Key starts with: -----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w
+2026-01-05 21:38:01,974 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Generated Vonage JWT token
+2026-01-05 21:38:01,975 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 Decoded JWT: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649081, 'exp': 1767652681, 'jti': 'c8728010-e99f-449e-b3df-a5d55de71ec0'}
+2026-01-05 21:38:01,978 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f510 JWT Token (first 100 chars): eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBsaWNhdGlvbl9pZCI6ImQxMTU0MDhhLTIyMWQtNDAwNC04NzNjLWI0Mjg
+2026-01-05 21:38:01,979 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4e1 Transfer request URL: https://api.nexmo.com/v1/calls/a783a1ee38954169ceb86e07162329fa
+2026-01-05 21:38:01,982 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:38:02,094 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Speechmatics complete: 968ms (11 chunks)
+2026-01-05 21:38:02,117 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Starting Speechmatics TTS for: \U0001f60a...
+2026-01-05 21:38:02,121 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics voice: sarah
+2026-01-05 21:38:02,129 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: \U0001f60a...
+2026-01-05 21:38:02,281 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:38:02,384 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u26a1 First Speechmatics audio bytes in 255ms
+2026-01-05 21:38:02,385 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Transfer initiated - keeping session alive for potential reconnect
+2026-01-05 21:38:02,386 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2705 Speechmatics complete: 257ms (2 chunks)
+2026-01-05 21:38:02,606 - VonageAgent - INFO - \U0001f4e1 transfer-ncco request (POST) to='447595289669' from='447441474491' uuid='a783a1ee38954169ceb86e07162329fa'
+2026-01-05 21:38:02,691 - VonageAgent - INFO - \U0001f4cb Event [a783a1ee38954169ceb86e07162329fa]: unknown
+2026-01-05 21:38:03,389 - VonageAgent - WARNING - [a783a1ee38954169ceb86e07162329fa] \u26a0\ufe0f Transfer may not have executed - verifying...
+2026-01-05 21:38:03,536 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f4ca Call status after transfer: answered
+2026-01-05 21:38:04,593 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a783a1ee38954169ceb86e07162329fa, status=started, direction=outbound, duration=0
+2026-01-05 21:38:04,604 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a783a1ee38954169ceb86e07162329fa, status=ringing, direction=outbound, duration=0
+INFO:     connection closed
+2026-01-05 21:38:07,571 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Credit monitoring cancelled
+2026-01-05 21:38:08,151 - VonageAgent - INFO - \U0001f4cb Event [70fff210-e0a0-40cf-82ad-f2bec9c62310]: completed
+2026-01-05 21:38:08,152 - VonageAgent - INFO - [70fff210-e0a0-40cf-82ad-f2bec9c62310] Call ended - session cleaned up
+2026-01-05 21:38:08,716 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Call ended - transcript length: 258 chars, will generate summary
+2026-01-05 21:38:08,721 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Deducted 1.67 credits from user 25 (connection: 1.0, duration: 0.67, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:38:08,756 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Session closed
+2026-01-05 21:38:08,756 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] *** STARTING generate_summary function ***
+2026-01-05 21:38:08,758 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Database query result: True
+2026-01-05 21:38:08,759 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Transcript length: 258 chars, user_id: 25
+2026-01-05 21:38:09,128 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using DeepSeek API for summary
+2026-01-05 21:38:09,455 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:11,118 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Summary generated using deepseek/deepseek-chat: The caller asked to speak with Julie, but Judie informed them that Julie is unavailable. Judie offered to either take a message or assist the caller directly.
+2026-01-05 21:38:11,130 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Generated summary: The caller asked to speak with Julie, but Judie informed them that Julie is unavailable. Judie offered to either take a message or assist the caller directly.
+2026-01-05 21:38:11,131 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Tasks enabled - extracting tasks from call
+2026-01-05 21:38:11,131 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Extracting tasks from transcript
+INFO:     216.147.2.255:0 - "WebSocket /socket/a783a1ee38954169ceb86e07162329fa" [accepted]
+2026-01-05 21:38:11,589 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \U0001f50c WebSocket connected at 1767649091.5874546
+2026-01-05 21:38:11,589 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f Starting OpenAI connection at 0.002s after WS connect
+2026-01-05 21:38:11,589 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:38:11,590 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:38:11,593 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a783a1ee38954169ceb86e07162329fa, status=answered, direction=outbound, duration=0
+2026-01-05 21:38:11,594 - VonageAgent - INFO - \u2705 Transfer successful for call a783a1ee38954169ceb86e07162329fa
+2026-01-05 21:38:11,596 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a783a1ee38954169ceb86e07162329fa, status=completed, direction=outbound, duration=1
+2026-01-05 21:38:11,601 - VonageAgent - INFO - \U0001f4b3 Transfer billing: 1s = 0.02 min × 3 credits/min + 5 base = 5.05 credits
+2026-01-05 21:38:11,609 - VonageAgent - INFO - \U0001f4cb Event [a783a1ee38954169ceb86e07162329fa]: completed
+2026-01-05 21:38:11,614 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Call ended - transcript length: 258 chars, will generate summary
+2026-01-05 21:38:11,619 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Deducted 6.82 credits from user 25 (connection: 1.0, duration: 0.77, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 5.05, sms: 0)
+2026-01-05 21:38:11,625 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Session closed
+2026-01-05 21:38:11,625 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Call ended - session cleaned up
+2026-01-05 21:38:11,626 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] *** STARTING generate_summary function ***
+2026-01-05 21:38:11,627 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Database query result: True
+2026-01-05 21:38:11,627 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Transcript length: 258 chars, user_id: 25
+2026-01-05 21:38:11,999 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using DeepSeek API for summary
+2026-01-05 21:38:12,343 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:14,079 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Summary generated using deepseek/deepseek-chat: The caller asked to speak to Julie, but Judie informed them that Julie was unavailable. Judie offered to either take a message or assist the caller directly.
+2026-01-05 21:38:14,085 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Generated summary: The caller asked to speak to Julie, but Judie informed them that Julie was unavailable. Judie offered to either take a message or assist the caller directly.
+2026-01-05 21:38:14,086 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Tasks enabled - extracting tasks from call
+2026-01-05 21:38:14,087 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Extracting tasks from transcript
+2026-01-05 21:38:14,533 - VonageAgent - INFO - \U0001f4cb Event [00cad590-25e3-4e0f-b05e-20ab3e64fec4]: cancelled
+2026-01-05 21:38:14,533 - VonageAgent - INFO - [00cad590-25e3-4e0f-b05e-20ab3e64fec4] Call ended - session cleaned up
+INFO:     connection closed
+2026-01-05 21:38:14,835 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:14,859 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:15,039 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f OpenAI WebSocket connection took 3.449s
+2026-01-05 21:38:15,047 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f Global instructions DB query took 0.006s
+2026-01-05 21:38:15,048 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied global instructions
+2026-01-05 21:38:15,048 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Applied business info (69 chars): We supply cards for all occassions.
+Open only on a Monday 9 am to 5pm...
+2026-01-05 21:38:15,049 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied user-specific personality
+2026-01-05 21:38:15,050 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied user-specific instructions
+2026-01-05 21:38:15,051 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Applied transfer instructions with function calling
+2026-01-05 21:38:15,052 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:38:15,057 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:38:15,058 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using OpenAI voice: shimmer
+2026-01-05 21:38:15,059 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:38:15,059 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:38:15,060 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:38:15,060 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:38:15,066 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:38:15,066 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2713 Injected business context into conversation
+2026-01-05 21:38:15,067 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Connected to OpenAI successfully
+2026-01-05 21:38:15,067 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u23f1\ufe0f OpenAI connection took 3.478s
+2026-01-05 21:38:15,068 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2b50 GREETING CONFIG: strict_greeting = 'Hi Thanks for calling Cards Are Us, how can I help you?'
+2026-01-05 21:38:15,068 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi Thanks for calling Cards Are Us, how can I help you?
+2026-01-05 21:38:15,789 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Task extraction response: []
+2026-01-05 21:38:15,791 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] No tasks found in conversation
+2026-01-05 21:38:15,798 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] SMS notification not sent: disabled
+2026-01-05 21:38:16,021 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Task extraction response: []
+2026-01-05 21:38:16,023 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] No tasks found in conversation
+2026-01-05 21:38:16,036 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] SMS notification not sent: disabled
+2026-01-05 21:38:16,229 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Call ended - transcript length: 321 chars, will generate summary
+2026-01-05 21:38:16,234 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Deducted 6.95 credits from user 25 (connection: 1.0, duration: 0.90, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 5.05, sms: 0)
+2026-01-05 21:38:16,259 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Session closed
+2026-01-05 21:38:16,260 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] *** STARTING generate_summary function ***
+2026-01-05 21:38:16,262 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Database query result: True
+2026-01-05 21:38:16,262 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Transcript length: 321 chars, user_id: 25
+2026-01-05 21:38:16,644 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Using DeepSeek API for summary
+2026-01-05 21:38:16,971 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:18,815 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Summary generated using deepseek/deepseek-chat: The caller asked to speak with Julie, who was unavailable. Judie offered to take a message or assist the caller directly.
+2026-01-05 21:38:18,829 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Generated summary: The caller asked to speak with Julie, who was unavailable. Judie offered to take a message or assist the caller directly.
+2026-01-05 21:38:18,829 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Tasks enabled - extracting tasks from call
+2026-01-05 21:38:18,829 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Extracting tasks from transcript
+2026-01-05 21:38:19,527 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:38:20,816 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Task extraction response: ["Call Julie back regarding the caller's inquiry"]
+2026-01-05 21:38:20,820 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Created task: Call Julie back regarding the caller's inquiry
+2026-01-05 21:38:20,820 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Charged 1.0 credits for 1 tasks (1.0 credits each)
+2026-01-05 21:38:20,825 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] Extracted and saved 1 tasks
+2026-01-05 21:38:20,829 - VonageAgent - INFO - [a783a1ee38954169ceb86e07162329fa] SMS notification not sent: disabled
+2026-01-05 21:39:14,231 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 21:39:14,233 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 21:39:14,233 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 21:39:14,234 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 21:39:14,234 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 21:39:14,234 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 21:39:14,236 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 21:39:14,244 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 21:39:14,244 - VonageAgent - INFO - Business info unchanged for user 25; skipping moderation
+2026-01-05 21:39:14,245 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 21:39:14,245 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 21:39:14,245 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 21:39:14,246 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 21:39:14,246 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 21:39:14,246 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 21:39:14,247 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 21:39:14,247 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 21:39:14,247 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 21:39:14,247 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 21:39:14,260 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 21:39:25,656 - VonageAgent - INFO - \U0001f4cb Event [c78cf30b175f8811c83d0a3786e27f70]: started
+2026-01-05 21:39:25,798 - VonageAgent - INFO - \U0001f4cb Event [c78cf30b175f8811c83d0a3786e27f70]: ringing
+2026-01-05 21:39:25,841 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474491 (UUID: c78cf30b175f8811c83d0a3786e27f70)
+2026-01-05 21:39:25,847 - VonageAgent - INFO - \U0001f4de Call assigned to Julie Richardson (user_id: 25)
+2026-01-05 21:39:25,848 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f534 BARGE-IN THRESHOLD SET TO: 0.30 seconds (CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3)
+2026-01-05 21:39:26,237 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Loaded voice preference: shimmer
+2026-01-05 21:39:26,238 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 Transfer number configured: 07595289669
+2026-01-05 21:39:26,239 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Voice provider: speechmatics
+2026-01-05 21:39:26,239 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Bundle settings - Calendar: True, Tasks: True, AdvancedVoice: False, SalesDetector: False
+2026-01-05 21:39:26,239 - VonageAgent - WARNING - [c78cf30b175f8811c83d0a3786e27f70] \U0001f9e0 Brain locked selected=openrouter effective=openrouter reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:39:26,278 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f9e0 Brain routing selected=openrouter effective=openrouter call_mode=realtime reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:39:26,300 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Returning NCCO with WebSocket: wss://anticipated-travelling-hint-millions.trycloudflare.com/socket/c78cf30b175f8811c83d0a3786e27f70
+INFO:     216.147.2.36:0 - "WebSocket /socket/c78cf30b175f8811c83d0a3786e27f70" [accepted]
+2026-01-05 21:39:26,712 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f50c WebSocket connected at 1767649166.7103155
+2026-01-05 21:39:26,712 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f Starting OpenAI connection at 0.002s after WS connect
+2026-01-05 21:39:26,712 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:39:26,713 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:39:27,152 - VonageAgent - INFO - \U0001f4cb Event [c78cf30b175f8811c83d0a3786e27f70]: answered
+2026-01-05 21:39:27,252 - VonageAgent - INFO - \U0001f4cb Event [c2763937-885b-4d3c-b4c8-d93b21f2017d]: ringing
+2026-01-05 21:39:27,269 - VonageAgent - INFO - \U0001f4cb Event [c2763937-885b-4d3c-b4c8-d93b21f2017d]: started
+2026-01-05 21:39:27,285 - VonageAgent - INFO - \U0001f4cb Event [c2763937-885b-4d3c-b4c8-d93b21f2017d]: answered
+2026-01-05 21:39:27,345 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f OpenAI WebSocket connection took 0.631s
+2026-01-05 21:39:27,354 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f Global instructions DB query took 0.009s
+2026-01-05 21:39:27,355 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied global instructions
+2026-01-05 21:39:27,355 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Applied business info (69 chars): We supply cards for all occassions.
+Open only on a Monday 9 am to 5pm...
+2026-01-05 21:39:27,355 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied user-specific personality
+2026-01-05 21:39:27,356 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied user-specific instructions
+2026-01-05 21:39:27,356 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied transfer instructions with function calling
+2026-01-05 21:39:27,356 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:39:27,359 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:39:27,359 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using OpenAI voice: shimmer
+2026-01-05 21:39:27,359 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:39:27,360 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:39:27,360 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:39:27,360 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:39:27,364 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:39:27,364 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Injected business context into conversation
+2026-01-05 21:39:27,364 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Connected to OpenAI successfully
+2026-01-05 21:39:27,365 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f OpenAI connection took 0.653s
+2026-01-05 21:39:27,365 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2b50 GREETING CONFIG: strict_greeting = 'Hi Thanks for calling Cards Are Us, how can I help you?'
+2026-01-05 21:39:27,365 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi Thanks for calling Cards Are Us, how can I help you?
+2026-01-05 21:39:27,366 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Vonage audio mode: bytes
+2026-01-05 21:39:27,371 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:39:27,371 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:27,371 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:39:27,372 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] OpenAI session created
+2026-01-05 21:39:27,373 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:27,503 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] OpenAI session configured
+2026-01-05 21:39:27,672 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:27,674 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 303ms
+2026-01-05 21:39:27,892 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:28,397 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:28,724 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 1353ms (14 chunks)
+2026-01-05 21:39:31,634 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:35,275 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:35,276 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 Quick acknowledgment: 'Thank you for calling today' (after caller finished speaking)
+2026-01-05 21:39:35,277 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: Thank you for calling today....
+2026-01-05 21:39:35,277 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:35,277 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Thank you for calling today....
+2026-01-05 21:39:35,350 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=24 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:35,561 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:35,563 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 286ms
+2026-01-05 21:39:35,856 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=14 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:35,914 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 637ms (6 chunks)
+2026-01-05 21:39:35,914 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4ca FULL RESPONSE LATENCY: 638ms (user stopped \u2192 audio complete)
+2026-01-05 21:39:36,251 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:39:36,253 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:39:36,253 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4de Caller: Oh, hello. Can I speak to Julie, please?
+2026-01-05 21:39:36,254 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:39:36,254 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f50d Transfer check: transfer_number='07595289669', transcript='Oh, hello. Can I speak to Julie, please?'
+2026-01-05 21:39:36,442 - VonageAgent - ERROR - [c78cf30b175f8811c83d0a3786e27f70] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:39:36,628 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:39:36,630 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] OpenRouter stream start latency=0.38s msgs=3 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:39:37,062 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: May I ask who’s calling, please?...
+2026-01-05 21:39:37,064 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:37,064 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: May I ask who’s calling, please?...
+2026-01-05 21:39:37,070 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f916 Judie (OpenRouter): Sure! May I ask who’s calling, please?
+2026-01-05 21:39:37,092 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:37,297 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:37,298 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 234ms
+2026-01-05 21:39:37,596 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:37,768 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 704ms (8 chunks)
+2026-01-05 21:39:40,034 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:41,303 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:42,165 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:39:42,169 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:39:42,170 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:39:42,171 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4de Caller: Yeah, it's a mom.
+2026-01-05 21:39:42,172 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:39:42,173 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f50d Transfer check: transfer_number='07595289669', transcript='Yeah, it's a mom.'
+2026-01-05 21:39:42,321 - VonageAgent - ERROR - [c78cf30b175f8811c83d0a3786e27f70] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:39:42,478 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:39:42,479 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] OpenRouter stream start latency=0.31s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:39:42,894 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: I’ll transfer you to Julie right away....
+2026-01-05 21:39:42,894 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:42,895 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I’ll transfer you to Julie right away....
+2026-01-05 21:39:42,899 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:43,057 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f916 Judie (OpenRouter): Got it! I’ll transfer you to Julie right away. Please hold for just a moment.
+2026-01-05 21:39:43,059 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f525 TRANSFER NARRATIVE detected in AI text: 'Got it! I’ll transfer you to Julie right away. Please hold for just a moment.'
+2026-01-05 21:39:43,069 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer allowed - no caller-name requirement
+2026-01-05 21:39:43,070 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer allowed - caller name check passed
+2026-01-05 21:39:43,216 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:43,218 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:39:43,220 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:39:43,221 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:43,222 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:39:43,421 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:43,504 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:43,506 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 284ms
+2026-01-05 21:39:43,939 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:44,452 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:44,953 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:45,238 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 2015ms (22 chunks)
+2026-01-05 21:39:45,239 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4ca FULL RESPONSE LATENCY: 3935ms (user stopped \u2192 audio complete)
+2026-01-05 21:39:47,219 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:48,211 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:39:49,065 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:39:49,068 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: Okay — I'll try to transfer you now....
+2026-01-05 21:39:49,069 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:49,070 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Okay — I'll try to transfer you now....
+2026-01-05 21:39:49,072 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af =================================
+2026-01-05 21:39:49,072 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af AUTO-TRANSFER EXECUTION STARTING
+2026-01-05 21:39:49,073 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af Original transfer number: 07595289669
+2026-01-05 21:39:49,073 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af Detected sentence: AI requested transfer
+2026-01-05 21:39:49,073 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f3af =================================
+2026-01-05 21:39:49,076 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4de Normalized transfer number: 07595289669 \u2192 447595289669
+2026-01-05 21:39:49,076 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f50a Playing transfer message: OK, I'll try and transfer you to them. Please hold a moment.
+2026-01-05 21:39:49,077 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f504 Marked session as transferring
+2026-01-05 21:39:49,083 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:49,327 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:49,328 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 259ms
+2026-01-05 21:39:49,598 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:49,932 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 863ms (9 chunks)
+2026-01-05 21:39:49,934 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4ca FULL RESPONSE LATENCY: 1721ms (user stopped \u2192 audio complete)
+2026-01-05 21:39:50,072 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f504 Delayed transcript arrived: triggering response now
+2026-01-05 21:39:50,074 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 OpenRouter brain triggered (delayed_transcript_after_filler)
+2026-01-05 21:39:50,216 - VonageAgent - ERROR - [c78cf30b175f8811c83d0a3786e27f70] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:39:50,445 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:39:50,447 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] OpenRouter stream start latency=0.37s msgs=6 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:39:50,681 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4fb Received 101376 bytes of transfer message audio
+2026-01-05 21:39:50,681 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Agent started speaking
+2026-01-05 21:39:50,682 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer message played successfully
+2026-01-05 21:39:50,691 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:50,836 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: Transferring you now, one moment please....
+2026-01-05 21:39:50,838 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:50,838 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Transferring you now, one moment please....
+2026-01-05 21:39:51,073 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:51,076 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 238ms
+2026-01-05 21:39:51,102 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f916 Judie (OpenRouter): Transferring you now, one moment please. Thank you for calling.
+2026-01-05 21:39:51,103 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f525 TRANSFER NARRATIVE detected in AI text: 'Transferring you now, one moment please. Thank you for calling.'
+2026-01-05 21:39:51,104 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer allowed - no caller-name requirement
+2026-01-05 21:39:51,104 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer allowed - caller name check passed
+2026-01-05 21:39:51,138 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:39:51,139 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Starting Speechmatics TTS for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:39:51,140 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics voice: sarah
+2026-01-05 21:39:51,140 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:39:51,196 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:51,435 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:39:51,437 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u26a1 First Speechmatics audio bytes in 297ms
+2026-01-05 21:39:51,710 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=12 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:52,219 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:52,690 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4de Executing Vonage transfer to 447595289669
+2026-01-05 21:39:52,692 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 JWT Payload: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649192, 'exp': 1767652792, 'jti': '6f154949-7b30-4aba-becc-91efd68b9e18'}
+2026-01-05 21:39:52,692 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 Application ID: d115408a-221d-4004-873c-b4282efac8e5
+2026-01-05 21:39:52,692 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 Private Key Length: 1703 chars
+2026-01-05 21:39:52,693 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 Private Key starts with: -----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w
+2026-01-05 21:39:52,727 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Generated Vonage JWT token
+2026-01-05 21:39:52,728 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 Decoded JWT: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649192, 'exp': 1767652792, 'jti': '6f154949-7b30-4aba-becc-91efd68b9e18'}
+2026-01-05 21:39:52,728 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f510 JWT Token (first 100 chars): eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBsaWNhdGlvbl9pZCI6ImQxMTU0MDhhLTIyMWQtNDAwNC04NzNjLWI0Mjg
+2026-01-05 21:39:52,728 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4e1 Transfer request URL: https://api.nexmo.com/v1/calls/c78cf30b175f8811c83d0a3786e27f70
+2026-01-05 21:39:52,730 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:39:53,115 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Transfer initiated - keeping session alive for potential reconnect
+2026-01-05 21:39:53,160 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2705 Speechmatics complete: 2020ms (21 chunks)
+2026-01-05 21:39:53,218 - VonageAgent - INFO - \U0001f4cb Event [c78cf30b175f8811c83d0a3786e27f70]: unknown
+2026-01-05 21:39:53,453 - VonageAgent - INFO - \U0001f4e1 transfer-ncco request (POST) to='447595289669' from='447441474491' uuid='c78cf30b175f8811c83d0a3786e27f70'
+2026-01-05 21:39:54,129 - VonageAgent - WARNING - [c78cf30b175f8811c83d0a3786e27f70] \u26a0\ufe0f Transfer may not have executed - verifying...
+2026-01-05 21:39:54,336 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f4ca Call status after transfer: answered
+2026-01-05 21:39:55,556 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=c78cf30b175f8811c83d0a3786e27f70, status=ringing, direction=outbound, duration=0
+2026-01-05 21:39:55,718 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=c78cf30b175f8811c83d0a3786e27f70, status=started, direction=outbound, duration=0
+INFO:     connection closed
+2026-01-05 21:39:58,292 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Credit monitoring cancelled
+2026-01-05 21:39:58,668 - VonageAgent - INFO - \U0001f4cb Event [c2763937-885b-4d3c-b4c8-d93b21f2017d]: completed
+2026-01-05 21:39:58,671 - VonageAgent - INFO - [c2763937-885b-4d3c-b4c8-d93b21f2017d] Call ended - session cleaned up
+2026-01-05 21:39:59,488 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Call ended - transcript length: 359 chars, will generate summary
+2026-01-05 21:39:59,542 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Deducted 2.10 credits from user 25 (connection: 1.0, duration: 1.10, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:39:59,825 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Session closed
+2026-01-05 21:39:59,839 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] *** STARTING generate_summary function ***
+2026-01-05 21:39:59,842 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Database query result: True
+2026-01-05 21:39:59,850 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Transcript length: 359 chars, user_id: 25
+2026-01-05 21:40:00,247 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using DeepSeek API for summary
+2026-01-05 21:40:00,883 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:02,930 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Summary generated using deepseek/deepseek-chat: The caller asked to speak to Julie, and Judie offered to transfer the call after confirming the caller's identity as "a mom." The caller did not respond to the transfer request, which Judie repeated.
+2026-01-05 21:40:02,995 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Generated summary: The caller asked to speak to Julie, and Judie offered to transfer the call after confirming the caller's identity as "a mom." The caller did not respond to the transfer request, which Judie repeated.
+2026-01-05 21:40:02,996 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Tasks enabled - extracting tasks from call
+2026-01-05 21:40:02,997 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Extracting tasks from transcript
+2026-01-05 21:40:03,528 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=c78cf30b175f8811c83d0a3786e27f70, status=answered, direction=outbound, duration=0
+2026-01-05 21:40:03,536 - VonageAgent - INFO - \u2705 Transfer successful for call c78cf30b175f8811c83d0a3786e27f70
+INFO:     216.147.2.115:0 - "WebSocket /socket/c78cf30b175f8811c83d0a3786e27f70" [accepted]
+2026-01-05 21:40:03,672 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \U0001f50c WebSocket connected at 1767649203.6581647
+2026-01-05 21:40:03,677 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f Starting OpenAI connection at 0.020s after WS connect
+2026-01-05 21:40:03,686 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:40:03,694 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:40:03,890 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:03,944 - VonageAgent - INFO - \U0001f4cb Event [808c1362-cd61-4cf0-b0c0-bee42ebcfce3]: started
+2026-01-05 21:40:04,006 - VonageAgent - INFO - \U0001f4cb Event [808c1362-cd61-4cf0-b0c0-bee42ebcfce3]: ringing
+2026-01-05 21:40:04,363 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f OpenAI WebSocket connection took 0.660s
+2026-01-05 21:40:04,433 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f Global instructions DB query took 0.002s
+2026-01-05 21:40:04,453 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied global instructions
+2026-01-05 21:40:04,472 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Applied business info (69 chars): We supply cards for all occassions.
+Open only on a Monday 9 am to 5pm...
+2026-01-05 21:40:04,474 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied user-specific personality
+2026-01-05 21:40:04,513 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied user-specific instructions
+2026-01-05 21:40:04,526 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Applied transfer instructions with function calling
+2026-01-05 21:40:04,530 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:40:04,541 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:40:04,547 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using OpenAI voice: shimmer
+2026-01-05 21:40:04,549 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:40:04,556 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:40:04,559 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:40:04,561 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:40:04,570 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:40:04,573 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2713 Injected business context into conversation
+2026-01-05 21:40:04,577 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Connected to OpenAI successfully
+2026-01-05 21:40:04,582 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u23f1\ufe0f OpenAI connection took 0.905s
+2026-01-05 21:40:04,590 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2b50 GREETING CONFIG: strict_greeting = 'Hi Thanks for calling Cards Are Us, how can I help you?'
+2026-01-05 21:40:04,594 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi Thanks for calling Cards Are Us, how can I help you?
+2026-01-05 21:40:04,696 - VonageAgent - INFO - \U0001f4cb Event [808c1362-cd61-4cf0-b0c0-bee42ebcfce3]: answered
+2026-01-05 21:40:04,710 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Task extraction response: []
+2026-01-05 21:40:04,717 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] No tasks found in conversation
+2026-01-05 21:40:04,726 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] SMS notification not sent: disabled
+2026-01-05 21:40:06,819 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=c78cf30b175f8811c83d0a3786e27f70, status=completed, direction=outbound, duration=4
+2026-01-05 21:40:06,866 - VonageAgent - INFO - \U0001f4b3 Transfer billing: 4s = 0.07 min × 3 credits/min + 5 base = 5.20 credits
+INFO:     connection closed
+2026-01-05 21:40:11,522 - VonageAgent - INFO - \U0001f4cb Event [c78cf30b175f8811c83d0a3786e27f70]: completed
+2026-01-05 21:40:11,539 - VonageAgent - INFO - \U0001f4cb Event [808c1362-cd61-4cf0-b0c0-bee42ebcfce3]: completed
+2026-01-05 21:40:11,539 - VonageAgent - INFO - [808c1362-cd61-4cf0-b0c0-bee42ebcfce3] Call ended - session cleaned up
+2026-01-05 21:40:12,413 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Call ended - transcript length: 422 chars, will generate summary
+2026-01-05 21:40:12,424 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Deducted 7.73 credits from user 25 (connection: 1.0, duration: 1.53, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 5.2, sms: 0)
+2026-01-05 21:40:12,454 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Session closed
+2026-01-05 21:40:12,467 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Call ended - transcript length: 422 chars, will generate summary
+2026-01-05 21:40:12,472 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Deducted 7.73 credits from user 25 (connection: 1.0, duration: 1.53, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 5.2, sms: 0)
+2026-01-05 21:40:12,485 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Session closed
+2026-01-05 21:40:12,486 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Call ended - session cleaned up
+2026-01-05 21:40:12,486 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] *** STARTING generate_summary function ***
+2026-01-05 21:40:12,488 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Database query result: True
+2026-01-05 21:40:12,488 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Transcript length: 422 chars, user_id: 25
+2026-01-05 21:40:12,863 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using DeepSeek API for summary
+2026-01-05 21:40:13,205 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:15,050 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Summary generated using deepseek/deepseek-chat: The caller asked to speak to Julie. Judie offered to transfer the call and asked for confirmation, but the caller did not respond, leading Judie to restart the greeting.
+2026-01-05 21:40:15,061 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Generated summary: The caller asked to speak to Julie. Judie offered to transfer the call and asked for confirmation, but the caller did not respond, leading Judie to restart the greeting.
+2026-01-05 21:40:15,062 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Tasks enabled - extracting tasks from call
+2026-01-05 21:40:15,062 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Extracting tasks from transcript
+2026-01-05 21:40:15,441 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] *** STARTING generate_summary function ***
+2026-01-05 21:40:15,444 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Database query result: True
+2026-01-05 21:40:15,444 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Transcript length: 422 chars, user_id: 25
+2026-01-05 21:40:15,824 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Using DeepSeek API for summary
+2026-01-05 21:40:16,115 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:18,986 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Summary generated using deepseek/deepseek-chat: The caller asked to speak to Julie at Cards Are Us. Judie requested the caller's name, and the caller identified herself as "a mom." Judie then attempted to transfer the call, but the conversation appears to have been interrupted or repeated, as Judie restarted the greeting without completing the transfer.
+2026-01-05 21:40:18,990 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Generated summary: The caller asked to speak to Julie at Cards Are Us. Judie requested the caller's name, and the caller identified herself as "a mom." Judie then attempted to transfer the call, but the conversation appears to have been interrupted or repeated, as Judie restarted the greeting without completing the transfer.
+2026-01-05 21:40:18,991 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Tasks enabled - extracting tasks from call
+2026-01-05 21:40:18,991 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Extracting tasks from transcript
+2026-01-05 21:40:19,713 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:19,766 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:40:20,697 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Task extraction response: []
+2026-01-05 21:40:20,699 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] No tasks found in conversation
+2026-01-05 21:40:20,702 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] SMS notification not sent: disabled
+2026-01-05 21:40:20,739 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] Task extraction response: []
+2026-01-05 21:40:20,740 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] No tasks found in conversation
+2026-01-05 21:40:20,744 - VonageAgent - INFO - [c78cf30b175f8811c83d0a3786e27f70] SMS notification not sent: disabled
+2026-01-05 21:41:04,256 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 21:41:04,262 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 21:41:04,272 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 21:41:04,276 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 21:41:04,283 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 21:41:04,288 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 21:41:04,299 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 21:41:04,323 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 21:41:04,328 - VonageAgent - INFO - Business info unchanged for user 25; skipping moderation
+2026-01-05 21:41:04,339 - VonageAgent - INFO - Agent personality updated for user 25
+2026-01-05 21:41:04,345 - VonageAgent - INFO - Agent instructions updated for user 25
+2026-01-05 21:41:04,351 - VonageAgent - INFO - Call greeting updated for user 25
+2026-01-05 21:41:04,351 - VonageAgent - INFO - Voice updated to shimmer for user 25
+2026-01-05 21:41:04,354 - VonageAgent - INFO - ElevenLabs setting updated to 0 for user 25
+2026-01-05 21:41:04,369 - VonageAgent - INFO - ElevenLabs voice ID updated to EXAVITQu4vr4xnSDxMaL for user 25
+2026-01-05 21:41:04,375 - VonageAgent - INFO - Phone number updated to 447441474491 for user 25
+2026-01-05 21:41:04,382 - VonageAgent - INFO - Transfer number updated to 07595289669 for user 25
+2026-01-05 21:41:04,388 - VonageAgent - INFO - Transfer instructions updated for user 25
+2026-01-05 21:41:04,400 - VonageAgent - INFO - Response latency updated to 500ms for user 25
+2026-01-05 21:41:04,489 - VonageAgent - INFO - Configuration saved to database for user 25
+2026-01-05 21:41:16,272 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: started
+2026-01-05 21:41:16,292 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: ringing
+2026-01-05 21:41:16,308 - VonageAgent - INFO - \U0001f4de Incoming call: 447595289669 -> 447441474491 (UUID: a918865854defb004c4e88ea944016bd)
+2026-01-05 21:41:16,311 - VonageAgent - INFO - \U0001f4de Call assigned to Julie Richardson (user_id: 25)
+2026-01-05 21:41:16,312 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f534 BARGE-IN THRESHOLD SET TO: 0.30 seconds (CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3)
+2026-01-05 21:41:16,685 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Loaded voice preference: shimmer
+2026-01-05 21:41:16,686 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 Transfer number configured: 07595289669
+2026-01-05 21:41:16,686 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Voice provider: speechmatics
+2026-01-05 21:41:16,687 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Bundle settings - Calendar: True, Tasks: True, AdvancedVoice: False, SalesDetector: False
+2026-01-05 21:41:16,687 - VonageAgent - WARNING - [a918865854defb004c4e88ea944016bd] \U0001f9e0 Brain locked selected=openrouter effective=openrouter reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:41:16,720 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f9e0 Brain routing selected=openrouter effective=openrouter call_mode=realtime reasons=realtime_mode_uses_openai_asr_only,disabled_calendar_booking_for_non_openai_brain
+2026-01-05 21:41:16,742 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Returning NCCO with WebSocket: wss://anticipated-travelling-hint-millions.trycloudflare.com/socket/a918865854defb004c4e88ea944016bd
+INFO:     216.147.2.0:0 - "WebSocket /socket/a918865854defb004c4e88ea944016bd" [accepted]
+2026-01-05 21:41:17,157 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50c WebSocket connected at 1767649277.155317
+2026-01-05 21:41:17,157 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f1\ufe0f Starting OpenAI connection at 0.002s after WS connect
+2026-01-05 21:41:17,158 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Connecting to OpenAI Realtime API (attempt 1)...
+2026-01-05 21:41:17,158 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] API Key starts with: sk-proj-0TwbsgMAM6ZE... ends with: ...2Oz7ME4PgA
+INFO:     connection open
+2026-01-05 21:41:17,569 - VonageAgent - INFO - \U0001f4cb Event [19bffeee-4892-4f0a-a4c5-bd4246abd45b]: started
+2026-01-05 21:41:17,739 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: answered
+2026-01-05 21:41:17,763 - VonageAgent - INFO - \U0001f4cb Event [19bffeee-4892-4f0a-a4c5-bd4246abd45b]: ringing
+2026-01-05 21:41:17,783 - VonageAgent - INFO - \U0001f4cb Event [19bffeee-4892-4f0a-a4c5-bd4246abd45b]: answered
+2026-01-05 21:41:17,991 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f1\ufe0f OpenAI WebSocket connection took 0.832s
+2026-01-05 21:41:18,002 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f1\ufe0f Global instructions DB query took 0.010s
+2026-01-05 21:41:18,003 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Applied global instructions
+2026-01-05 21:41:18,004 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2713 Applied business info (69 chars): We supply cards for all occassions.
+Open only on a Monday 9 am to 5pm...
+2026-01-05 21:41:18,004 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Applied user-specific personality
+2026-01-05 21:41:18,006 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Applied user-specific instructions
+2026-01-05 21:41:18,006 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Applied transfer instructions with function calling
+2026-01-05 21:41:18,007 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using instructions: You are Judie, a phone assistant.
+
+\U0001f310 GLOBAL INSTRUCTIONS (MANDATORY FOR ALL AGENTS):
+Simple, friendl...
+2026-01-05 21:41:18,016 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using custom response latency: 500ms (user-configured)
+2026-01-05 21:41:18,016 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using OpenAI voice: shimmer
+2026-01-05 21:41:18,017 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2696\ufe0f BALANCED MODE: silence=500ms, prefix=300ms, tokens=300, temp=0.8
+2026-01-05 21:41:18,017 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics for TTS - OpenAI text-only mode
+2026-01-05 21:41:18,018 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD: voice_provider=speechmatics, brain_provider=openrouter, auto_create=False, threshold=0.6, silence=450ms, padding=120ms
+2026-01-05 21:41:18,018 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Calendar booking tool DISABLED (user turned off bundle)
+2026-01-05 21:41:18,025 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2713 Injected GLOBAL instructions into conversation
+2026-01-05 21:41:18,026 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2713 Injected business context into conversation
+2026-01-05 21:41:18,026 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Connected to OpenAI successfully
+2026-01-05 21:41:18,027 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f1\ufe0f OpenAI connection took 0.869s
+2026-01-05 21:41:18,027 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2b50 GREETING CONFIG: strict_greeting = 'Hi Thanks for calling Cards Are Us, how can I help you?'
+2026-01-05 21:41:18,027 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2b50 Using STRICT greeting (non-OpenAI brain): Hi Thanks for calling Cards Are Us, how can I help you?
+2026-01-05 21:41:18,028 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Vonage audio mode: bytes
+2026-01-05 21:41:18,036 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:41:18,037 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:18,037 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Hi Thanks for calling Cards Are Us, how can I help...
+2026-01-05 21:41:18,038 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] OpenAI session created
+2026-01-05 21:41:18,039 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:18,154 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] OpenAI session configured
+2026-01-05 21:41:18,339 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:18,341 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 304ms
+2026-01-05 21:41:18,545 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:19,059 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:19,361 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Speechmatics complete: 1324ms (14 chunks)
+2026-01-05 21:41:22,053 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:24,557 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:24,560 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 Quick acknowledgment: 'Thank you for calling today' (after caller finished speaking)
+2026-01-05 21:41:24,561 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Thank you for calling today....
+2026-01-05 21:41:24,562 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:24,562 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Thank you for calling today....
+2026-01-05 21:41:24,585 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=24 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:24,843 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:24,845 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 282ms
+2026-01-05 21:41:25,064 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f6d1 Barge-in (caller interrupting) - stopping agent: 'Hello, may I speak to Julie please?'
+2026-01-05 21:41:25,065 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 OpenRouter brain triggered (post_barge_in_transcript)
+2026-01-05 21:41:25,066 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 AI response triggered (post-barge-in transcript)
+2026-01-05 21:41:25,067 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Caller: Hello, may I speak to Julie please?
+2026-01-05 21:41:25,067 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:41:25,067 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50d Transfer check: transfer_number='07595289669', transcript='Hello, may I speak to Julie please?'
+2026-01-05 21:41:25,105 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:41:25,205 - VonageAgent - ERROR - [a918865854defb004c4e88ea944016bd] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:41:25,208 - VonageAgent - ERROR - [a918865854defb004c4e88ea944016bd] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:41:25,431 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:25,434 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] OpenRouter stream start latency=0.37s msgs=3 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:41:26,137 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Could I just ask who’s calling, please?...
+2026-01-05 21:41:26,139 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:26,139 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Could I just ask who’s calling, please?...
+2026-01-05 21:41:26,140 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:26,154 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f916 Judie (OpenRouter): Of course! Could I just ask who’s calling, please?
+2026-01-05 21:41:26,444 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:26,445 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 306ms
+2026-01-05 21:41:26,643 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:27,073 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Speechmatics complete: 934ms (9 chunks)
+2026-01-05 21:41:27,075 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4ca FULL RESPONSE LATENCY: 2515ms (user stopped \u2192 audio complete)
+2026-01-05 21:41:29,369 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:30,598 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:31,463 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:41:31,465 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 OpenRouter brain triggered (late_transcript_fallback)
+2026-01-05 21:41:31,466 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 AI response trigger scheduled (late transcript fallback)
+2026-01-05 21:41:31,466 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Caller: Yeah, it's her mom.
+2026-01-05 21:41:31,467 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Custom transfer rules detected in business context - AI will handle transfer logic naturally
+2026-01-05 21:41:31,467 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50d Transfer check: transfer_number='07595289669', transcript='Yeah, it's her mom.'
+2026-01-05 21:41:31,607 - VonageAgent - ERROR - [a918865854defb004c4e88ea944016bd] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:41:31,723 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:31,724 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] OpenRouter stream start latency=0.26s msgs=5 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:41:32,212 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Let me transfer you right over....
+2026-01-05 21:41:32,214 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:32,215 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Let me transfer you right over....
+2026-01-05 21:41:32,232 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:32,471 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f916 Judie (OpenRouter): No problem! Let me transfer you right over. Please hold for just a moment.
+2026-01-05 21:41:32,473 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f525 TRANSFER NARRATIVE detected in AI text: 'No problem! Let me transfer you right over. Please hold for just a moment.'
+2026-01-05 21:41:32,473 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer allowed - no caller-name requirement
+2026-01-05 21:41:32,474 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer allowed - caller name check passed
+2026-01-05 21:41:32,511 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:32,511 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:41:32,512 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:41:32,512 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:32,513 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:41:32,737 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:32,791 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:32,792 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 279ms
+2026-01-05 21:41:33,239 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:33,752 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:34,258 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:34,590 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Speechmatics complete: 2078ms (22 chunks)
+2026-01-05 21:41:34,591 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4ca FULL RESPONSE LATENCY: 3991ms (user stopped \u2192 audio complete)
+2026-01-05 21:41:36,545 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:37,202 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:38,072 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u23f3 Transcript pending; scheduling filler to cover latency (delay=0.30s)
+2026-01-05 21:41:38,074 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f5e3\ufe0f CALLER STARTED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:38,169 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Okay — I'll try to transfer you now....
+2026-01-05 21:41:38,171 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:38,171 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Okay — I'll try to transfer you now....
+2026-01-05 21:41:38,172 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af =================================
+2026-01-05 21:41:38,172 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af AUTO-TRANSFER EXECUTION STARTING
+2026-01-05 21:41:38,173 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Original transfer number: 07595289669
+2026-01-05 21:41:38,173 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Detected sentence: AI requested transfer
+2026-01-05 21:41:38,173 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af =================================
+2026-01-05 21:41:38,176 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Normalized transfer number: 07595289669 \u2192 447595289669
+2026-01-05 21:41:38,176 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50a Playing transfer message: OK, I'll try and transfer you to them. Please hold a moment.
+2026-01-05 21:41:38,177 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f504 Marked session as transferring
+2026-01-05 21:41:38,178 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0928 max_sample=13109 vad_thr=0.0050 speaking_now=True vad_speaking=True agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:38,178 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f6d1\U0001f6d1\U0001f6d1 VAD BARGE-IN: caller spoke 0.36s >= threshold 0.30s - BLOCKING ALL OUTBOUND AUDIO
+2026-01-05 21:41:38,179 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50d Debug: _barge_in_min_speech_seconds=0.30, CONFIG['BARGE_IN_MIN_SPEECH_SECONDS']=0.3
+2026-01-05 21:41:38,319 - VonageAgent - ERROR - [a918865854defb004c4e88ea944016bd] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:41:38,432 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:38,434 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:41:38,720 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f513 VAD: caller stopped - unblocking outbound audio for next response
+2026-01-05 21:41:39,074 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f504 Delayed transcript arrived: triggering response now
+2026-01-05 21:41:39,077 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 OpenRouter brain triggered (delayed_transcript_after_filler)
+2026-01-05 21:41:39,087 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f507 CALLER STOPPED SPEAKING (agent_speaking=False)
+2026-01-05 21:41:39,699 - httpx - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:39,701 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] OpenRouter stream start latency=0.62s msgs=6 model=deepseek/deepseek-chat max_tokens=100
+2026-01-05 21:41:39,771 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4fb Received 101376 bytes of transfer message audio
+2026-01-05 21:41:39,771 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Agent started speaking
+2026-01-05 21:41:39,772 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:39,773 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer message played successfully
+2026-01-05 21:41:39,832 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Alright, transferring you now....
+2026-01-05 21:41:39,833 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:39,833 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Alright, transferring you now....
+2026-01-05 21:41:40,109 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:40,111 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 278ms
+2026-01-05 21:41:40,121 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f916 Judie (OpenRouter): Alright, transferring you now. One moment, please!
+2026-01-05 21:41:40,122 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f525 TRANSFER NARRATIVE detected in AI text: 'Alright, transferring you now. One moment, please!'
+2026-01-05 21:41:40,123 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer allowed - no caller-name requirement
+2026-01-05 21:41:40,123 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer allowed - caller name check passed
+2026-01-05 21:41:40,171 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Speechmatics TTS interrupted by barge-in
+2026-01-05 21:41:40,172 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:41:40,173 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:40,173 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: I can transfer you now. Would you like me to trans...
+2026-01-05 21:41:40,278 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:40,449 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:40,451 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 278ms
+2026-01-05 21:41:40,501 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af =================================
+2026-01-05 21:41:40,502 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af AUTO-TRANSFER EXECUTION STARTING
+2026-01-05 21:41:40,502 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Original transfer number: 07595289669
+2026-01-05 21:41:40,502 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af Detected sentence: AI requested transfer
+2026-01-05 21:41:40,502 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f3af =================================
+2026-01-05 21:41:40,505 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Normalized transfer number: 07595289669 \u2192 447595289669
+2026-01-05 21:41:40,506 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50a Playing transfer message: OK, I'll try and transfer you to them. Please hold a moment.
+2026-01-05 21:41:40,506 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f504 Marked session as transferring
+2026-01-05 21:41:40,507 - VonageAgent - ERROR - [a918865854defb004c4e88ea944016bd] OpenAI error: Cancellation failed: no active response found
+2026-01-05 21:41:40,785 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:41,300 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:41,775 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Executing Vonage transfer to 447595289669
+2026-01-05 21:41:41,777 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 JWT Payload: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649301, 'exp': 1767652901, 'jti': 'ed91de01-5f5b-4b3f-a605-e60f1f76f999'}
+2026-01-05 21:41:41,778 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Application ID: d115408a-221d-4004-873c-b4282efac8e5
+2026-01-05 21:41:41,779 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Private Key Length: 1703 chars
+2026-01-05 21:41:41,779 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Private Key starts with: -----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w
+2026-01-05 21:41:41,835 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Generated Vonage JWT token
+2026-01-05 21:41:41,835 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Decoded JWT: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649301, 'exp': 1767652901, 'jti': 'ed91de01-5f5b-4b3f-a605-e60f1f76f999'}
+2026-01-05 21:41:41,835 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 JWT Token (first 100 chars): eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBsaWNhdGlvbl9pZCI6ImQxMTU0MDhhLTIyMWQtNDAwNC04NzNjLWI0Mjg
+2026-01-05 21:41:41,836 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4e1 Transfer request URL: https://api.nexmo.com/v1/calls/a918865854defb004c4e88ea944016bd
+2026-01-05 21:41:41,837 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:42,195 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4fb Received 99840 bytes of transfer message audio
+2026-01-05 21:41:42,198 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer message played successfully
+2026-01-05 21:41:42,226 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer initiated - keeping session alive for potential reconnect
+2026-01-05 21:41:42,289 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Speechmatics complete: 2116ms (21 chunks)
+2026-01-05 21:41:42,290 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4ca FULL RESPONSE LATENCY: 3202ms (user stopped \u2192 audio complete)
+2026-01-05 21:41:42,290 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Starting Speechmatics TTS for: Okay — I'll try to transfer you now....
+2026-01-05 21:41:42,291 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using Speechmatics voice: sarah
+2026-01-05 21:41:42,291 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f399\ufe0f Using Speechmatics HTTP TTS (pcm_16000) for: Okay — I'll try to transfer you now....
+2026-01-05 21:41:42,332 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: unknown
+2026-01-05 21:41:42,338 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:42,523 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=pcm_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:41:42,525 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u26a1 First Speechmatics audio bytes in 234ms
+2026-01-05 21:41:42,610 - VonageAgent - INFO - \U0001f4e1 transfer-ncco request (POST) to='447595289669' from='447441474491' uuid='a918865854defb004c4e88ea944016bd'
+2026-01-05 21:41:42,863 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] VAD dbg: energy=0.0002 max_sample=8 vad_thr=0.0050 speaking_now=False vad_speaking=False agent_speaking=True barge_in_min=0.30s audio_bytes=640
+2026-01-05 21:41:43,158 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Speechmatics complete: 867ms (9 chunks)
+2026-01-05 21:41:43,228 - VonageAgent - WARNING - [a918865854defb004c4e88ea944016bd] \u26a0\ufe0f Transfer may not have executed - verifying...
+2026-01-05 21:41:43,445 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4ca Call status after transfer: answered
+2026-01-05 21:41:44,202 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4de Executing Vonage transfer to 447595289669
+2026-01-05 21:41:44,205 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 JWT Payload: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649304, 'exp': 1767652904, 'jti': 'ef47c5de-71bc-43a0-a67b-075d374ee522'}
+2026-01-05 21:41:44,205 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Application ID: d115408a-221d-4004-873c-b4282efac8e5
+2026-01-05 21:41:44,206 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Private Key Length: 1703 chars
+2026-01-05 21:41:44,207 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Private Key starts with: -----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w
+2026-01-05 21:41:44,259 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Generated Vonage JWT token
+2026-01-05 21:41:44,259 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 Decoded JWT: {'application_id': 'd115408a-221d-4004-873c-b4282efac8e5', 'iat': 1767649304, 'exp': 1767652904, 'jti': 'ef47c5de-71bc-43a0-a67b-075d374ee522'}
+2026-01-05 21:41:44,260 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f510 JWT Token (first 100 chars): eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBsaWNhdGlvbl9pZCI6ImQxMTU0MDhhLTIyMWQtNDAwNC04NzNjLWI0Mjg
+2026-01-05 21:41:44,260 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4e1 Transfer request URL: https://api.nexmo.com/v1/calls/a918865854defb004c4e88ea944016bd
+2026-01-05 21:41:44,403 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a918865854defb004c4e88ea944016bd, status=started, direction=outbound, duration=0
+2026-01-05 21:41:44,455 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a918865854defb004c4e88ea944016bd, status=ringing, direction=outbound, duration=0
+2026-01-05 21:41:44,614 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Transfer initiated - keeping session alive for potential reconnect
+2026-01-05 21:41:44,689 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: unknown
+2026-01-05 21:41:44,822 - VonageAgent - INFO - \U0001f4e1 transfer-ncco request (POST) to='447595289669' from='447441474491' uuid='a918865854defb004c4e88ea944016bd'
+2026-01-05 21:41:46,516 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a918865854defb004c4e88ea944016bd, status=busy, direction=outbound, duration=0
+2026-01-05 21:41:46,518 - VonageAgent - WARNING - \u26a0\ufe0f Transfer failed for call a918865854defb004c4e88ea944016bd: busy payload={'from': '447441474491', 'to': '447595289669', 'detail': 'remote_busy', 'uuid': '96efeea8-fe6c-4df2-bbfd-e8341d1bea09', 'conversation_uuid': 'CON-375ae8a8-84f1-446a-a0d9-7090b79b2209', 'status': 'busy', 'direction': 'outbound', 'timestamp': '2026-01-05T21:35:10.379Z', 'sip_code': 486}
+2026-01-05 21:41:46,518 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f504 Handling failed transfer: them (busy)
+2026-01-05 21:41:46,519 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f50a Playing failed transfer message: I'm really sorry but it appears the person you're trying to connect to is not answering.
+2026-01-05 21:41:46,778 - VonageAgent - INFO - \U0001f4cb Event [a918865854defb004c4e88ea944016bd]: completed
+2026-01-05 21:41:46,779 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Credit monitoring cancelled
+INFO:     connection closed
+2026-01-05 21:41:47,927 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Call ended - transcript length: 368 chars, will generate summary
+2026-01-05 21:41:47,932 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Deducted 2.03 credits from user 25 (connection: 1.0, duration: 1.03, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:41:47,973 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Session closed
+2026-01-05 21:41:47,985 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Call ended - transcript length: 368 chars, will generate summary
+2026-01-05 21:41:47,989 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Deducted 2.03 credits from user 25 (connection: 1.0, duration: 1.03, bookings: 0, tasks: 0, voice: 0, sales: 0, transfer: 0, sms: 0)
+2026-01-05 21:41:48,015 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Session closed
+2026-01-05 21:41:48,016 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Call ended - session cleaned up
+2026-01-05 21:41:48,016 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] *** STARTING generate_summary function ***
+2026-01-05 21:41:48,018 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Database query result: True
+2026-01-05 21:41:48,019 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Transcript length: 368 chars, user_id: 25
+2026-01-05 21:41:48,388 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using DeepSeek API for summary
+2026-01-05 21:41:49,038 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:50,853 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Summary generated using deepseek/deepseek-chat: The caller, who identified herself as Julie's mother, wanted to speak to Julie. Judie offered to transfer the call and asked for confirmation to proceed.
+2026-01-05 21:41:50,865 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Generated summary: The caller, who identified herself as Julie's mother, wanted to speak to Julie. Judie offered to transfer the call and asked for confirmation to proceed.
+2026-01-05 21:41:50,866 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Tasks enabled - extracting tasks from call
+2026-01-05 21:41:50,867 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Extracting tasks from transcript
+2026-01-05 21:41:51,237 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] *** STARTING generate_summary function ***
+2026-01-05 21:41:51,240 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Database query result: True
+2026-01-05 21:41:51,240 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Transcript length: 368 chars, user_id: 25
+2026-01-05 21:41:51,615 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Using DeepSeek API for summary
+2026-01-05 21:41:51,946 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:54,998 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Summary generated using deepseek/deepseek-chat: **Summary of the call:**
+
+The caller, who identified herself as Julie's mother, asked to speak to Julie. Judie offered to transfer the call and requested a confirmation ("yes" or "no") from the caller to proceed with the transfer. The conversation ended before the caller responded.
+2026-01-05 21:41:55,002 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Generated summary: **Summary of the call:**
+
+The caller, who identified herself as Julie's mother, asked to speak to Julie. Judie offered to transfer the call and requested a confirmation ("yes" or "no") from the caller to proceed with the transfer. The conversation ended before the caller responded.
+2026-01-05 21:41:55,003 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Tasks enabled - extracting tasks from call
+2026-01-05 21:41:55,003 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Extracting tasks from transcript
+2026-01-05 21:41:55,393 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \U0001f4fb Received 127488 bytes of failed transfer audio
+2026-01-05 21:41:55,393 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] \u2705 Failed transfer message played successfully
+2026-01-05 21:41:55,403 - VonageAgent - INFO - \U0001f4cb Event [19bffeee-4892-4f0a-a4c5-bd4246abd45b]: completed
+2026-01-05 21:41:55,404 - VonageAgent - INFO - [19bffeee-4892-4f0a-a4c5-bd4246abd45b] Call ended - session cleaned up
+2026-01-05 21:41:55,404 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a918865854defb004c4e88ea944016bd, status=completed, direction=outbound, duration=0
+2026-01-05 21:41:55,405 - VonageAgent - INFO - \U0001f4de Transfer event: uuid=a918865854defb004c4e88ea944016bd, status=cancelled, direction=outbound, duration=0
+2026-01-05 21:41:55,406 - VonageAgent - WARNING - \u26a0\ufe0f Transfer failed for call a918865854defb004c4e88ea944016bd: cancelled payload={'from': '447441474491', 'to': '447595289669', 'detail': 'ring_timeout', 'uuid': '16102cf7-7fc9-43ee-92f8-46c6f46b666b', 'conversation_uuid': 'CON-f3a6f8c2-5629-472f-9b9a-c55bd73b6a0a', 'status': 'cancelled', 'direction': 'outbound', 'timestamp': '2026-01-05T21:35:14.028Z', 'sip_code': 487}
+2026-01-05 21:41:55,717 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:55,738 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-05 21:41:56,693 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Task extraction response: []
+2026-01-05 21:41:56,694 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] No tasks found in conversation
+2026-01-05 21:41:56,697 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] SMS notification not sent: disabled
+2026-01-05 21:41:56,882 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] Task extraction response: []
+2026-01-05 21:41:56,883 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] No tasks found in conversation
+2026-01-05 21:41:56,886 - VonageAgent - INFO - [a918865854defb004c4e88ea944016bd] SMS notification not sent: disabled
+2026-01-05 21:43:23,785 - VonageAgent - INFO - \u2705 AI Brain Provider set to openrouter by super-admin
+2026-01-05 21:43:41,329 - httpx - INFO - HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+2026-01-05 21:43:41,378 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-893' coro=<CallSession._speechmatics_tts_worker() running at C:\website33new\website33-main\website33-main\vonage_agent.py:9090> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2026-01-05 21:43:41,380 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-1056' coro=<CallSession._speechmatics_tts_worker() running at C:\website33new\website33-main\website33-main\vonage_agent.py:9090> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2026-01-05 21:43:41,383 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-1256' coro=<CallSession._speechmatics_tts_worker() running at C:\website33new\website33-main\website33-main\vonage_agent.py:9090> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2026-01-05 21:44:17,694 - VonageAgent - INFO - \U0001f501 Regenerating global filler 3
+2026-01-05 21:44:18,442 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+C:\website33new\website33-main\website33-main\vonage_agent.py:13949: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "updated_at": datetime.utcnow().isoformat() + "Z",
+2026-01-05 21:44:18,710 - VonageAgent - INFO - \u2705 Regenerated filler 3: Ah...Ok
+2026-01-05 21:45:22,658 - VonageAgent - INFO - \U0001f501 Regenerating global filler 6
+2026-01-05 21:45:23,952 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:45:24,302 - VonageAgent - INFO - \u2705 Regenerated filler 6: One second...
+2026-01-05 21:45:50,740 - VonageAgent - INFO - \U0001f501 Regenerating global filler 5
+2026-01-05 21:45:51,543 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:45:51,805 - VonageAgent - INFO - \u2705 Regenerated filler 5: right.. ok
+C:\website33new\website33-main\website33-main\vonage_agent.py:14023: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  meta["updated_at"] = datetime.utcnow().isoformat() + "Z"
+2026-01-05 21:46:20,754 - VonageAgent - INFO - \U0001f501 Regenerating global filler 13
+2026-01-05 21:46:21,527 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:46:21,576 - VonageAgent - INFO - \u2705 Regenerated filler 13: ALright..
+2026-01-05 21:46:52,886 - VonageAgent - INFO - \U0001f501 Regenerating global filler 14
+2026-01-05 21:46:53,671 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:46:54,055 - VonageAgent - INFO - \u2705 Regenerated filler 14: Great. one moment...
+2026-01-05 21:47:18,662 - VonageAgent - INFO - \U0001f501 Regenerating global filler 15
+2026-01-05 21:47:19,414 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:47:20,152 - VonageAgent - INFO - \u2705 Regenerated filler 15: yes.. ok.. one moment...
+2026-01-05 21:47:23,492 - VonageAgent - INFO - \U0001f501 Regenerating global filler 13
+2026-01-05 21:47:24,208 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:47:27,283 - VonageAgent - INFO - \u2705 Regenerated filler 13: ALright..
+2026-01-05 21:48:00,550 - VonageAgent - INFO - \U0001f501 Regenerating global filler 16
+2026-01-05 21:48:02,020 - httpx - INFO - HTTP Request: POST https://preview.tts.speechmatics.com/generate/sarah?output_format=wav_16000 "HTTP/1.1 200 OK"
+2026-01-05 21:48:02,394 - VonageAgent - INFO - \u2705 Regenerated filler 16: Absolutely.one moment..
+2026-01-05 21:50:01,793 - VonageAgent - INFO - Saving voice settings for user 25:
+2026-01-05 21:50:01,800 - VonageAgent - INFO -   - voice_provider: speechmatics
+2026-01-05 21:50:01,807 - VonageAgent - INFO -   - openai_voice: shimmer
+2026-01-05 21:50:01,808 - VonageAgent - INFO -   - elevenlabs_voice_id: EXAVITQu4vr4xnSDxMaL
+2026-01-05 21:50:01,812 - VonageAgent - INFO -   - google_voice: en-GB-Neural2-A
+2026-01-05 21:50:01,821 - VonageAgent - INFO -   - playht_voice_id: s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json
+2026-01-05 21:50:01,826 - VonageAgent - INFO - \u2705 Updated voice provider for user 25: speechmatics (rows affected: 1)
+2026-01-05 21:50:01,843 - VonageAgent - INFO - Agent name updated to Judie for user 25

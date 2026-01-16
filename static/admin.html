@@ -1024,6 +1024,9 @@
                             <label for="voiceProvider">Voice Provider</label>
                             <select id="voiceProvider" onchange="switchVoiceProvider()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
                                 <option value="speechmatics">Speechmatics (Sarah)</option>
+                                <option value="lemonfox">Lemonfox (No fillers)</option>
+                                <option value="vapi">Vapi (Choose Voice)</option>
+                                <option value="vapi_assistant">Vapi Assistant (Pre-configured)</option>
                             </select>
                             <!-- Voice provider descriptions hidden as requested -->
                             <div class="example-box" style="margin-top: 10px; display: none;">
@@ -1148,6 +1151,128 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Lemonfox Voice Selection -->
+                        <div id="lemonfoxVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="lemonfoxVoice">Agent Voice</label>
+                                <select id="lemonfoxVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <option value="heart">Heart (Default)</option>
+                                </select>
+                                <button type="button" onclick="testLemonfoxVoice()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
+                                    🔊 Test Voice
+                                </button>
+                                <div class="example-box" style="margin-top: 10px;">
+                                    <strong>Note:</strong> Lemonfox uses the global Lemonfox API key set by Super Admin. No filler sounds.
+                                    <div id="lemonfoxConfigStatus" style="margin-top: 6px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vapi Voice Selection -->
+                        <div id="vapiVoiceSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="vapiVoice">Vapi Voice</label>
+                                <div class="example-box" style="margin: 10px 0 12px 0;">
+                                    <strong>Note:</strong> Vapi API key is configured globally in Super Admin (applies to all accounts).
+                                </div>
+                                <select id="vapiVoice" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px; cursor: pointer;">
+                                    <optgroup label="🇬🇧 UK Female Voices (ElevenLabs)">
+                                        <option value="charlotte-uk">Charlotte (Professional & Clear)</option>
+                                        <option value="alice-uk">Alice (Warm & Friendly)</option>
+                                        <option value="lily-uk">Lily (Bright & Approachable)</option>
+                                        <option value="jessica-uk">Jessica (Confident & Mature)</option>
+                                        <option value="nicole-uk">Nicole (Energetic & Conversational)</option>
+                                        <option value="emily-uk">Emily (Soft & Pleasant)</option>
+                                        <option value="matilda-uk">Matilda (Calm & Reassuring)</option>
+                                        <option value="freya-uk">Freya (Young & Friendly)</option>
+                                    </optgroup>
+                                    <optgroup label="🇬🇧 UK Male Voices (ElevenLabs)">
+                                        <option value="george-uk">George (Professional & Clear)</option>
+                                        <option value="harry-uk">Harry (Confident & Strong)</option>
+                                        <option value="james-uk">James (Calm & Authoritative)</option>
+                                        <option value="brian-uk">Brian (Warm & Conversational)</option>
+                                        <option value="daniel-uk">Daniel (Deep & Professional)</option>
+                                        <option value="thomas-uk">Thomas (Mature & Trustworthy)</option>
+                                        <option value="callum-uk">Callum (Young & Energetic)</option>
+                                        <option value="liam-uk">Liam (Friendly & Approachable)</option>
+                                    </optgroup>
+                                    <optgroup label="🇺🇸 US Voices (ElevenLabs)">
+                                        <option value="sarah-elevenlabs">Sarah (Female - Natural & Expressive)</option>
+                                        <option value="adam-elevenlabs">Adam (Male - Deep & Professional)</option>
+                                    </optgroup>
+                                </select>
+                                <button id="playVapiPreview" onclick="playVapiVoicePreview()" style="margin-top: 10px; padding: 12px 24px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; font-weight: 600;">
+                                    ▶️ Play Preview
+                                </button>
+                                <div id="vapiPreviewInfo" style="margin-top: 8px; padding: 10px; background: rgba(102,126,234,0.15); border-radius: 6px; color: rgba(255,255,255,0.8); font-size: 13px; display: none;">
+                                    <span id="vapiPreviewText"></span>
+                                </div>
+                                
+                                <div class="example-box" style="margin-top: 10px;">
+                                    <strong>ℹ️ Note:</strong> Vapi provides AI-powered conversational voices with natural-sounding speech.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vapi Assistant Selection (Pre-configured assistants from dashboard.vapi.ai) -->
+                        <div id="vapiAssistantSection" style="display: none;">
+                            <div class="form-group">
+                                <label style="display: block; margin-bottom: 12px; color: rgba(255,255,255,0.9); font-weight: 600;">
+                                    🎯 Vapi Pre-configured Assistants
+                                </label>
+                                
+                                <div class="example-box" style="margin-bottom: 15px;">
+                                    <strong>Info:</strong> Assistants are configured by your administrator in the Super Admin panel. 
+                                    You can optionally override the voice with an ElevenLabs voice below.
+                                </div>
+                                
+                                <!-- Voice Selection for Assistant -->
+                                <div style="margin-bottom: 15px;">
+                                    <label for="vapiAssistantVoice" style="display: block; margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 600;">Voice Override (Optional):</label>
+                                    <select id="vapiAssistantVoice" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                                        <option value="use-assistant-voice">🎙️ Use Assistant's Voice (from Vapi)</option>
+                                        <optgroup label="🇬🇧 UK Female Voices">
+                                            <option value="charlotte-uk">Charlotte (Professional & Clear)</option>
+                                            <option value="alice-uk">Alice (Warm & Friendly)</option>
+                                            <option value="lily-uk">Lily (Bright & Approachable)</option>
+                                            <option value="jessica-uk">Jessica (Confident & Mature)</option>
+                                            <option value="nicole-uk">Nicole (Energetic & Conversational)</option>
+                                            <option value="emily-uk">Emily (Soft & Pleasant)</option>
+                                            <option value="matilda-uk">Matilda (Calm & Reassuring)</option>
+                                            <option value="freya-uk">Freya (Young & Friendly)</option>
+                                        </optgroup>
+                                        <optgroup label="🇬🇧 UK Male Voices">
+                                            <option value="george-uk">George (Professional & Clear)</option>
+                                            <option value="harry-uk">Harry (Confident & Strong)</option>
+                                            <option value="james-uk">James (Calm & Authoritative)</option>
+                                            <option value="brian-uk">Brian (Warm & Conversational)</option>
+                                            <option value="daniel-uk">Daniel (Deep & Professional)</option>
+                                            <option value="thomas-uk">Thomas (Friendly & Clear)</option>
+                                            <option value="callum-uk">Callum (Young & Energetic)</option>
+                                            <option value="liam-uk">Liam (Confident & Modern)</option>
+                                        </optgroup>
+                                        <optgroup label="🇺🇸 US Voices">
+                                            <option value="sarah-elevenlabs">Sarah (US Female - Warm)</option>
+                                            <option value="adam-elevenlabs">Adam (US Male - Deep)</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                
+                                <!-- Select Assistant Dropdown -->
+                                <div style="margin-bottom: 15px;">
+                                    <label for="vapiAssistantSelect" style="display: block; margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 600;">Select Assistant:</label>
+                                    <select id="vapiAssistantSelect" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                                        <option value="">-- Loading assistants... --</option>
+                                    </select>
+                                    <div style="margin-top: 8px; font-size: 13px; color: rgba(255,255,255,0.6);">
+                                        💡 Assistants are managed in the Super Admin panel
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -1200,6 +1325,97 @@
                                     </button>
                                 </div>
                                 <div id="analyzeStatus" style="margin-top: 12px; padding: 10px; border-radius: 6px; display: none; font-size: 13px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>🕒 Business Hours (Appointments)</h3>
+
+                        <div class="form-group">
+                            <label for="businessTimezone">Timezone</label>
+                            <input type="text" id="businessTimezone" placeholder="e.g., Europe/London" value="Europe/London">
+                            <div class="example-box">
+                                <strong>Tip:</strong> Appointment times are interpreted in this timezone. For UK, use <strong>Europe/London</strong>.
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Weekly Schedule</label>
+                            <div id="businessHoursGrid" style="display: grid; gap: 10px;">
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Mon</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_mon_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_mon_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_mon_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Tue</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_tue_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_tue_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_tue_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Wed</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_wed_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_wed_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_wed_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Thu</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_thu_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_thu_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_thu_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Fri</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_fri_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_fri_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_fri_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Sat</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_sat_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_sat_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_sat_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                                    <div style="width: 70px; font-weight: 700; color: rgba(255,255,255,0.9);">Sun</div>
+                                    <label style="display:flex; align-items:center; gap:8px; min-width: 85px;">
+                                        <input type="checkbox" id="bh_sun_open" checked style="width: 18px; height: 18px;">
+                                        <span style="color: rgba(255,255,255,0.75); font-size: 13px;">Open</span>
+                                    </label>
+                                    <input type="time" id="bh_sun_start" value="09:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                    <span style="color: rgba(255,255,255,0.5);">to</span>
+                                    <input type="time" id="bh_sun_end" value="17:00" style="padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: white;">
+                                </div>
+                            </div>
+                            <div class="example-box" style="margin-top: 12px;">
+                                <strong>Important:</strong> The AI will only offer/book appointments inside these hours (and only if slots are free).
                             </div>
                         </div>
                     </div>
@@ -1491,6 +1707,38 @@
                 'Content-Type': 'application/json'
             };
         }
+
+        // Admin control APIs (/api/admin/*) are protected by super-admin cookies + CSRF.
+        // Ensure non-GET requests include the CSRF header when the cookie exists.
+        function _getCookie(name) {
+            const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+            return match ? decodeURIComponent(match[1]) : '';
+        }
+
+        (function() {
+            const _origFetch = window.fetch.bind(window);
+            function _setHeader(init, k, v) {
+                if (!init.headers) init.headers = {};
+                if (init.headers instanceof Headers) init.headers.set(k, v);
+                else init.headers[k] = v;
+            }
+            window.fetch = async function(input, init) {
+                init = init || {};
+                // Make sure super-admin session cookies are sent.
+                init.credentials = init.credentials || 'include';
+
+                const url = (typeof input === 'string') ? input : (input && input.url) ? input.url : '';
+                const method = String(init.method || 'GET').toUpperCase();
+
+                const isProtected = url.startsWith('/api/admin') || url.startsWith('/api/super-admin');
+                if (isProtected && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+                    const csrf = _getCookie('website33_super_admin_csrf');
+                    if (csrf) _setHeader(init, 'X-CSRF-Token', csrf);
+                }
+
+                return _origFetch(input, init);
+            };
+        })();
         
         // Run auth check when page loads
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1532,6 +1780,7 @@
             loadConfig(); // Load config to populate phone number and other settings
             loadBundles(); // Load bundle settings
             loadTaskCount(); // Load task count badge
+            loadGlobalVapiAssistants(); // Load global Vapi assistants from super admin
 
             // Update tunnel status indicators early
             try {
@@ -1542,6 +1791,21 @@
             
             // Handle form submission - must be inside DOMContentLoaded
             document.getElementById('configForm').addEventListener('submit', handleConfigSubmit);
+
+            // Business hours UI wiring
+            try {
+                ['mon','tue','wed','thu','fri','sat','sun'].forEach(d => {
+                    const openEl = document.getElementById(`bh_${d}_open`);
+                    if (openEl) openEl.addEventListener('change', () => toggleBusinessHourRow(d));
+                    toggleBusinessHourRow(d);
+                });
+                const tzEl = document.getElementById('businessTimezone');
+                if (tzEl && (!tzEl.value || tzEl.value.trim() === '')) {
+                    tzEl.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+                }
+            } catch (e) {
+                console.warn('Business hours wiring failed:', e);
+            }
         });
 
         async function handleReturnFromTopUp(sessionId) {
@@ -1669,6 +1933,7 @@
             if (tabName === 'calls') {
                 loadCalls('today'); // Load with default 'today' filter
                 setActiveFilter('today'); // Set today button as active
+                startCallPolling(); // Start polling for pending transcripts
             } else if (tabName === 'dashboard') {
                 loadDashboard();
             } else if (tabName === 'tasks') {
@@ -2096,16 +2361,54 @@
             }
         }
 
-        async function loadCalls(filterPeriod = 'today') {
+        let callPollingInterval = null;
+
+        function startCallPolling() {
+            // Clear any existing polling interval
+            if (callPollingInterval) {
+                clearInterval(callPollingInterval);
+            }
+            
+            // Poll every 5 seconds to check for updated transcripts/recordings
+            callPollingInterval = setInterval(async () => {
+                const callHistoryContent = document.getElementById('callHistoryContent');
+                if (!callHistoryContent) return;
+                
+                // Check if we're still on the calls tab
+                const callsTab = document.querySelector('.main-content[style*="display: block"]');
+                if (!callsTab || !callsTab.id.includes('calls')) {
+                    clearInterval(callPollingInterval);
+                    callPollingInterval = null;
+                    return;
+                }
+                
+                // Only refresh if there are pending calls
+                const hasPendingCalls = callHistoryContent.innerHTML.includes('Waiting for Vapi transcript') || 
+                                        callHistoryContent.innerHTML.includes('Generating AI summary');
+                
+                if (hasPendingCalls) {
+                    const currentFilter = document.querySelector('.filter-btn.active')?.textContent.toLowerCase().trim() || 'today';
+                    await loadCalls(currentFilter, true); // Silent refresh
+                }
+            }, 5000);
+        }
+
+        async function loadCalls(filterPeriod = 'today', silentRefresh = false) {
             try {
-                console.log('Loading calls with filter:', filterPeriod);
+                if (!silentRefresh) {
+                    console.log('Loading calls with filter:', filterPeriod);
+                }
                 const response = await fetch('/api/calls', {
                     headers: getAuthHeaders()
                 });
-                console.log('Calls response status:', response.status);
+                if (!silentRefresh) {
+                    console.log('Calls response status:', response.status);
+                }
                 
                 const data = await response.json();
-                console.log('Calls data:', data);
+                if (!silentRefresh) {
+                    console.log('Calls data:', data);
+                }
                 
                 const callHistoryContent = document.getElementById('callHistoryContent');
                 
@@ -2169,6 +2472,8 @@
                             const formattedTime = startTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                             const duration = call.duration ? `${call.duration}s` : 'N/A';
                             const isCompleted = call.status === 'completed';
+                            const hasRecording = !!call.recording_url;
+                            const recordingUrlEscaped = (call.recording_url || '').toString().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                             const apptBadge = call.has_appointment ? `<span onclick="openCalendarModal(${call.appointment_id}); event.stopPropagation();" style="background: #ff4444; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 10px; display: inline-block; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#ff6666'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff4444'; this.style.transform='scale(1)'">📅 APPOINTMENT</span>` : '';
                             
                             // Add sales confidence badge if available
@@ -2212,6 +2517,10 @@
                                             </div>
                                         </div>
                                         <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                                            ${hasRecording
+                                                ? `<button onclick="openRecordingUrl('${recordingUrlEscaped}'); event.stopPropagation();" style="background: rgba(102,200,234,0.2); border: 1px solid rgba(102,200,234,0.4); padding: 8px 14px; border-radius: 8px; color: white; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">🎧 Listen</button>`
+                                                : `<button disabled title="No recording saved for this call" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 8px; color: rgba(255,255,255,0.35); font-size: 12px; font-weight: 700; cursor: not-allowed;">🎧 Listen</button>`
+                                            }
                                             ${isCompleted 
                                                 ? '<button disabled style="background: rgba(100,255,100,0.2); border: 1px solid rgba(100,255,100,0.4); padding: 8px 16px; border-radius: 8px; color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600; cursor: not-allowed;">✓ Complete</button>'
                                                 : `<button onclick="markCallComplete('${call.call_uuid}')" style="background: linear-gradient(135deg, #66ea96 0%, #66c8ea 100%); border: none; padding: 8px 16px; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Mark Complete</button>`
@@ -2221,7 +2530,11 @@
                                     </div>
                                     <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border-left: 3px solid #667eea;">
                                         <div style="font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6;">
-                                            ${call.summary || '<span style="color: rgba(255,255,255,0.4);">Generating AI summary...</span>'}
+                                            ${call.summary 
+                                                ? (call.summary.includes('Waiting for Vapi transcript') 
+                                                    ? '<span style="color: rgba(255,200,100,0.8);">⏳ Waiting for Vapi transcript...</span>' 
+                                                    : call.summary)
+                                                : '<span style="color: rgba(255,255,255,0.4);">Generating AI summary...</span>'}
                                         </div>
                                     </div>
                                 </div>
@@ -2285,8 +2598,19 @@
                 });
                 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to analyze website');
+                    let message = 'Failed to analyze website';
+                    try {
+                        const error = await response.json();
+                        message = error.detail || error.error || error.message || message;
+                    } catch (e) {
+                        try {
+                            const text = await response.text();
+                            if (text && text.trim()) message = text;
+                        } catch (e2) {
+                            // ignore
+                        }
+                    }
+                    throw new Error(message);
                 }
                 
                 const data = await response.json();
@@ -2364,6 +2688,13 @@
                 const agentInstructionsEl = document.getElementById('agentInstructions');
                 if (agentInstructionsEl) agentInstructionsEl.value = config.AGENT_INSTRUCTIONS;
 
+                // Business hours (appointments)
+                try {
+                    setBusinessHoursUI(config.BUSINESS_HOURS, config.BUSINESS_TIMEZONE);
+                } catch (e) {
+                    console.warn('Failed to populate business hours UI:', e);
+                }
+
                 const callGreetingEl = document.getElementById('callGreeting');
                 if (callGreetingEl) callGreetingEl.value = config.CALL_GREETING || '';
 
@@ -2415,12 +2746,69 @@
             }
         }
 
+        function setBusinessHoursUI(hoursObj, tzName) {
+            const tzEl = document.getElementById('businessTimezone');
+            const tz = (tzName && String(tzName).trim()) || (tzEl && tzEl.value) || 'Europe/London';
+            if (tzEl) tzEl.value = tz;
+
+            const fallback = {
+                mon: { open: true, start: '09:00', end: '17:00' },
+                tue: { open: true, start: '09:00', end: '17:00' },
+                wed: { open: true, start: '09:00', end: '17:00' },
+                thu: { open: true, start: '09:00', end: '17:00' },
+                fri: { open: true, start: '09:00', end: '17:00' },
+                sat: { open: true, start: '09:00', end: '17:00' },
+                sun: { open: true, start: '09:00', end: '17:00' }
+            };
+            const h = (hoursObj && typeof hoursObj === 'object') ? hoursObj : fallback;
+            ['mon','tue','wed','thu','fri','sat','sun'].forEach(d => {
+                const openEl = document.getElementById(`bh_${d}_open`);
+                const startEl = document.getElementById(`bh_${d}_start`);
+                const endEl = document.getElementById(`bh_${d}_end`);
+                const cfg = h[d] || fallback[d];
+                if (openEl) openEl.checked = cfg.open !== false;
+                if (startEl) startEl.value = cfg.start || fallback[d].start;
+                if (endEl) endEl.value = cfg.end || fallback[d].end;
+                toggleBusinessHourRow(d);
+            });
+        }
+
+        function getBusinessHoursFromUI() {
+            const out = {};
+            ['mon','tue','wed','thu','fri','sat','sun'].forEach(d => {
+                const openEl = document.getElementById(`bh_${d}_open`);
+                const startEl = document.getElementById(`bh_${d}_start`);
+                const endEl = document.getElementById(`bh_${d}_end`);
+                out[d] = {
+                    open: openEl ? !!openEl.checked : true,
+                    start: startEl ? (startEl.value || '09:00') : '09:00',
+                    end: endEl ? (endEl.value || '17:00') : '17:00'
+                };
+            });
+            return out;
+        }
+
+        function toggleBusinessHourRow(dayKey) {
+            const openEl = document.getElementById(`bh_${dayKey}_open`);
+            const startEl = document.getElementById(`bh_${dayKey}_start`);
+            const endEl = document.getElementById(`bh_${dayKey}_end`);
+            if (!openEl || !startEl || !endEl) return;
+            const enabled = !!openEl.checked;
+            startEl.disabled = !enabled;
+            endEl.disabled = !enabled;
+            startEl.style.opacity = enabled ? '1' : '0.5';
+            endEl.style.opacity = enabled ? '1' : '0.5';
+        }
+
         // Store voice selections in memory
         const savedVoiceSelections = {
             openai: null,
             google: null,
             elevenlabs: null,
             playht: null,
+            speechmatics: null,
+            lemonfox: null,
+            vapi: null,
             provider: null
         };
 
@@ -3129,10 +3517,17 @@
                 const agentName = document.getElementById('agentName').value || 'Julie';
                 const voiceProvider = document.getElementById('voiceProvider').value || 'openai';
                 const agentVoice = document.getElementById('agentVoice').value || 'shimmer';
+                const lemonfoxVoiceId = document.getElementById('lemonfoxVoice')?.value || savedVoiceSelections.lemonfox || 'heart';
                 const businessInfo = document.getElementById('businessInfo').value || '';
                 const agentPersonality = document.getElementById('agentPersonality').value || '';
                 const agentInstructions = document.getElementById('agentInstructions').value || '';
                 const callGreeting = document.getElementById('callGreeting')?.value || '';
+                const businessTimezone = document.getElementById('businessTimezone')?.value || 'Europe/London';
+                const businessHours = getBusinessHoursFromUI();
+                
+                // Get current vapi voice selection directly from dropdown
+                const vapiVoiceId = document.getElementById('vapiVoice')?.value || savedVoiceSelections.vapi || 'charlotte-uk';
+                console.log('💾 Saving vapi_voice_id:', vapiVoiceId);
                 
                 // Save voice provider first
                 const voiceResponse = await fetch('/api/update-voice-provider', {
@@ -3148,7 +3543,9 @@
                         elevenlabs_voice_id: 'EXAVITQu4vr4xnSDxMaL',
                         cartesia_voice_id: 'a0e99841-438c-4a64-b679-ae501e7d6091',
                         google_voice: 'en-GB-Neural2-A',
-                        playht_voice_id: 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json'
+                        playht_voice_id: 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json',
+                        lemonfox_voice: lemonfoxVoiceId,
+                        vapi_voice_id: vapiVoiceId
                     })
                 });
                 
@@ -3171,6 +3568,8 @@
                         ELEVENLABS_VOICE_ID: 'EXAVITQu4vr4xnSDxMaL',
                         RESPONSE_LATENCY: 500,
                         BUSINESS_INFO: businessInfo,
+                        BUSINESS_TIMEZONE: businessTimezone,
+                        BUSINESS_HOURS: businessHours,
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
                         CALL_GREETING: callGreeting,
@@ -3229,11 +3628,30 @@
                 savedVoiceSelections.elevenlabs = data.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
                 savedVoiceSelections.playht = data.PLAYHT_VOICE_ID || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
                 savedVoiceSelections.speechmatics = data.SPEECHMATICS_VOICE_ID || 'sarah';
+                savedVoiceSelections.lemonfox = data.LEMONFOX_VOICE || 'heart';
+                savedVoiceSelections.vapi = data.VAPI_VOICE_ID || 'charlotte-uk';
+
+                // Store desired Vapi assistant selection; apply after assistants list loads.
+                window._pendingVapiAssistantId = data.VAPI_ASSISTANT_ID || null;
+                
+                // Load Vapi assistant voice override
+                const vapiAssistantVoice = document.getElementById('vapiAssistantVoice');
+                if (vapiAssistantVoice && data.VAPI_VOICE_ID) {
+                    vapiAssistantVoice.value = data.VAPI_VOICE_ID;
+                }
+                
+                // Store config globally for later reference
+                window.currentConfig = data;
                 
                 console.log('Loaded voice settings:', savedVoiceSelections);
                 
-                // Set voice provider dropdown
-                document.getElementById('voiceProvider').value = savedVoiceSelections.provider;
+                // Set voice provider dropdown (fallback if option missing)
+                const providerEl = document.getElementById('voiceProvider');
+                if (providerEl) {
+                    const hasOption = Array.from(providerEl.options || []).some(o => o.value === savedVoiceSelections.provider);
+                    providerEl.value = hasOption ? savedVoiceSelections.provider : 'speechmatics';
+                    savedVoiceSelections.provider = providerEl.value;
+                }
                 
                 // Set all voice dropdowns to their saved values
                 document.getElementById('agentVoice').value = savedVoiceSelections.openai;
@@ -3241,6 +3659,8 @@
                 document.getElementById('elevenLabsVoice').value = savedVoiceSelections.elevenlabs;
                 document.getElementById('playhtVoice').value = savedVoiceSelections.playht;
                 document.getElementById('speechmaticsVoice').value = savedVoiceSelections.speechmatics;
+                const lemonfoxEl = document.getElementById('lemonfoxVoice');
+                if (lemonfoxEl) lemonfoxEl.value = savedVoiceSelections.lemonfox;
                 
                 // Add change listeners to remember manual selections
                 document.getElementById('agentVoice').addEventListener('change', (e) => {
@@ -3258,16 +3678,54 @@
                 document.getElementById('speechmaticsVoice').addEventListener('change', (e) => {
                     savedVoiceSelections.speechmatics = e.target.value;
                 });
+                const lemonfoxSelect = document.getElementById('lemonfoxVoice');
+                if (lemonfoxSelect) {
+                    lemonfoxSelect.addEventListener('change', (e) => {
+                        savedVoiceSelections.lemonfox = e.target.value;
+                    });
+                }
+                const vapiSelect = document.getElementById('vapiVoice');
+                if (vapiSelect) {
+                    vapiSelect.addEventListener('change', (e) => {
+                        savedVoiceSelections.vapi = e.target.value;
+                    });
+                }
                 document.getElementById('voiceProvider').addEventListener('change', (e) => {
                     savedVoiceSelections.provider = e.target.value;
                 });
                 
                 // Show correct voice section
                 await switchVoiceProvider();
+
+                // Try applying assistant selection now (will also be applied after list renders)
+                try {
+                    applyVapiAssistantSelection();
+                } catch (e) {
+                    // ignore
+                }
                 
             } catch (error) {
                 console.error('Failed to load voice provider:', error);
             }
+        }
+
+        function applyVapiAssistantSelection() {
+            const select = document.getElementById('vapiAssistantSelect');
+            if (!select) return;
+
+            const desired = window._pendingVapiAssistantId || (window.currentConfig && window.currentConfig.VAPI_ASSISTANT_ID) || '';
+            if (!desired) return;
+
+            // If desired assistant isn't in the dropdown, keep it visible so it won't get cleared on save.
+            const hasDesired = Array.from(select.options || []).some(o => o.value === desired);
+            if (!hasDesired) {
+                const opt = document.createElement('option');
+                opt.value = desired;
+                opt.textContent = `⚠️ Current assistant not in list: ${desired}`;
+                select.insertBefore(opt, select.firstChild);
+            }
+
+            select.value = desired;
         }
 
         // Switch voice provider sections
@@ -3280,16 +3738,116 @@
             document.getElementById('elevenLabsVoiceSection').style.display = 'none';
             document.getElementById('playhtVoiceSection').style.display = 'none';
             document.getElementById('speechmaticsVoiceSection').style.display = 'none';
+            document.getElementById('lemonfoxVoiceSection').style.display = 'none';
+            const vapiSection = document.getElementById('vapiVoiceSection');
+            if (vapiSection) vapiSection.style.display = 'none';
+            const vapiAssistantSection = document.getElementById('vapiAssistantSection');
+            if (vapiAssistantSection) vapiAssistantSection.style.display = 'none';
             
             // Show the selected provider section
             if (provider === 'openai') {
                 document.getElementById('openaiVoiceSection').style.display = 'block';
             } else if (provider === 'speechmatics') {
                 document.getElementById('speechmaticsVoiceSection').style.display = 'block';
+            } else if (provider === 'lemonfox') {
+                document.getElementById('lemonfoxVoiceSection').style.display = 'block';
+                await loadLemonfoxVoices();
+            } else if (provider === 'vapi') {
+                if (vapiSection) {
+                    vapiSection.style.display = 'block';
+                    await checkVapiConfig();
+                }
+            } else if (provider === 'vapi_assistant') {
+                if (vapiAssistantSection) {
+                    vapiAssistantSection.style.display = 'block';
+                }
             }
             
             // Force a repaint to ensure dropdown is visible
             await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        async function loadLemonfoxVoices() {
+            const selectEl = document.getElementById('lemonfoxVoice');
+            const statusEl = document.getElementById('lemonfoxConfigStatus');
+            if (!selectEl) return;
+
+            try {
+                const resp = await fetch('/api/lemonfox-voices', { headers: getAuthHeaders() });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    if (statusEl) {
+                        statusEl.textContent = '⚠️ Lemonfox voices unavailable. Ask Super Admin to set the global Lemonfox API key.';
+                        statusEl.style.color = 'rgba(255,200,120,0.95)';
+                    }
+                    return;
+                }
+
+                const voices = Array.isArray(data.voices) ? data.voices : [];
+                const current = savedVoiceSelections.lemonfox || selectEl.value;
+                selectEl.innerHTML = '';
+
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    const name = v.name || v.id;
+                    const gender = v.gender ? String(v.gender) : '';
+                    const accent = v.accent ? String(v.accent) : '';
+                    const meta = [gender, accent].filter(Boolean).join(', ');
+                    opt.textContent = meta ? `${name} (${meta})` : name;
+                    selectEl.appendChild(opt);
+                }
+
+                const hasCurrent = Array.from(selectEl.options).some(o => o.value === current);
+                selectEl.value = hasCurrent ? current : (voices[0]?.id || 'heart');
+                savedVoiceSelections.lemonfox = selectEl.value;
+
+                if (statusEl) {
+                    statusEl.textContent = '✅ Lemonfox voices loaded.';
+                    statusEl.style.color = 'rgba(255,255,255,0.85)';
+                }
+            } catch (e) {
+                console.error('Failed to load Lemonfox voices:', e);
+            }
+        }
+
+        // Check Vapi configuration status
+        async function checkVapiConfig() {
+            const statusEl = document.getElementById('vapiConfigStatus');
+            const selectEl = document.getElementById('vapiVoice');
+            if (!statusEl || !selectEl) return;
+
+            try {
+                const resp = await fetch('/api/super-admin/vapi-key', { headers: getAuthHeaders() });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success || !data.key_set) {
+                    statusEl.innerHTML = '⚠️ Vapi API key not configured. Ask Super Admin to set it in Super Admin panel.';
+                    statusEl.style.color = 'rgba(255,200,120,0.95)';
+                } else {
+                    statusEl.innerHTML = '✅ Vapi configured and ready to use.';
+                    statusEl.style.color = 'rgba(255,255,255,0.85)';
+                }
+
+                // Set saved voice if available
+                if (savedVoiceSelections.vapi) {
+                    const hasOption = Array.from(selectEl.options).some(o => o.value === savedVoiceSelections.vapi);
+                    if (hasOption) {
+                        selectEl.value = savedVoiceSelections.vapi;
+                    }
+                }
+                
+                // Set saved assistant ID if available
+                const assistantIdInput = document.getElementById('vapiAssistantId');
+                if (assistantIdInput && window.currentConfig && window.currentConfig.VAPI_ASSISTANT_ID) {
+                    assistantIdInput.value = window.currentConfig.VAPI_ASSISTANT_ID;
+                }
+            } catch (e) {
+                console.error('Failed to check Vapi config:', e);
+                statusEl.innerHTML = '⚠️ Could not verify Vapi configuration.';
+                statusEl.style.color = 'rgba(255,200,120,0.95)';
+            }
         }
 
         // Toggle ElevenLabs voice dropdown visibility (legacy function - no longer used)
@@ -3687,6 +4245,225 @@
             }
         }
 
+        // Test Lemonfox voice
+        async function testLemonfoxVoice() {
+            const voiceSelect = document.getElementById('lemonfoxVoice');
+            const voiceId = voiceSelect?.value || 'heart';
+            const voiceName = voiceSelect?.options?.[voiceSelect.selectedIndex]?.textContent || voiceId;
+
+            try {
+                showMessage(`🔊 Testing ${voiceName} voice...`, 'info');
+
+                const response = await fetch('/api/test-lemonfox-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ voice_id: voiceId })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.error || 'Failed to generate voice sample');
+                }
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                audio.onerror = (e) => {
+                    console.error('Audio playback error:', e);
+                    showMessage('❌ Failed to play audio', 'error');
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                try {
+                    await audio.play();
+                    showMessage(`✅ Playing ${voiceName} voice sample`, 'success');
+                } catch (playError) {
+                    console.error('Autoplay prevented:', playError);
+                    showMessage('🔊 Click anywhere to play the audio sample', 'info');
+                    document.addEventListener('click', async function playOnClick() {
+                        try {
+                            await audio.play();
+                            showMessage(`✅ Playing ${voiceName} voice sample`, 'success');
+                            document.removeEventListener('click', playOnClick);
+                        } catch (e) {
+                            console.error('Play error:', e);
+                            showMessage('❌ Failed to play audio', 'error');
+                        }
+                    }, { once: true });
+                }
+
+            } catch (error) {
+                console.error('Lemonfox voice test error:', error);
+                showMessage(`❌ Failed to test voice: ${error.message}`, 'error');
+            }
+        }
+
+        let currentVapiAudio = null;
+        
+        async function playVapiVoicePreview() {
+            const voiceId = document.getElementById('vapiVoice').value;
+            const voiceSelect = document.getElementById('vapiVoice');
+            const voiceName = voiceSelect.options[voiceSelect.selectedIndex].text.split(' -')[0].trim();
+            const playBtn = document.getElementById('playVapiPreview');
+            const infoDiv = document.getElementById('vapiPreviewInfo');
+            const infoText = document.getElementById('vapiPreviewText');
+            
+            // Map voice IDs to ElevenLabs voice IDs
+            const voiceMap = {
+                'charlotte-uk': 'XB0fDUnXU5powFXDhCwa',
+                'alice-uk': 'Xb7hH8MSUJpSbSDYk0k2',
+                'lily-uk': 'pFZP5JQG7iQjIQuC4Bku',
+                'jessica-uk': 'cgSgspJ2msm6clMCkdW9',
+                'nicole-uk': 'piTKgcLEGmPE4e6mEKli',
+                'emily-uk': 'LcfcDJNUP1GQjkzn1xUU',
+                'matilda-uk': 'XrExE9yKIg1WjnnlVkGX',
+                'freya-uk': 'jsCqWAovK2LkecY7zXl4',
+                'george-uk': 'JBFqnCBsd6RMkjVDRZzb',
+                'harry-uk': 'SOYHLrjzK2X1ezoPC6cr',
+                'james-uk': 'ZQe5CZNOzWyzPSCn5a3c',
+                'brian-uk': 'nPczCjzI2devNBz1zQrb',
+                'daniel-uk': 'onwK4e9ZLuTAKqWW03F9',
+                'thomas-uk': 'GBv7mTt0atIp3Br8iCZE',
+                'callum-uk': 'N2lVS1w4EtoT3dr4eOWO',
+                'liam-uk': 'TX3LPaxmHKxFdv7VOQHJ',
+                'sarah-elevenlabs': 'EXAVITQu4vr4xnSDxMaL',
+                'adam-elevenlabs': 'pNInz6obpgDQGcFmaJgB'
+            };
+            
+            const elevenlabsId = voiceMap[voiceId] || voiceMap['charlotte-uk'];
+            
+            // Stop current audio if playing
+            if (currentVapiAudio) {
+                currentVapiAudio.pause();
+                currentVapiAudio = null;
+            }
+            
+            try {
+                playBtn.disabled = true;
+                playBtn.innerHTML = '⏳ Loading...';
+                infoDiv.style.display = 'block';
+                infoText.innerHTML = `Loading preview for ${voiceName}...`;
+                
+                // Call backend to generate audio sample
+                const response = await fetch('/api/test-vapi-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ 
+                        voice_id: voiceId,
+                        text: 'Hello! I hope your day is going well. This is how I sound.'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate preview');
+                }
+                
+                // Get audio blob from response
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                currentVapiAudio = new Audio(audioUrl);
+                
+                currentVapiAudio.oncanplaythrough = () => {
+                    playBtn.innerHTML = '▶️ Play Preview';
+                    playBtn.disabled = false;
+                    infoText.innerHTML = `🎵 Playing ${voiceName} preview...`;
+                    currentVapiAudio.play().catch(e => {
+                        console.error('Play error:', e);
+                        infoText.innerHTML = `⚠️ Click the button again to play`;
+                    });
+                };
+                
+                currentVapiAudio.onended = () => {
+                    playBtn.innerHTML = '▶️ Play Preview';
+                    infoText.innerHTML = `✅ Preview complete. This voice will be used in your calls!`;
+                    URL.revokeObjectURL(audioUrl);
+                    currentVapiAudio = null;
+                };
+                
+                currentVapiAudio.onerror = (e) => {
+                    console.error('Audio error:', e);
+                    playBtn.innerHTML = '▶️ Play Preview';
+                    playBtn.disabled = false;
+                    infoText.innerHTML = `ℹ️ Preview unavailable, but ${voiceName} will work perfectly in your calls!`;
+                    URL.revokeObjectURL(audioUrl);
+                    currentVapiAudio = null;
+                };
+
+            } catch (error) {
+                console.error('Preview error:', error);
+                playBtn.innerHTML = '▶️ Play Preview';
+                playBtn.disabled = false;
+                
+                // Show friendly error message
+                const errorMsg = error.message || 'Unknown error';
+                if (errorMsg.includes('ElevenLabs API key')) {
+                    infoText.innerHTML = `ℹ️ Preview requires ElevenLabs API key. Your selected voice will work perfectly in actual calls!`;
+                } else {
+                    infoText.innerHTML = `ℹ️ Preview unavailable, but ${voiceName} will work in your calls!`;
+                }
+            }
+        }
+
+        // Vapi Assistant Management - Load from global super admin config
+        let vapiAssistants = [];
+        
+        async function loadGlobalVapiAssistants() {
+            try {
+                const response = await fetch('/api/super-admin/vapi-assistants', {
+                    headers: getAuthHeaders()
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    vapiAssistants = data.assistants || [];
+                    renderVapiAssistants();
+                } else {
+                    console.error('Failed to load global Vapi assistants');
+                }
+            } catch (error) {
+                console.error('Error loading global Vapi assistants:', error);
+            }
+        }
+        
+        function renderVapiAssistants() {
+            const select = document.getElementById('vapiAssistantSelect');
+            
+            if (!select) return;
+            
+            // Update dropdown
+            if (vapiAssistants.length === 0) {
+                select.innerHTML = '<option value="">-- No assistants available --</option>';
+            } else {
+                select.innerHTML = '<option value="">-- Select an assistant --</option>';
+                vapiAssistants.forEach((asst) => {
+                    const option = document.createElement('option');
+                    option.value = asst.id;
+                    option.textContent = asst.name;
+                    select.appendChild(option);
+                });
+            }
+
+            // Apply any pending/loaded selection after options exist.
+            try {
+                applyVapiAssistantSelection();
+            } catch (e) {
+                // ignore
+            }
+        }
+
         // Analyze response times and optimize settings
         async function analyzeResponseTimes() {
             const analysisResult = document.getElementById('analysisResult');
@@ -3815,6 +4592,7 @@
             const googleVoice = document.getElementById('googleVoice')?.value || 'en-GB-Neural2-A';
             const playhtVoiceId = document.getElementById('playhtVoice')?.value || 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json';
             const speechmaticsVoiceId = document.getElementById('speechmaticsVoice')?.value || 'sarah';
+            const lemonfoxVoiceId = document.getElementById('lemonfoxVoice')?.value || savedVoiceSelections.lemonfox || 'heart';
             const responseLatency = parseInt(document.getElementById('responseLatency')?.value || '500');
             const businessInfo = document.getElementById('businessInfo')?.value || '';
             const agentPersonality = document.getElementById('agentPersonality')?.value || '';
@@ -3822,11 +4600,43 @@
             const callGreeting = document.getElementById('callGreeting')?.value || '';
             const transferNumber = document.getElementById('transferNumber')?.value || '';
             const transferInstructions = document.getElementById('transferInstructions')?.value || '';
+            const businessTimezone = document.getElementById('businessTimezone')?.value || 'Europe/London';
+            const businessHours = getBusinessHoursFromUI();
+            
+            // Get Vapi selections. Preserve existing Vapi config when saving non-Vapi providers
+            // so users don't accidentally wipe their assistant selection.
+            let vapiVoiceId;
+            if (voiceProvider === 'vapi_assistant') {
+                // Prefer the dedicated assistant-voice selector, but fall back to the generic Vapi voice selector
+                // to avoid accidentally saving 'use-assistant-voice' when the user picked a voice elsewhere.
+                const assistantVoiceEl = document.getElementById('vapiAssistantVoice');
+                const genericVoiceEl = document.getElementById('vapiVoice');
+                vapiVoiceId = assistantVoiceEl?.value || genericVoiceEl?.value || (window.currentConfig?.VAPI_VOICE_ID || 'use-assistant-voice');
+            } else if (voiceProvider === 'vapi') {
+                vapiVoiceId = document.getElementById('vapiVoice')?.value || (window.currentConfig?.VAPI_VOICE_ID || 'charlotte-uk');
+            } else {
+                vapiVoiceId = window.currentConfig?.VAPI_VOICE_ID || 'charlotte-uk';
+            }
+
+            let vapiAssistantId = document.getElementById('vapiAssistantSelect')?.value;
+            if (!vapiAssistantId) {
+                vapiAssistantId = window.currentConfig?.VAPI_ASSISTANT_ID || null;
+            }
+            const vapiAssistantsJson = JSON.stringify(vapiAssistants);
+            
+            // Validate: If vapi_assistant provider selected, ensure an assistant is selected
+            if (voiceProvider === 'vapi_assistant' && !vapiAssistantId) {
+                showMessage('⚠️ Please select a Vapi assistant or add one first', 'error');
+                return;
+            }
             
             console.log('🔵 Voice provider selected:', voiceProvider);
             console.log('🔵 Google voice selected:', googleVoice);
             console.log('🔵 PlayHT voice selected:', playhtVoiceId);
             console.log('🔵 Speechmatics voice selected:', speechmaticsVoiceId);
+            console.log('💾 Vapi voice selected:', vapiVoiceId);
+            console.log('🎯 Vapi assistant ID:', vapiAssistantId);
+            console.log('📋 Vapi assistants:', vapiAssistants);
             
             try {
                 showMessage('💾 Saving voice settings...', 'info');
@@ -3844,7 +4654,11 @@
                         cartesia_voice_id: cartesiaVoiceId,
                         google_voice: googleVoice,
                         playht_voice_id: playhtVoiceId,
-                        speechmatics_voice_id: speechmaticsVoiceId
+                        speechmatics_voice_id: speechmaticsVoiceId,
+                        lemonfox_voice: lemonfoxVoiceId,
+                        vapi_voice_id: vapiVoiceId,
+                        vapi_assistant_id: vapiAssistantId
+                        // vapi_assistants removed - now managed globally in super admin
                     })
                 });
                 
@@ -3873,6 +4687,8 @@
                         ELEVENLABS_VOICE_ID: elevenLabsVoiceId,
                         RESPONSE_LATENCY: responseLatency,
                         BUSINESS_INFO: businessInfo,
+                        BUSINESS_TIMEZONE: businessTimezone,
+                        BUSINESS_HOURS: businessHours,
                         AGENT_PERSONALITY: agentPersonality,
                         AGENT_INSTRUCTIONS: agentInstructions,
                         CALL_GREETING: callGreeting,
@@ -4130,7 +4946,9 @@
                     });
                     const apptData = await apptResponse.json();
                     unreadAppointmentsList = (apptData.appointments || []).filter(
-                        apt => apt.status === 'scheduled' && apt.created_by === 'ai_agent'
+                        apt => apt.created_by === 'ai_agent'
+                            && (apt.status === 'pending' || apt.status === 'scheduled')
+                            && Number(apt.is_read || 0) === 0
                     );
                 }
                 
@@ -4942,8 +5760,10 @@
                     return;
                 }
                 
-                // Mark as read if it's an AI-created appointment that's still scheduled
-                if (appointment.created_by === 'ai_agent' && appointment.status === 'scheduled') {
+                // Mark as read if it's an AI-created appointment the user hasn't opened yet
+                if (appointment.created_by === 'ai_agent'
+                    && (appointment.status === 'pending' || appointment.status === 'scheduled')
+                    && Number(appointment.is_read || 0) === 0) {
                     await fetch(`/api/appointments/${id}/read`, { 
                         method: 'POST',
                         headers: getAuthHeaders()
@@ -5032,6 +5852,14 @@
                 summaryHTML += `<div style="font-size: 16px;"><strong>Date:</strong> ${new Date(call.start_time).toLocaleString()}</div>`;
                 summaryHTML += `<div style="font-size: 16px;"><strong>Duration:</strong> ${call.duration || 'N/A'} seconds</div>`;
                 summaryHTML += `</div></div>`;
+
+                if (call.recording_url) {
+                    summaryHTML += `<div style="background: rgba(0,0,0,0.25); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.12);">`;
+                    summaryHTML += `<strong style="display: block; margin-bottom: 10px; font-size: 16px;">Recording:</strong>`;
+                    summaryHTML += `<audio controls style="width: 100%;" src="${call.recording_url}"></audio>`;
+                    summaryHTML += `<div style="margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.6);">If playback fails, <a href="${call.recording_url}" target="_blank" style="color: rgba(102,200,234,0.95);">open the file</a>.</div>`;
+                    summaryHTML += `</div>`;
+                }
                 
                 if (call.summary) {
                     summaryHTML += `<div style="background: rgba(100,200,100,0.15); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(100,200,100,0.3);">`;
@@ -5064,6 +5892,15 @@
         function closeCallSummary() {
             const overlay = document.getElementById('callSummaryOverlay');
             if (overlay) overlay.remove();
+        }
+
+        function openRecordingUrl(url) {
+            try {
+                if (!url) return;
+                window.open(url, '_blank', 'noopener');
+            } catch (e) {
+                alert('Could not open recording URL');
+            }
         }
 
         async function deleteAppointmentFromView(id) {

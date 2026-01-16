@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import os
+from datetime import datetime
 
 def kill_process_on_port(port=5004):
     """Kill any process using the specified port."""
@@ -94,7 +95,23 @@ def start_server():
     try:
         # Start the server in a detached process so this script can exit.
         log_path = os.path.join(os.getcwd(), "server_log_new.txt")
-        log_file = open(log_path, "a", encoding="utf-8")
+
+        # If an old log exists with a UTF-16 BOM (common when created via PowerShell redirection),
+        # rotate it so we don't append UTF-8 into a UTF-16 file (which corrupts the log output).
+        try:
+            if os.path.exists(log_path):
+                with open(log_path, "rb") as f:
+                    head = f.read(4)
+                if head.startswith(b"\xff\xfe") or head.startswith(b"\xfe\xff"):
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    rotated = os.path.join(os.getcwd(), f"server_log_new.{ts}.utf16.bak.txt")
+                    os.replace(log_path, rotated)
+                    print(f"📝 Rotated UTF-16 log to: {rotated}")
+        except Exception:
+            pass
+
+        # Start fresh UTF-8 log each run so tailing/grep works reliably.
+        log_file = open(log_path, "w", encoding="utf-8")
         proc = subprocess.Popen(
             [sys.executable, "vonage_agent.py"],
             env=env,

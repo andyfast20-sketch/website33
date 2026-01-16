@@ -1,0 +1,63 @@
+C:\Users\Windows\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+2026-01-05 21:52:50,148 - VonageAgent - INFO - ElevenLabs client initialized
+2026-01-05 21:52:50,222 - VonageAgent - INFO - Google Cloud TTS client initialized
+2026-01-05 21:52:50,238 - VonageAgent - INFO - PlayHT TTS configured with API key
+2026-01-05 21:52:50,331 - VonageAgent - INFO - \u2705 Fixed 1 trial account(s) with incorrect total_minutes_purchased
+2026-01-05 21:52:50,339 - VonageAgent - INFO - \u2705 Loaded Speechmatics API key from database
+2026-01-05 21:52:50,341 - VonageAgent - INFO - \u2705 Loaded OpenAI API key from database
+2026-01-05 21:52:50,345 - VonageAgent - INFO - \u2705 Loaded DeepSeek API key from database
+2026-01-05 21:52:50,359 - VonageAgent - INFO - \u2705 Loaded Groq API key from database
+2026-01-05 21:52:50,360 - VonageAgent - INFO - \u2705 Loaded OpenRouter API key from database
+2026-01-05 21:52:50,364 - VonageAgent - INFO - \u2705 Loaded OpenRouter model from database: deepseek/deepseek-chat
+2026-01-05 21:52:50,377 - VonageAgent - INFO - \u2705 Loaded Vonage API key from database
+2026-01-05 21:52:50,382 - VonageAgent - INFO - \u2705 Loaded Vonage API secret from database
+2026-01-05 21:52:50,387 - VonageAgent - INFO - \u2705 Loaded Vonage Application ID from database
+2026-01-05 21:52:50,399 - VonageAgent - INFO - \u2705 Loaded Vonage private key (PEM) from database
+2026-01-05 21:52:50,403 - VonageAgent - INFO - \u2705 AI Brain Provider set to: openrouter
+2026-01-05 21:52:50,416 - VonageAgent - INFO - \u2705 Performance: History parts = 4
+2026-01-05 21:52:50,419 - VonageAgent - INFO - \u2705 Performance: Max tokens = 100
+2026-01-05 21:52:50,420 - VonageAgent - INFO - \u2705 Performance: Max message chars = 250
+2026-01-05 21:52:50,424 - VonageAgent - INFO - \u2705 Performance: Request timeout = 8.0s
+2026-01-05 21:52:50,436 - VonageAgent - INFO - \u2705 Performance: System max chars = 3500
+2026-01-05 21:52:50,439 - VonageAgent - INFO - \u2705 Performance: Total prompt max chars = 5000
+INFO:     Started server process [16396]
+INFO:     Waiting for application startup.
+2026-01-05 21:52:50,564 - VonageAgent - INFO - \U0001f680 Vonage Voice Agent starting...
+2026-01-05 21:52:50,582 - VonageAgent - INFO - \U0001f310 Tunnel provider (DB): cloudflare
+2026-01-05 21:52:50,596 - VonageAgent - INFO - \U0001f4de Answer URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/answer
+2026-01-05 21:52:50,598 - VonageAgent - INFO - \U0001f4cb Event URL: https://anticipated-travelling-hint-millions.trycloudflare.com/webhooks/events
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5004 (Press CTRL+C to quit)
+2026-01-05 21:52:51,121 - VonageAgent - INFO - Agent name updated to Judie for user 25
+2026-01-05 21:52:53,563 - VonageAgent - WARNING - \U0001f6a8 Content FLAGGED for user 25: sexual - Business advertises sexual content (sex toys) (confidence: 0.95)
+2026-01-05 21:52:53,668 - VonageAgent - WARNING - \U0001f6a8 ACCOUNT SUSPENDED - User 25: Content policy violation: sexual
+2026-01-05 21:52:53,672 - VonageAgent - ERROR - Failed to update config: 403: Account suspended: Content policy violation: sexual. Please contact support.
+2026-01-05 21:52:56,877 - VonageAgent - INFO - \u2705 AI Brain Provider set to openrouter by super-admin
+2026-01-05 21:53:11,457 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:11,471 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:12,445 - httpx - INFO - HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+2026-01-05 21:53:15,485 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:15,491 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:25,489 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:25,497 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:35,485 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:35,490 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,106 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,112 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,126 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,145 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,157 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:43,865 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:53:43,868 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:53:43,868 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:53:53,122 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:53:53,127 - VonageAgent - WARNING - Blocked auth for restricted user 25 (is_suspended=1, status=active)
+2026-01-05 21:56:44,004 - VonageAgent - INFO - \u2705 Account unsuspended and restored to normal: User 25
+2026-01-05 21:56:49,511 - VonageAgent - INFO - User signed in: Julie Richardson (ID: 25)
+2026-01-05 21:56:55,402 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:56:55,406 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:56:55,406 - VonageAgent - INFO - Found 3 numbers from Vonage API
+2026-01-05 21:56:56,190 - httpx - INFO - HTTP Request: GET https://rest.nexmo.com/account/numbers?api_key=b5d8ed31&api_secret=Calmdown6%21 "HTTP/1.1 200 OK"
+2026-01-05 21:56:56,192 - VonageAgent - INFO - Vonage API response status: 200
+2026-01-05 21:56:56,193 - VonageAgent - INFO - Found 3 numbers from Vonage API

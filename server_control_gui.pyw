@@ -652,10 +652,16 @@ class ServerControlGUI:
             log_path = os.path.join(script_dir, "server_startup.log")
             
             try:
+                # Prefer the workspace virtualenv interpreter (python.exe) to avoid
+                # accidentally spawning pythonw.exe child processes that can silently
+                # hold the port and cause confusing restart/terminal flashing.
+                venv_python = os.path.join(script_dir, ".venv", "Scripts", "python.exe")
+                python_exe = venv_python if os.path.exists(venv_python) else sys.executable
+
                 # Open log file for output
                 with open(log_path, 'w') as log_file:
                     proc = subprocess.Popen(
-                        [sys.executable, script_path],
+                        [python_exe, script_path],
                         cwd=script_dir,
                         creationflags=subprocess.CREATE_NO_WINDOW,
                         stdout=log_file,
@@ -759,8 +765,11 @@ class ServerControlGUI:
             script_path = os.path.join(script_dir, SERVER_SCRIPT)
             
             try:
+                venv_python = os.path.join(script_dir, ".venv", "Scripts", "python.exe")
+                python_exe = venv_python if os.path.exists(venv_python) else sys.executable
+
                 subprocess.Popen(
-                    [sys.executable, script_path],
+                    [python_exe, script_path],
                     cwd=script_dir,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                     stdout=subprocess.DEVNULL,
