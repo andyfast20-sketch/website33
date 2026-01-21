@@ -41,3 +41,6 @@ static/*_old*.html
 
 # Scratch outputs
 test_results.txt
+
+# Local backups
+_snapshots/

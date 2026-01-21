@@ -1,6 +1,9 @@
 param(
   [Parameter(Mandatory=$false)]
-  [string]$Tag = "answerly-working-pre-postgres"
+  [string]$Tag = "answerly-working-pre-postgres",
+
+  [Parameter(Mandatory=$false)]
+  [switch]$IncludeUntracked
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +27,11 @@ try {
   $status = git status --porcelain
   if ($status) {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    git stash push -u -m "auto-stash-before-rollback-$stamp" | Out-Null
+    if ($IncludeUntracked) {
+      git stash push -u -m "auto-stash-before-rollback-$stamp" | Out-Null
+    } else {
+      git stash push -m "auto-stash-before-rollback-$stamp" | Out-Null
+    }
     Write-Host "Stashed local changes." 
   }
 } catch {
