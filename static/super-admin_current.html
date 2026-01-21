@@ -992,6 +992,39 @@
                     🔄 Reload Configuration
                 </button>
             </div>
+
+            <!-- Safety / Rollback (dyslexia-friendly) -->
+            <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.12);">
+                <div style="font-size: 18px; font-weight: 900; letter-spacing: 0.2px;">🛡️ Safety / Rollback (Easy Mode)</div>
+                <div style="font-size: 13px; opacity: 0.85; margin-top: 6px; max-width: 900px;">
+                    Use these buttons if a Postgres change breaks anything. Step 1 backs up your SQLite data. Steps 2–3 roll back to the safe working version.
+                </div>
+
+                <div id="safetyMeta" style="margin-top: 10px; font-size: 12px; opacity: 0.85;"></div>
+                <div id="safetyInlineStatus" style="display:none; margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-weight: 800;"></div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px;">
+                    <button class="btn" style="padding: 14px 16px; font-size: 14px; font-weight: 900; background: linear-gradient(135deg, #2ecc71, #27ae60);" onclick="safetyBackupSqlite()">
+                        1) Backup SQLite Data
+                    </button>
+                    <button class="btn" style="padding: 14px 16px; font-size: 14px; font-weight: 900; background: linear-gradient(135deg, #f39c12, #e67e22);" onclick="safetyRollbackCodeOnly()">
+                        2) Roll Back Code (Safe Version)
+                    </button>
+                    <button class="btn" style="padding: 14px 16px; font-size: 14px; font-weight: 900; background: linear-gradient(135deg, #e74c3c, #c0392b);" onclick="safetyRollbackAndRestoreLatest()">
+                        3) Roll Back + Restore Latest Backup
+                    </button>
+                </div>
+
+                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr; gap: 10px; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px;">
+                    <div style="font-size: 12px; font-weight: 900; opacity: 0.9;">Optional: choose a specific backup</div>
+                    <div style="display:flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                        <select id="safetyBackupSelect" style="min-width: 320px; flex: 1; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white; font-size: 13px;"></select>
+                        <button class="btn" style="padding: 12px 14px; font-size: 13px; font-weight: 900; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);" onclick="safetyRefreshBackups()">🔄 Refresh</button>
+                        <button class="btn" style="padding: 12px 14px; font-size: 13px; font-weight: 900; background: rgba(231, 76, 60, 0.22); border: 1px solid rgba(231, 76, 60, 0.55);" onclick="safetyRollbackAndRestoreSelected()">↩️ Roll Back + Restore Selected</button>
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.8;">Tip: Rollback may briefly disconnect this page while the server restarts. Just refresh after ~10–20 seconds.</div>
+                </div>
+            </div>
         </div>
 
         <!-- Charges / Billing Configuration -->
@@ -2536,6 +2569,10 @@
             setTimeout(() => {
                 startHealthMonitoring();
             }, 1000);
+            // Safety / Rollback panel (load allowed tags + backups)
+            setTimeout(() => {
+                try { safetyInit(); } catch (e) { console.error('Safety init failed:', e); }
+            }, 500);
         }
         async function logout() {
             stopStreamingStatusPolling();
@@ -2579,6 +2616,189 @@
             await safe('loadPerformanceSettings', () => loadPerformanceSettings());
             await safe('loadRacingSettings', () => loadRacingSettings());
             await safe('loadVapiAssistants', () => loadVapiAssistants());
+        }
+
+        // ==================== SAFETY / ROLLBACK (EASY MODE) ====================
+        let _safetyAllowedTags = [];
+        let _safetyDefaultTag = 'answerly-working-safety-ui';
+
+        function _safetySetInline(msg, kind='info') {
+            const el = document.getElementById('safetyInlineStatus');
+            if (!el) return;
+            if (!msg) {
+                el.style.display = 'none';
+                el.textContent = '';
+                return;
+            }
+            el.style.display = 'block';
+            el.textContent = msg;
+            if (kind === 'success') {
+                el.style.background = 'rgba(46, 204, 113, 0.18)';
+                el.style.border = '1px solid rgba(46, 204, 113, 0.35)';
+                el.style.color = 'rgba(200, 255, 220, 0.98)';
+            } else if (kind === 'warning') {
+                el.style.background = 'rgba(243, 156, 18, 0.22)';
+                el.style.border = '1px solid rgba(243, 156, 18, 0.45)';
+                el.style.color = 'rgba(255, 245, 215, 0.98)';
+            } else if (kind === 'error') {
+                el.style.background = 'rgba(231, 76, 60, 0.22)';
+                el.style.border = '1px solid rgba(231, 76, 60, 0.45)';
+                el.style.color = 'rgba(255, 220, 220, 0.98)';
+            } else {
+                el.style.background = 'rgba(52, 152, 219, 0.18)';
+                el.style.border = '1px solid rgba(52, 152, 219, 0.35)';
+                el.style.color = 'rgba(215, 240, 255, 0.98)';
+            }
+        }
+
+        function _safetyMetaText() {
+            const el = document.getElementById('safetyMeta');
+            if (!el) return;
+            const tags = (_safetyAllowedTags || []).slice(0, 4).join(', ');
+            el.textContent = `Default safe tag: ${_safetyDefaultTag}${tags ? ' · Allowed: ' + tags : ''}`;
+        }
+
+        async function safetyInit() {
+            await safetyLoadOptions();
+            await safetyRefreshBackups();
+        }
+
+        async function safetyLoadOptions() {
+            try {
+                const resp = await fetch('/api/super-admin/safety/options');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data && data.success) {
+                    _safetyDefaultTag = data.default_tag || _safetyDefaultTag;
+                    _safetyAllowedTags = Array.isArray(data.allowed_tags) ? data.allowed_tags : _safetyAllowedTags;
+                    _safetyMetaText();
+                }
+            } catch (e) {
+                console.error('Safety options error:', e);
+            }
+        }
+
+        async function safetyRefreshBackups() {
+            const select = document.getElementById('safetyBackupSelect');
+            if (!select) return;
+            select.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = 'Loading backups…';
+            select.appendChild(opt0);
+
+            try {
+                const resp = await fetch('/api/super-admin/safety/sqlite-backups');
+                const data = await resp.json().catch(() => ({}));
+                const backups = (data && data.backups && Array.isArray(data.backups)) ? data.backups : [];
+
+                select.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = backups.length ? 'Latest backup (recommended)' : 'No backups found yet';
+                select.appendChild(opt);
+
+                backups.forEach((name) => {
+                    const o = document.createElement('option');
+                    o.value = name;
+                    o.textContent = name;
+                    select.appendChild(o);
+                });
+            } catch (e) {
+                select.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Failed to load backups';
+                select.appendChild(opt);
+                console.error('Backup list error:', e);
+            }
+        }
+
+        async function safetyBackupSqlite() {
+            _safetySetInline('Creating SQLite backup…', 'info');
+            try {
+                const resp = await fetch('/api/super-admin/safety/backup-sqlite', { method: 'POST' });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data || !data.success) {
+                    _safetySetInline(data.error || 'Backup failed', 'error');
+                    return;
+                }
+                const latest = data.latest_backup || '';
+                _safetySetInline(latest ? `Backup created: ${latest}` : 'Backup created', 'success');
+                showAlert('✅ SQLite backup created', 'success');
+                await safetyRefreshBackups();
+            } catch (e) {
+                _safetySetInline(`Backup failed: ${e.message || e}`, 'error');
+            }
+        }
+
+        async function _safetyStartRollback(payload) {
+            _safetySetInline('Starting rollback… this page may disconnect.', 'warning');
+            try {
+                const resp = await fetch('/api/super-admin/safety/rollback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload || {})
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data || !data.success) {
+                    _safetySetInline(data.error || 'Rollback failed to start', 'error');
+                    return;
+                }
+                showAlert('⚠️ Rollback started — refresh in ~10–20 seconds', 'warning');
+                // Attempt auto-refresh after restart
+                setTimeout(() => {
+                    try { location.reload(); } catch (_) {}
+                }, 12000);
+            } catch (e) {
+                // If rollback kills the server, fetch may fail — that's expected.
+                showAlert('⚠️ Rollback started (connection may drop). Refresh in ~10–20 seconds.', 'warning');
+                setTimeout(() => {
+                    try { location.reload(); } catch (_) {}
+                }, 12000);
+            }
+        }
+
+        function safetyRollbackCodeOnly() {
+            const tag = _safetyDefaultTag || 'answerly-working-safety-ui';
+            const ok = confirm(`Roll back CODE to safe tag: ${tag}?\n\nThis may restart the server and disconnect this page briefly.`);
+            if (!ok) return;
+            _safetyStartRollback({ tag });
+        }
+
+        async function safetyRollbackAndRestoreLatest() {
+            const tag = _safetyDefaultTag || 'answerly-working-safety-ui';
+            const ok = confirm(`Roll back CODE and restore the LATEST SQLite backup?\n\nSafe tag: ${tag}\n\nThis will restart the server.`);
+            if (!ok) return;
+
+            try {
+                const resp = await fetch('/api/super-admin/safety/sqlite-backups');
+                const data = await resp.json().catch(() => ({}));
+                const backups = (data && Array.isArray(data.backups)) ? data.backups : [];
+                const latest = backups.length ? backups[0] : '';
+                if (!latest) {
+                    _safetySetInline('No backups found. Click “1) Backup SQLite Data” first.', 'error');
+                    return;
+                }
+                _safetyStartRollback({ tag, restore_backup: latest });
+            } catch (e) {
+                _safetySetInline('Failed to load backups. Try Refresh.', 'error');
+            }
+        }
+
+        function safetyRollbackAndRestoreSelected() {
+            const tag = _safetyDefaultTag || 'answerly-working-safety-ui';
+            const select = document.getElementById('safetyBackupSelect');
+            const chosen = (select && select.value) ? String(select.value) : '';
+
+            if (!chosen) {
+                _safetySetInline('Pick a backup from the dropdown first (or use “Restore Latest”).', 'warning');
+                return;
+            }
+
+            const ok = confirm(`Roll back CODE and restore this backup?\n\nSafe tag: ${tag}\nBackup: ${chosen}\n\nThis will restart the server.`);
+            if (!ok) return;
+            _safetyStartRollback({ tag, restore_backup: chosen });
         }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================

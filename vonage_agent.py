@@ -25550,9 +25550,11 @@ async def delete_account(user_id: int):
 
 
 @app.post("/api/super-admin/backup")
-async def create_backup():
-    """Create database backup"""
+async def create_backup(request: Request):
+    """Create database backup (legacy)."""
     try:
+        _super_admin_require_auth(request)
+        _super_admin_require_csrf(request)
         import shutil
         from datetime import datetime
         
@@ -25569,9 +25571,10 @@ async def create_backup():
 
 
 @app.get("/api/super-admin/export-reports")
-async def export_reports():
+async def export_reports(request: Request):
     """Export usage reports as CSV"""
     try:
+        _super_admin_require_auth(request)
         import csv
         from io import StringIO
         
@@ -25606,6 +25609,164 @@ async def export_reports():
     except Exception as e:
         logger.error(f"Failed to export reports: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/super-admin/safety/options")
+async def super_admin_safety_options(request: Request):
+    """Return the allowed rollback tags + default tag for the Safety panel."""
+    _super_admin_require_auth(request)
+    default_tag = (os.getenv("SUPER_ADMIN_DEFAULT_ROLLBACK_TAG") or "answerly-working-safety-ui").strip()
+    raw = (os.getenv("SUPER_ADMIN_ROLLBACK_ALLOWED_TAGS") or "").strip()
+    tags = [t.strip() for t in raw.split(",") if t.strip()]
+    if not tags:
+        tags = [
+            "answerly-working-safety-ui",
+            "answerly-working-pre-postgres-tools",
+            "answerly-working-pre-postgres",
+        ]
+    # Ensure default is present
+    if default_tag and default_tag not in tags:
+        tags.insert(0, default_tag)
+    return {"success": True, "default_tag": default_tag, "allowed_tags": tags}
+
+
+def _super_admin_repo_root() -> "Path":
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent
+
+
+@app.get("/api/super-admin/safety/sqlite-backups")
+async def super_admin_list_sqlite_backups(request: Request):
+    """List snapshot folders created by scripts/backup_sqlite_dbs.py."""
+    _super_admin_require_auth(request)
+    from pathlib import Path
+
+    repo_root = _super_admin_repo_root()
+    snapshots = repo_root / "_snapshots"
+    backups: list[str] = []
+    if snapshots.exists():
+        dirs = [d for d in snapshots.iterdir() if d.is_dir() and d.name.startswith("sqlite_db_backup_")]
+        dirs.sort(key=lambda p: p.name, reverse=True)
+        backups = [d.name for d in dirs]
+    return {"success": True, "backups": backups}
+
+
+@app.post("/api/super-admin/safety/backup-sqlite")
+async def super_admin_backup_sqlite(request: Request):
+    """Create a point-in-time backup of all local SQLite DBs into _snapshots/."""
+    _super_admin_require_auth(request)
+    _super_admin_require_csrf(request)
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = _super_admin_repo_root()
+    script_path = repo_root / "scripts" / "backup_sqlite_dbs.py"
+    if not script_path.exists():
+        return JSONResponse({"success": False, "error": "Backup script not found"}, status_code=500)
+
+    proc = subprocess.run(
+        [sys.executable, str(script_path)],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    if proc.returncode != 0:
+        return JSONResponse(
+            {"success": False, "error": (proc.stdout or "") + (proc.stderr or "")},
+            status_code=500,
+        )
+
+    # Find newest backup folder
+    snapshots = repo_root / "_snapshots"
+    newest: str = ""
+    if snapshots.exists():
+        dirs = [d for d in snapshots.iterdir() if d.is_dir() and d.name.startswith("sqlite_db_backup_")]
+        dirs.sort(key=lambda p: p.name, reverse=True)
+        newest = dirs[0].name if dirs else ""
+
+    return {
+        "success": True,
+        "message": "SQLite backup created",
+        "latest_backup": newest,
+        "stdout": (proc.stdout or "").strip(),
+    }
+
+
+@app.post("/api/super-admin/safety/rollback")
+async def super_admin_start_rollback(request: Request):
+    """Start a rollback in a background process. This may briefly disconnect the UI while the server restarts."""
+    _super_admin_require_auth(request)
+    _super_admin_require_csrf(request)
+
+    if os.name != "nt":
+        return JSONResponse({"success": False, "error": "Rollback from UI is currently supported on Windows only."}, status_code=400)
+
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    tag = (body.get("tag") or os.getenv("SUPER_ADMIN_DEFAULT_ROLLBACK_TAG") or "answerly-working-safety-ui").strip()
+    restore_backup = (body.get("restore_backup") or "").strip()
+
+    # Validate tag against allow-list
+    raw = (os.getenv("SUPER_ADMIN_ROLLBACK_ALLOWED_TAGS") or "").strip()
+    allowed = [t.strip() for t in raw.split(",") if t.strip()]
+    if not allowed:
+        allowed = [
+            "answerly-working-safety-ui",
+            "answerly-working-pre-postgres-tools",
+            "answerly-working-pre-postgres",
+        ]
+    if tag not in allowed:
+        return JSONResponse({"success": False, "error": f"Tag not allowed: {tag}"}, status_code=400)
+
+    repo_root = _super_admin_repo_root()
+    rollback_script = repo_root / "scripts" / "rollback_to_working_tag.py"
+    if not rollback_script.exists():
+        return JSONResponse({"success": False, "error": "Rollback script not found"}, status_code=500)
+
+    args = [str(rollback_script), "--tag", tag]
+
+    if restore_backup:
+        # Only allow selecting a folder name under _snapshots to avoid arbitrary file access.
+        if any(sep in restore_backup for sep in ("/", "\\")):
+            return JSONResponse({"success": False, "error": "Invalid backup name"}, status_code=400)
+        restore_path = (repo_root / "_snapshots" / restore_backup).resolve()
+        snapshots_root = (repo_root / "_snapshots").resolve()
+        if not str(restore_path).startswith(str(snapshots_root)):
+            return JSONResponse({"success": False, "error": "Invalid backup path"}, status_code=400)
+        if not restore_path.exists() or not restore_path.is_dir():
+            return JSONResponse({"success": False, "error": "Backup folder not found"}, status_code=404)
+        args += ["--restore-db-from", str(restore_path)]
+
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    proc = subprocess.Popen(
+        [sys.executable] + args,
+        cwd=str(repo_root),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+    )
+
+    return JSONResponse(
+        {
+            "success": True,
+            "message": "Rollback started. The server may restart; refresh this page in ~10-20 seconds.",
+            "pid": proc.pid,
+            "tag": tag,
+            "restore_backup": restore_backup,
+        },
+        status_code=202,
+    )
 
 
 @app.get("/api/super-admin/global-instructions")
