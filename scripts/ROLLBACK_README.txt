@@ -9,6 +9,9 @@ A) GitHub rollback (recommended)
 2) To rollback, run:
    powershell -ExecutionPolicy Bypass -File scripts\rollback_to_working_tag.ps1 -Tag answerly-working-pre-postgres
 
+   Or using Python (if you prefer running from the venv):
+   .venv\Scripts\python.exe scripts\rollback_to_working_tag.py --tag answerly-working-pre-postgres
+
 This will:
 - stash any local edits
 - checkout the tagged working version
