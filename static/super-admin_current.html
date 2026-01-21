@@ -784,6 +784,7 @@
         <!-- Navigation Menu -->
         <div class="nav-menu" id="navMenu">
             <div class="nav-item active" onclick="navigateToSection('overview')"><span>🏠</span> Overview</div>
+            <div class="nav-item" onclick="navigateToSection('system-controls')"><span>🛡️</span> Safety</div>
             <div class="nav-item" onclick="navigateToSection('brain')" style="display:none;"><span>🧠</span> AI Brain</div>
             <div class="nav-item" onclick="navigateToSection('openrouter')" style="display:none;"><span>🔌</span> OpenRouter</div>
             <div class="nav-item" onclick="navigateToSection('performance')" style="display:none;"><span>⚡</span> Performance</div>
@@ -831,7 +832,7 @@
         <div class="header">
             <div>
                 <h1>🔧 Super Admin - System Configuration</h1>
-                <div class="build-stamp">UPDATED JAN 17 2026</div>
+                <div class="build-stamp">UPDATED JAN 21 2026 (SAFETY / BACKUP BUTTONS)</div>
             </div>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-logout" onclick="window.open('/', '_blank')" style="background: rgba(52, 152, 219, 0.3);">
@@ -952,7 +953,8 @@
         </div>
 
         <!-- System Controls Panel -->
-        <div class="panel" id="section-system-controls" style="margin-bottom: 25px; display:none;">
+        <div class="panel" id="section-system-controls" style="margin-bottom: 25px;">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <div class="panel-header">
                 <h2>🛠️ System Controls</h2>
                 <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Quick diagnostic and recovery tools</p>
