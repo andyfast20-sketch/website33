@@ -391,7 +391,7 @@
                         <span style="color: #667eea;">Pricing</span>
                     </h1>
                     <p>
-                        Simple, transparent pricing. Only £2/month for your number + credits as you need them.
+                        Simple, transparent pricing. Only <span class="js-number-hire-monthly">£4</span>/month for your number + credits as you need them.
                     </p>
                     <div style="margin-top: 30px; display: flex; gap: 15px; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 20px; font-size: 14px;">
@@ -422,7 +422,7 @@
                             <p style="color: rgba(255, 255, 255, 0.7); font-size: 15px;">Your dedicated business line</p>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-size: 48px; font-weight: 900; background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">£2</div>
+                            <div style="font-size: 48px; font-weight: 900; background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"><span class="js-number-hire-monthly">£4</span></div>
                             <div style="color: rgba(255, 255, 255, 0.7); font-size: 16px;">per month</div>
                         </div>
                     </div>
@@ -474,7 +474,7 @@
             <div style="font-size: 16px; color: rgba(255, 255, 255, 0.9); font-weight: 600; margin-bottom: 15px;">💡 Total Monthly Cost Example</div>
             <div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;">
                 <div>
-                    <div style="font-size: 32px; font-weight: 900; color: #667eea; margin-bottom: 5px;">£2</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #667eea; margin-bottom: 5px;"><span class="js-number-hire-monthly">£4</span></div>
                     <div style="font-size: 14px; color: rgba(255, 255, 255, 0.7);">Number Rental</div>
                 </div>
                 <div style="font-size: 32px; color: rgba(255, 255, 255, 0.5);">+</div>
@@ -515,6 +515,16 @@
                         <td>Charged per minute of active conversation</td>
                     </tr>
                     <tr>
+                        <td><strong>Text Notification (SMS)</strong></td>
+                        <td><span class="highlight"><span class="js-sms-notification-credits">3</span> credits</span></td>
+                        <td>Optional SMS summary after the call</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Full Transcript (Unlock)</strong></td>
+                        <td><span class="highlight"><span class="js-transcript-unlock-credits">2</span> credits</span></td>
+                        <td>One-off per call to reveal the full transcript</td>
+                    </tr>
+                    <tr>
                         <td><strong>Appointment Booking</strong></td>
                         <td><span class="highlight">5 credits</span></td>
                         <td>When AI successfully books an appointment</td>
@@ -541,7 +551,7 @@
                 <div class="note-title">💡 Important Notes</div>
                 <p>
                     <strong>Credits never expire</strong> - Use them at your own pace.<br>
-                    <strong>Pay as you go</strong> - Only pay £2/month for your number, then top up credits as needed.<br>
+                    <strong>Pay as you go</strong> - Only pay <span class="js-number-hire-monthly">£4</span>/month for your number, then top up credits as needed.<br>
                     <strong>Full transparency</strong> - See exact costs in your call logs.<br>
                     <strong>Unused credits roll over</strong> - Buy more anytime to top up.
                 </p>
@@ -650,8 +660,55 @@
             alert(`Purchase feature coming soon!\n\nYou selected: £${amount.toFixed(2)} for ${credits} credits\n\nPlease contact support to add credits to your account.`);
         }
 
+        function formatGBP(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) return null;
+
+            // Show whole pounds when possible; otherwise show 2dp.
+            const roundedToPennies = Math.round(num * 100) / 100;
+            const isWhole = Math.abs(roundedToPennies - Math.round(roundedToPennies)) < 1e-9;
+            return isWhole ? `£${Math.round(roundedToPennies)}` : `£${roundedToPennies.toFixed(2)}`;
+        }
+
+        function formatCreditsWhole(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) return null;
+            return String(Math.ceil(num));
+        }
+
+        async function loadNumberHireMonthly() {
+            try {
+                const res = await fetch('/api/billing-config', { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                const formatted = formatGBP(data?.number_hire_monthly_gbp);
+                if (!formatted) return;
+
+                document.querySelectorAll('.js-number-hire-monthly').forEach(el => {
+                    el.textContent = formatted;
+                });
+
+                const smsCredits = formatCreditsWhole(data?.credits_per_sms_notification);
+                if (smsCredits) {
+                    document.querySelectorAll('.js-sms-notification-credits').forEach(el => {
+                        el.textContent = smsCredits;
+                    });
+                }
+
+                const transcriptUnlockCredits = formatCreditsWhole(data?.credits_per_transcript_unlock);
+                if (transcriptUnlockCredits) {
+                    document.querySelectorAll('.js-transcript-unlock-credits').forEach(el => {
+                        el.textContent = transcriptUnlockCredits;
+                    });
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
         // Initialize on page load
         calculateCredits();
+        loadNumberHireMonthly();
     </script>
 </body>
 </html>

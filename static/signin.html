@@ -3,146 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - VoiceAI</title>
+    <title>Sign In - Answerly</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background:
+                radial-gradient(900px 480px at 20% 0%, rgba(102,126,234,0.35), transparent 55%),
+                radial-gradient(850px 520px at 90% 10%, rgba(118,75,162,0.35), transparent 55%),
+                #070713;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #ffffff;
+            color: rgba(255,255,255,0.92);
+            padding: 32px 20px;
         }
 
         .signin-container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            padding: 50px 60px;
-            border-radius: 25px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            max-width: 450px;
+            background: rgba(10, 12, 28, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 36px 36px 28px;
             width: 100%;
+            max-width: 520px;
         }
 
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .logo-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(102,126,234,1), rgba(118,75,162,1));
+            box-shadow: 0 10px 24px rgba(102,126,234,0.35);
+            border: 1px solid rgba(255,255,255,0.18);
+        }
+
+        .logo-mark svg { width: 24px; height: 24px; }
+
         h1 {
-            font-size: 36px;
-            margin-bottom: 10px;
+            font-size: 28px;
+            margin-bottom: 8px;
             text-align: center;
+            color: #fff;
         }
 
         .subtitle {
             text-align: center;
-            color: rgba(255, 255, 255, 0.8);
-            margin-bottom: 40px;
-            font-size: 16px;
+            color: rgba(255, 255, 255, 0.65);
+            margin-bottom: 26px;
+            font-size: 14px;
         }
 
-        .form-group {
-            margin-bottom: 30px;
-        }
+        .form-group { margin-bottom: 16px; }
 
         label {
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.85);
         }
 
         input {
             width: 100%;
-            padding: 15px 20px;
+            padding: 12px 14px;
             border-radius: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            font-size: 16px;
-            transition: all 0.3s;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.2s ease;
         }
 
         input:focus {
             outline: none;
-            border-color: rgba(255, 255, 255, 0.5);
-            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(122,167,255,0.7);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
         }
 
-        input::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-        }
+        input::placeholder { color: rgba(255,255,255,0.45); }
 
         .btn {
             width: 100%;
-            padding: 15px;
+            padding: 12px 18px;
             border-radius: 12px;
             border: none;
-            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
-            color: #667eea;
-            font-size: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            font-size: 14px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 6px;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 20px rgba(102,126,234,0.25);
         }
 
         .links {
             text-align: center;
-            margin-top: 25px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
         }
 
         .links a {
-            color: rgba(255, 255, 255, 0.9);
+            color: #9cc3ff;
             text-decoration: none;
-            font-size: 14px;
-            transition: all 0.3s;
+            font-weight: 600;
         }
 
-        .links a:hover {
-            color: white;
-            text-decoration: underline;
-        }
+        .links a:hover { text-decoration: underline; }
 
         .message {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin-bottom: 16px;
             text-align: center;
             display: none;
+            font-size: 14px;
         }
 
         .message.success {
-            background: rgba(76, 175, 80, 0.3);
-            border: 1px solid rgba(76, 175, 80, 0.5);
+            background: rgba(46, 204, 113, 0.18);
+            border: 1px solid rgba(46, 204, 113, 0.25);
+            color: #9be7b5;
         }
 
         .message.error {
-            background: rgba(244, 67, 54, 0.3);
-            border: 1px solid rgba(244, 67, 54, 0.5);
+            background: rgba(231, 76, 60, 0.18);
+            border: 1px solid rgba(231, 76, 60, 0.25);
+            color: #f3b2ab;
+        }
+
+        @media (max-width: 640px) {
+            .signin-container { padding: 28px 22px; }
         }
     </style>
 </head>
 <body>
     <div class="signin-container">
-        <h1>🎤 Sign In</h1>
-        <p class="subtitle">Welcome back to VoiceAI</p>
+        <div class="brand">
+            <span class="logo-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12c0-3.87 3.13-7 7-7" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M12 5c3.87 0 7 3.13 7 7" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/>
+                    <rect x="8" y="10" width="8" height="10" rx="4" fill="rgba(255,255,255,0.9)"/>
+                    <circle cx="12" cy="14" r="1.5" fill="#3f4cff"/>
+                </svg>
+            </span>
+            <div style="font-weight: 900; font-size: 18px;">Answerly</div>
+        </div>
+        <h1>Sign in</h1>
+        <p class="subtitle">Welcome back. Enter your details to continue.</p>
 
         <div id="message" class="message"></div>
 
         <form id="signinForm">
             <div class="form-group">
-                <label for="name">Your Name</label>
-                <input type="text" id="name" placeholder="Enter your name" required autofocus>
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
             </div>
 
             <button type="submit" class="btn">Sign In</button>
@@ -158,11 +198,12 @@
         document.getElementById('signinForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const name = document.getElementById('name').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
             const messageEl = document.getElementById('message');
             
-            if (!name) {
-                showMessage('Please enter your name', 'error');
+            if (!username || !password) {
+                showMessage('Please enter your username and password', 'error');
                 return;
             }
 
@@ -170,7 +211,7 @@
                 const response = await fetch('/api/auth/signin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name })
+                    body: JSON.stringify({ username, password, name: username })
                 });
 
                 const data = await response.json();

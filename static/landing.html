@@ -174,6 +174,82 @@
             line-height: 1.6;
         }
 
+        /* Pay-as-you-go section */
+        .payg {
+            padding: 110px 50px;
+            background: #0a0a0a;
+        }
+
+        .payg-wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .payg-title {
+            font-size: 44px;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .payg-subtitle {
+            text-align: center;
+            font-size: 18px;
+            opacity: 0.85;
+            max-width: 980px;
+            margin: 0 auto 44px;
+            line-height: 1.7;
+        }
+
+        .payg-table {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.03);
+            box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+        }
+
+        .payg-table table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 720px;
+        }
+
+        .payg-table th,
+        .payg-table td {
+            padding: 16px 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            text-align: left;
+        }
+
+        .payg-table th {
+            font-weight: 800;
+            background: rgba(102,126,234,0.16);
+        }
+
+        .pill-ok {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            background: rgba(46, 204, 113, 0.14);
+            border: 1px solid rgba(46, 204, 113, 0.24);
+        }
+
+        .pill-no {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            background: rgba(231, 76, 60, 0.14);
+            border: 1px solid rgba(231, 76, 60, 0.24);
+        }
+
         .cta-buttons {
             display: flex;
             gap: 20px;
@@ -479,6 +555,52 @@
         </div>
     </section>
 
+    <section id="payg" class="payg">
+        <div class="payg-wrap">
+            <h2 class="payg-title">Pay‑As‑You‑Go (Way Cheaper Than Big Monthly Plans)</h2>
+            <p class="payg-subtitle">No expensive per‑month platform fee. You just rent your number for a small fee (<strong><span data-number-rent-monthly>£4.00/mo</span></strong>) and then pay only for what you use.</p>
+
+            <div class="payg-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Our service</th>
+                            <th>Typical subscription-based providers</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Platform subscription</td>
+                            <td><strong>£0/mo</strong> (pay as you go)</td>
+                            <td>Usually a fixed monthly fee</td>
+                        </tr>
+                        <tr>
+                            <td>Number rental</td>
+                            <td><strong><span data-number-rent-monthly>£4.00/mo</span></strong></td>
+                            <td>Varies (often extra or bundled)</td>
+                        </tr>
+                        <tr>
+                            <td>Only pay when you use it</td>
+                            <td><span class="pill-ok">✓ Yes</span></td>
+                            <td><span class="pill-no">✗ No</span></td>
+                        </tr>
+                        <tr>
+                            <td>Great for seasonal/quiet periods</td>
+                            <td><span class="pill-ok">✓ Yes</span></td>
+                            <td><span class="pill-no">✗ Still pay monthly</span></td>
+                        </tr>
+                        <tr>
+                            <td>Top up anytime</td>
+                            <td><span class="pill-ok">✓ Yes</span></td>
+                            <td><span class="pill-ok">✓ Usually</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
     <section id="features" class="features">
         <h2 class="section-title">Powerful Features</h2>
         <p class="section-subtitle">Everything you need to deliver exceptional phone support</p>
@@ -523,33 +645,30 @@
     </section>
 
     <section id="pricing" class="pricing">
-        <h2 class="section-title">Simple, Transparent Pricing</h2>
-        <p class="section-subtitle">No hidden fees. Cancel anytime.</p>
+        <h2 class="section-title">Simple Pay‑As‑You‑Go Pricing</h2>
+        <p class="section-subtitle">No expensive monthly plans. Rent your number + pay only for what you use.</p>
         
         <div class="pricing-grid">
             <div class="pricing-card">
-                <div class="plan-name">Starter</div>
-                <div class="plan-price">$49<span>/mo</span></div>
+                <div class="plan-name">Pay as you go</div>
+                <div class="plan-price">From <span data-topup-from>£0.30</span></div>
                 <ul class="plan-features">
-                    <li>1,000 credits/month</li>
-                    <li>AI call summaries</li>
-                    <li>Email notifications</li>
-                    <li>Basic analytics</li>
-                    <li>24/7 support</li>
+                    <li>Top up credits anytime</li>
+                    <li>No long contracts</li>
+                    <li>Only pay for usage</li>
+                    <li>Start with a free trial</li>
                 </ul>
                 <a href="/admin" class="btn-primary">Start Free Trial</a>
             </div>
 
             <div class="pricing-card featured">
-                <div class="plan-name">Professional</div>
-                <div class="plan-price">$149<span>/mo</span></div>
+                <div class="plan-name">Number rental</div>
+                <div class="plan-price"><span data-number-rent-monthly>£4.00/mo</span></div>
                 <ul class="plan-features">
-                    <li>5,000 credits/month</li>
-                    <li>Advanced AI summaries</li>
-                    <li>SMS notifications</li>
-                    <li>Advanced analytics</li>
-                    <li>Custom personality</li>
-                    <li>Priority support</li>
+                    <li>Dedicated phone number</li>
+                    <li>Forward calls when busy</li>
+                    <li>Switch on/off anytime</li>
+                    <li>Works with your existing number</li>
                 </ul>
                 <a href="/admin" class="btn-primary">Start Free Trial</a>
             </div>
@@ -558,17 +677,47 @@
                 <div class="plan-name">Enterprise</div>
                 <div class="plan-price">Custom</div>
                 <ul class="plan-features">
-                    <li>Unlimited credits</li>
-                    <li>Custom AI training</li>
-                    <li>Dedicated account manager</li>
-                    <li>Custom integrations</li>
-                    <li>SLA guarantee</li>
-                    <li>White-label option</li>
+                    <li>Custom workflows + integrations</li>
+                    <li>SLA + dedicated support</li>
+                    <li>Volume pricing available</li>
                 </ul>
                 <a href="/admin" class="btn-primary">Contact Sales</a>
             </div>
         </div>
     </section>
+
+    <script>
+        (function hydratePublicPricing() {
+            const setText = (selector, text) => {
+                document.querySelectorAll(selector).forEach(el => {
+                    try { el.textContent = text; } catch (_) {}
+                });
+            };
+
+            fetch('/api/billing-config', { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+
+                    const fee = Number(data.number_hire_monthly_gbp);
+                    if (Number.isFinite(fee)) {
+                        setText('[data-number-rent-monthly]', `£${fee.toFixed(2)}/mo`);
+                    }
+
+                    const packages = Array.isArray(data.topup_packages) ? data.topup_packages : [];
+                    let minPrice = null;
+                    for (const p of packages) {
+                        const price = Number(p?.price_gbp);
+                        if (!Number.isFinite(price) || price <= 0) continue;
+                        if (minPrice === null || price < minPrice) minPrice = price;
+                    }
+                    if (minPrice !== null) {
+                        setText('[data-topup-from]', `£${minPrice.toFixed(2)}`);
+                    }
+                })
+                .catch(() => {});
+        })();
+    </script>
 
     <footer id="contact">
         <p>&copy; 2025 VoiceAI. All rights reserved. | support@voiceai.com</p>

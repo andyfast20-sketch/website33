@@ -6,171 +6,295 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Sign Up - VoiceAI</title>
+    <title>Sign Up - Answerly</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background:
+                radial-gradient(900px 480px at 20% 0%, rgba(102,126,234,0.35), transparent 55%),
+                radial-gradient(850px 520px at 90% 10%, rgba(118,75,162,0.35), transparent 55%),
+                #070713;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 32px 20px;
+            color: rgba(255,255,255,0.92);
         }
         .signup-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
+            background: rgba(10, 12, 28, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 36px 36px 28px;
             width: 100%;
-            max-width: 500px;
+            max-width: 640px;
         }
-        h1 { color: #667eea; font-size: 28px; margin-bottom: 10px; text-align: center; }
-        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 14px; }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .logo-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(102,126,234,1), rgba(118,75,162,1));
+            box-shadow: 0 10px 24px rgba(102,126,234,0.35);
+            border: 1px solid rgba(255,255,255,0.18);
+        }
+        .logo-mark svg { width: 24px; height: 24px; }
+        h1 { color: #fff; font-size: 28px; margin-bottom: 8px; text-align: center; }
+        .subtitle { text-align: center; color: rgba(255,255,255,0.65); margin-bottom: 26px; font-size: 14px; }
+
+        .progress {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 26px;
+        }
+        .progress-step {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.7);
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+        }
+        .progress-step.active {
+            color: #fff;
+            border-color: rgba(122,167,255,0.6);
+            background: rgba(122,167,255,0.2);
+        }
+        .progress-line {
+            width: 40px;
+            height: 2px;
+            background: rgba(255,255,255,0.15);
+        }
+        .progress-line.active { background: rgba(122,167,255,0.6); }
+
+        .form-step { display: none; }
+        .form-step.active { display: block; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 8px; color: rgba(255,255,255,0.85); font-weight: 600; font-size: 13px; }
         input, textarea {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 15px;
-            transition: all 0.3s;
+            padding: 12px 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            font-size: 14px;
+            color: #fff;
+            background: rgba(255,255,255,0.06);
+            transition: all 0.2s ease;
         }
+        input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
         input:focus, textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: rgba(122,167,255,0.7);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
         }
         .checkbox-group {
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-top: 6px;
+            margin-bottom: 6px;
         }
         .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
+            width: 16px;
+            height: 16px;
+            accent-color: #7aa7ff;
         }
         .checkbox-group label {
             margin: 0;
-            font-weight: normal;
+            font-weight: 500;
             font-size: 13px;
+            color: rgba(255,255,255,0.75);
+        }
+        .form-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 8px;
         }
         .btn {
-            width: 100%;
-            padding: 14px;
+            padding: 12px 18px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
-        .btn:hover { transform: translateY(-2px); }
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.25); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-secondary {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.85);
         }
+        .btn-full { width: 100%; }
+
         .message {
             padding: 12px 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            margin-bottom: 16px;
             display: none;
             font-size: 14px;
         }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .message.success { background: rgba(46, 204, 113, 0.18); color: #9be7b5; border: 1px solid rgba(46, 204, 113, 0.25); }
+        .message.error { background: rgba(231, 76, 60, 0.18); color: #f3b2ab; border: 1px solid rgba(231, 76, 60, 0.25); }
+
         .links {
             text-align: center;
             margin-top: 20px;
-            font-size: 14px;
-            color: #666;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
         }
-        .links a { color: #667eea; text-decoration: none; font-weight: 600; }
+        .links a { color: #9cc3ff; text-decoration: none; font-weight: 600; }
         .links a:hover { text-decoration: underline; }
+
         .step { display: none; }
         .step.active { display: block; }
         .verification-code {
             display: flex;
             gap: 10px;
             justify-content: center;
-            margin: 20px 0;
+            margin: 18px 0 10px;
         }
         .verification-code input {
-            width: 55px;
-            height: 55px;
+            width: 52px;
+            height: 56px;
             text-align: center;
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 22px;
+            font-weight: 700;
+            border-radius: 14px;
+        }
+        .helper-text {
+            text-align: center;
+            color: rgba(255,255,255,0.65);
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        @media (max-width: 640px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .signup-container { padding: 28px 22px; }
         }
     </style>
 </head>
 <body>
     <div class="signup-container">
-        <h1>🎯 Create Your Account</h1>
-        <p class="subtitle">Start your AI phone assistant journey</p>
+        <div class="brand">
+            <span class="logo-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12c0-3.87 3.13-7 7-7" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M12 5c3.87 0 7 3.13 7 7" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/>
+                    <rect x="8" y="10" width="8" height="10" rx="4" fill="rgba(255,255,255,0.9)"/>
+                    <circle cx="12" cy="14" r="1.5" fill="#3f4cff"/>
+                </svg>
+            </span>
+            <div style="font-weight: 900; font-size: 18px;">Answerly</div>
+        </div>
+        <h1>Create your account</h1>
+        <p class="subtitle">Fast setup. Finish in less than 2 minutes.</p>
 
         <div id="message" class="message"></div>
 
         <!-- Step 1: Account Details -->
         <div id="step1" class="step active">
             <form id="signupForm">
-                <div class="form-group">
-                    <label for="name">Full Name *</label>
-                    <input type="text" id="name" placeholder="John Smith" required>
+                <div class="progress">
+                    <span class="progress-step active" data-step="1">1</span>
+                    <span class="progress-line active"></span>
+                    <span class="progress-step" data-step="2">2</span>
+                    <span class="progress-line"></span>
+                    <span class="progress-step" data-step="3">3</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="username">Username *</label>
-                    <input type="text" id="username" placeholder="johnsmith" required>
+                <div class="form-step active" data-step="1">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="name">Full Name *</label>
+                            <input type="text" id="name" placeholder="John Smith" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="username">Username *</label>
+                            <input type="text" id="username" placeholder="johnsmith" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" placeholder="john@example.com" required>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="email">Email *</label>
-                    <input type="email" id="email" placeholder="john@example.com" required>
+                <div class="form-step" data-step="2">
+                    <div class="form-group">
+                        <label for="mobile">Mobile Number *</label>
+                        <input type="tel" id="mobile" placeholder="+44 7700 900000 or 07700 900000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="business_name">Business Name *</label>
+                        <input type="text" id="business_name" placeholder="Your Business Ltd" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="website_url">Website (optional)</label>
+                        <input type="url" id="website_url" placeholder="https://example.com">
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="mobile">Mobile Number *</label>
-                    <input type="tel" id="mobile" placeholder="+44 7700 900000 or 07700 900000" required>
+                <div class="form-step" data-step="3">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="password">Password *</label>
+                            <input type="password" id="password" placeholder="Min 8 characters" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password2">Confirm Password *</label>
+                            <input type="password" id="password2" placeholder="Re-enter password" required>
+                        </div>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="confirm_adult" required>
+                        <label for="confirm_adult">I confirm I am 18 years or older *</label>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="business_name">Business Name *</label>
-                    <input type="text" id="business_name" placeholder="Your Business Ltd" required>
+                <div class="form-nav">
+                    <button type="button" class="btn btn-secondary" id="backBtn" disabled>Back</button>
+                    <button type="button" class="btn" id="nextBtn">Next</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn" style="display: none;">Send Verification Code</button>
                 </div>
-
-                <div class="form-group">
-                    <label for="website_url">Website (optional)</label>
-                    <input type="url" id="website_url" placeholder="https://example.com">
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Password *</label>
-                    <input type="password" id="password" placeholder="Min 8 characters" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="password2">Confirm Password *</label>
-                    <input type="password" id="password2" placeholder="Re-enter password" required>
-                </div>
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="confirm_adult" required>
-                    <label for="confirm_adult">I confirm I am 18 years or older *</label>
-                </div>
-
-                <button type="submit" class="btn" id="submitBtn">Send Verification Code</button>
             </form>
         </div>
 
         <!-- Step 2: SMS Verification -->
         <div id="step2" class="step">
-            <p style="text-align: center; margin-bottom: 20px; color: #666;">
+            <p class="helper-text">
                 📱 We sent a 5-digit code to<br>
                 <strong id="maskedPhone"></strong>
             </p>
@@ -187,8 +311,8 @@
                 <button type="submit" class="btn" id="verifyBtn">Verify & Create Account</button>
             </form>
 
-            <p style="text-align: center; margin-top: 20px; font-size: 13px; color: #999;">
-                Didn't receive the code? <a href="#" onclick="resendCode(); return false;" style="color: #667eea;">Resend</a>
+            <p class="helper-text">
+                Didn't receive the code? <a href="#" onclick="resendCode(); return false;" style="color: #9cc3ff;">Resend</a>
             </p>
         </div>
 
@@ -202,8 +326,63 @@
         let signupToken = '';
         let signupData = {};
 
+        const formSteps = Array.from(document.querySelectorAll('.form-step'));
+        const progressSteps = Array.from(document.querySelectorAll('.progress-step'));
+        const progressLines = Array.from(document.querySelectorAll('.progress-line'));
+        const nextBtn = document.getElementById('nextBtn');
+        const backBtn = document.getElementById('backBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        let currentStep = 0;
+
+        function updateStepUI() {
+            formSteps.forEach((step, index) => {
+                step.classList.toggle('active', index === currentStep);
+            });
+            progressSteps.forEach((step, index) => {
+                step.classList.toggle('active', index <= currentStep);
+            });
+            progressLines.forEach((line, index) => {
+                line.classList.toggle('active', index < currentStep);
+            });
+            backBtn.disabled = currentStep === 0;
+            nextBtn.style.display = currentStep === formSteps.length - 1 ? 'none' : 'inline-flex';
+            submitBtn.style.display = currentStep === formSteps.length - 1 ? 'inline-flex' : 'none';
+        }
+
+        function validateStep(stepEl) {
+            const inputs = Array.from(stepEl.querySelectorAll('input, textarea, select'));
+            for (const input of inputs) {
+                if (!input.checkValidity()) {
+                    input.reportValidity();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        nextBtn.addEventListener('click', () => {
+            if (!validateStep(formSteps[currentStep])) return;
+            currentStep = Math.min(currentStep + 1, formSteps.length - 1);
+            updateStepUI();
+        });
+
+        backBtn.addEventListener('click', () => {
+            currentStep = Math.max(currentStep - 1, 0);
+            updateStepUI();
+        });
+
+        updateStepUI();
+
         document.getElementById('signupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (currentStep < formSteps.length - 1) {
+                if (validateStep(formSteps[currentStep])) {
+                    currentStep = Math.min(currentStep + 1, formSteps.length - 1);
+                    updateStepUI();
+                }
+                return;
+            }
             
             const submitBtn = document.getElementById('submitBtn');
             const messageEl = document.getElementById('message');

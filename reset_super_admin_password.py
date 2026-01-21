@@ -1,49 +1,66 @@
 """Reset the Super Admin password stored in SQLite.
 
-This updates `super_admin_config.password_hash` to a PBKDF2-SHA256 spec.
+This is a standalone script (no imports from the server module) so it works
+even if `vonage_agent.py` is large or has side effects at import time.
 
 Usage:
-  python reset_super_admin_password.py
-
-Notes:
-- Runs locally against the same DB file the server uses (via `get_db_connection`).
-- Does NOT require existing super-admin login.
+  python reset_super_admin_password.py <new_password> [username]
 """
 
-from __future__ import annotations
-
-import getpass
+import base64
+import hashlib
+import os
+import secrets
+import sqlite3
+import sys
 from datetime import datetime
 
-import vonage_agent
+
+def _b64url_no_pad(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
 
 
-def main() -> None:
-    username_default = vonage_agent._get_configured_super_admin_username() or "admin"
-    username = input(f"Super-admin username [{username_default}]: ").strip() or username_default
+def _make_password_hash_spec(password: str, iterations: int) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${_b64url_no_pad(salt)}${_b64url_no_pad(dk)}"
 
-    password = getpass.getpass("New super-admin password: ")
-    confirm = getpass.getpass("Confirm password: ")
-    if password != confirm:
-        raise SystemExit("Passwords do not match")
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("Usage: python reset_super_admin_password.py <new_password> [username]")
+        return 2
+
+    password = (sys.argv[1] or "").strip()
     if len(password) < 6:
-        raise SystemExit("Password too short (use at least 6 characters)")
+        print("Password too short (min 6 characters)")
+        return 2
 
-    iterations_env = (vonage_agent.os.getenv("SUPER_ADMIN_PBKDF2_ITERATIONS") or "").strip()
+    username = (sys.argv[2] if len(sys.argv) >= 3 else "admin").strip() or "admin"
+
     try:
-        iterations = int(iterations_env or "310000")
+        iterations = int((os.getenv("SUPER_ADMIN_PBKDF2_ITERATIONS") or "310000").strip() or "310000")
     except Exception:
         iterations = 310000
     if iterations < 100_000:
         iterations = 310000
 
-    spec = vonage_agent._make_password_hash_spec(password, iterations)
-    if vonage_agent._parse_password_hash(spec) is None:
-        raise SystemExit("Failed to generate password hash")
-
+    spec = _make_password_hash_spec(password, iterations)
     now = datetime.now().isoformat()
-    conn = vonage_agent.get_db_connection()
+
+    conn = sqlite3.connect("call_logs.db")
     cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS super_admin_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            username TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
     cur.execute(
         "INSERT OR REPLACE INTO super_admin_config (id, username, password_hash, created_at, updated_at) "
         "VALUES (1, ?, ?, COALESCE((SELECT created_at FROM super_admin_config WHERE id = 1), ?), ?)",
@@ -52,8 +69,9 @@ def main() -> None:
     conn.commit()
     conn.close()
 
-    print("OK: super-admin password updated.")
+    print(f"OK: super-admin password updated for username={username!r}.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

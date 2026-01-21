@@ -24,6 +24,17 @@ google-credentials*.json
 __pycache__/
 *.pyc
 
+# Virtual environments
+.venv/
+venv/
+
+# Tunnel / local machine configs (can contain secrets)
+cloudflared_config.yml
+cloudflared*.yml
+
+# Local audio debug artifacts
+debug_audio_*.wav
+
 # Static backups / scratch
 static/*.new
 static/*_old*.html

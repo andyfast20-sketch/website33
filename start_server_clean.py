@@ -23,7 +23,7 @@ def kill_process_on_port(port=5004):
         result = subprocess.run(
             [
                 "powershell", "-Command",
-                f"(Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue).OwningProcess"
+                f"(Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue).OwningProcess"
             ],
             capture_output=True,
             text=True,
@@ -31,19 +31,18 @@ def kill_process_on_port(port=5004):
         )
         
         if result.stdout.strip():
-            pids = result.stdout.strip().split('\n')
-            for pid in pids:
-                pid = pid.strip()
-                if pid and pid.isdigit() and int(pid) > 0:
-                    print(f"⚠️  Found process {pid} on port {port}")
-                    # Kill the process
-                    subprocess.run(
-                        ["powershell", "-Command", f"Stop-Process -Id {pid} -Force"],
-                        capture_output=True,
-                        timeout=5
-                    )
-                    print(f"✅ Killed process {pid}")
-                    time.sleep(1)
+            raw_pids = [ln.strip() for ln in result.stdout.strip().split('\n') if ln.strip()]
+            unique_pids = sorted({pid for pid in raw_pids if pid.isdigit() and int(pid) > 0}, key=int)
+            for pid in unique_pids:
+                print(f"⚠️  Found process {pid} listening on port {port}")
+                subprocess.run(
+                    ["powershell", "-Command", f"Stop-Process -Id {pid} -Force"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                print(f"✅ Killed process {pid}")
+                time.sleep(1)
         else:
             # Fallback: netstat/taskkill (works even when Get-NetTCPConnection is unavailable)
             try:

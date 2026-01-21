@@ -31,14 +31,13 @@ Added automatic recording for all Vonage calls:
 #### `/webhooks/recording` (POST)
 - Receives recording URL when Vonage finishes processing the recording
 - Updates database with recording URL
-- Recordings are in MP3 format with stereo (2 channels)
-- Channel 1: Customer, Channel 2: Agent
+- Recordings are currently requested as WAV, split by conversation
 
 #### Modified `/webhooks/answer`
-- Added `record` action before `connect` in NCCO
+- Adds `record` action before `connect` in NCCO
 - Settings:
-  - Format: MP3
-  - Channels: 2 (stereo - separate customer/agent tracks)
+  - Format: WAV
+  - Split: `conversation`
   - Max duration: 2 hours
   - No beep when recording starts
   - Ends after 3 seconds of silence
@@ -73,6 +72,12 @@ Updated `viewCallSummary()` function in [admin.html](static/admin.html):
    - **Status Callback URL**: `https://YOUR_DOMAIN/webhooks/vapi-status`
 
 Replace `YOUR_DOMAIN` with your public URL (Cloudflare tunnel or ngrok).
+
+### Per-user recording option
+
+In the admin UI (Bundles tab), users can toggle **Call Recording**:
+- **Vapi (recommended)**: keeps answering fast; requires Vapi end-of-call webhook configured.
+- **Vonage (may slow answering)**: forces a Vonage `record` NCCO action before connect for realtime/Vapi calls.
 
 ### For Vonage Recordings:
 - No additional configuration needed

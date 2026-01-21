@@ -25,6 +25,7 @@
         .error-message { color: #ff6b6b; background: transparent; padding: 0; border-radius: 0; margin-top: 8px; display: none; font-weight: 600; font-size: 13px; text-align: right; }
         .main-container { display: none; max-width: 1400px; width: 100%; }
         .super-admin-name { color: white; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; padding: 10px 20px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; display: inline-block; }
+        .build-stamp { color: rgba(255, 255, 255, 0.85); font-size: 12px; font-weight: 800; letter-spacing: 0.6px; margin-top: 4px; }
         .header { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 16px; padding: 20px 30px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { color: white; font-size: 28px; font-weight: 700; }
         .btn-logout { padding: 12px 24px; border: none; border-radius: 8px; background: rgba(255, 255, 255, 0.2); color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
@@ -783,20 +784,22 @@
         <!-- Navigation Menu -->
         <div class="nav-menu" id="navMenu">
             <div class="nav-item active" onclick="navigateToSection('overview')"><span>🏠</span> Overview</div>
-            <div class="nav-item" onclick="navigateToSection('brain')"><span>🧠</span> AI Brain</div>
-            <div class="nav-item" onclick="navigateToSection('openrouter')"><span>🔌</span> OpenRouter</div>
-            <div class="nav-item" onclick="navigateToSection('performance')"><span>⚡</span> Performance</div>
+            <div class="nav-item" onclick="navigateToSection('brain')" style="display:none;"><span>🧠</span> AI Brain</div>
+            <div class="nav-item" onclick="navigateToSection('openrouter')" style="display:none;"><span>🔌</span> OpenRouter</div>
+            <div class="nav-item" onclick="navigateToSection('performance')" style="display:none;"><span>⚡</span> Performance</div>
             <div class="nav-item" onclick="navigateToSection('vonage')"><span>📞</span> Phone Numbers</div>
+                <div class="nav-item" onclick="navigateToSection('engaged')"><span>🚦</span> Engaged Tone</div>
             <div class="nav-item" onclick="navigateToSection('api-keys')"><span>🔑</span> API Keys</div>
-            <div class="nav-item" onclick="navigateToSection('testing')"><span>🧪</span> Testing</div>
+            <div class="nav-item" onclick="navigateToSection('charges')"><span>💰</span> Charges</div>
+            <div class="nav-item" onclick="navigateToSection('testing')" style="display:none;"><span>🧪</span> Testing</div>
             <div class="nav-item" onclick="navigateToSection('instructions')"><span>📝</span> Instructions</div>
-            <div class="nav-item" onclick="navigateToSection('backchannel')"><span>🎛️</span> Turn-Taking</div>
+            <div class="nav-item" onclick="navigateToSection('backchannel')" style="display:none;"><span>🎛️</span> Turn-Taking</div>
             <div class="nav-item" onclick="navigateToSection('vapi')"><span>🎙️</span> Vapi Assistants</div>
-            <div class="nav-item" onclick="navigateToSection('filler')"><span>💬</span> Filler Words</div>
+            <div class="nav-item" onclick="navigateToSection('filler')" style="display:none;"><span>💬</span> Filler Words</div>
             <div class="nav-item" onclick="window.open('/latency-dashboard.html', '_blank')"><span>📊</span> Latency</div>
         </div>
         
-        <div class="super-admin-name">Andy</div>
+        <div class="super-admin-name">Andrew Roberts</div>
         
         <!-- Floating Speechmatics Streaming Status -->
         <div class="streaming-status" id="streamingStatus" style="display: none;">
@@ -808,7 +811,7 @@
         </div>
 
         <!-- Live Brain Usage (OpenAI vs DeepSeek vs Groq) -->
-        <div id="section-overview" class="panel section-focused" style="margin-bottom: 25px;">
+        <div id="section-overview" class="panel section-focused" style="margin-bottom: 25px; display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <div class="panel-header">
                 <h2>🧠 Live Brain Usage</h2>
@@ -826,7 +829,10 @@
         </div>
         
         <div class="header">
-            <h1>🔧 Super Admin - System Configuration</h1>
+            <div>
+                <h1>🔧 Super Admin - System Configuration</h1>
+                <div class="build-stamp">UPDATED JAN 17 2026</div>
+            </div>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-logout" onclick="window.open('/', '_blank')" style="background: rgba(52, 152, 219, 0.3);">
                     🌐 Open Website
@@ -946,7 +952,7 @@
         </div>
 
         <!-- System Controls Panel -->
-        <div class="panel" style="margin-bottom: 25px;">
+        <div class="panel" id="section-system-controls" style="margin-bottom: 25px; display:none;">
             <div class="panel-header">
                 <h2>🛠️ System Controls</h2>
                 <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Quick diagnostic and recovery tools</p>
@@ -985,6 +991,73 @@
                 <button class="btn" id="reloadConfigBtn" style="background: linear-gradient(135deg, #f39c12, #e67e22); display: none;" onclick="reloadConfiguration()">
                     🔄 Reload Configuration
                 </button>
+            </div>
+        </div>
+
+        <!-- Charges / Billing Configuration -->
+        <div class="panel" id="section-charges" style="margin-bottom: 25px;">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <div class="panel-header">
+                <h2>💰 Charges (Credits)</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Update the live credit costs used by the billing engine.</p>
+            </div>
+
+            <div id="chargesMessage" style="display:none; margin: 10px 0 16px 0; padding: 12px 14px; border-radius: 12px; font-weight: 800;"></div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+                <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; padding: 16px;">
+                    <div style="font-weight: 900; margin-bottom: 10px;">Core</div>
+                    <div style="display:flex; flex-direction: column; gap: 10px;">
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9;">Credits per connected call</label>
+                        <input id="chargesPerCall" type="number" step="0.1" min="0" placeholder="5" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits per minute</label>
+                        <input id="chargesPerMinute" type="number" step="0.1" min="0" placeholder="2" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits per calendar booking</label>
+                        <input id="chargesPerBooking" type="number" step="0.1" min="0" placeholder="10" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits per SMS notification</label>
+                        <input id="chargesPerSmsNotification" type="number" step="0.1" min="0" placeholder="3" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits to unlock full transcript (per call)</label>
+                        <input id="chargesPerTranscriptUnlock" type="number" step="0.1" min="0" placeholder="2" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <div style="height: 1px; background: rgba(255,255,255,0.10); margin: 8px 0 2px 0;"></div>
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Phone number hire (GBP per month)</label>
+                        <input id="chargesNumberHireMonthlyGBP" type="number" step="0.01" min="0" placeholder="4.00" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+                    </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; padding: 16px;">
+                    <div style="font-weight: 900; margin-bottom: 10px;">Bundles</div>
+                    <div style="display:flex; flex-direction: column; gap: 10px;">
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9;">Credits per task extracted</label>
+                        <input id="chargesPerTask" type="number" step="0.1" min="0" placeholder="5" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits per advanced voice call</label>
+                        <input id="chargesPerAdvancedVoice" type="number" step="0.1" min="0" placeholder="3" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+
+                        <label style="font-size: 12px; font-weight: 800; opacity: 0.9; margin-top: 4px;">Credits per sales detector call</label>
+                        <input id="chargesPerSalesDetector" type="number" step="0.1" min="0" placeholder="2" style="width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: white;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; padding: 16px;">
+                <div style="font-weight: 900; margin-bottom: 10px;">💳 Top-up packages</div>
+                <div style="font-size: 12px; opacity: 0.75; margin-bottom: 12px;">These show in admin when trial expires. Each package needs credits + price (GBP).</div>
+                <div id="topupPackagesContainer" style="display:flex; flex-direction: column; gap: 10px;"></div>
+                <div style="margin-top: 10px; display:flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn" style="background: rgba(52, 152, 219, 0.2); border: 1px solid rgba(52, 152, 219, 0.45);" onclick="addTopupPackageRow()">➕ Add package</button>
+                    <button class="btn" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);" onclick="resetTopupPackagesToDefault()">↩️ Reset defaults</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; display:flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" style="background: linear-gradient(135deg, #2ecc71, #27ae60);" onclick="saveChargesConfig()">💾 Save charges</button>
+                <button class="btn" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);" onclick="loadChargesConfig()">🔄 Reload</button>
             </div>
         </div>
 
@@ -1086,15 +1159,42 @@
             </div>
         </div>
 
+        <!-- Engaged Tone Diagnostics -->
+        <div id="section-engaged" class="panel section-focused" style="margin-bottom: 25px;">
+            <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
+            <div class="panel-header">
+                <h2>🚦 Engaged Tone Diagnostics</h2>
+                <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">
+                    One-click checks for the common “engaged/busy tone” causes: tunnel reachability, Vonage webhook methods, and last webhook/NCCO.
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+                <button class="btn" id="runEngagedDiagBtn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); min-width: 220px;" onclick="runEngagedToneDiagnostics()">
+                    🔍 Run Engaged Tone Checks
+                </button>
+                <button class="btn" style="background: linear-gradient(135deg, #f39c12, #e67e22); min-width: 220px;" onclick="fixEngagedTone()">
+                    🛠 Restart Tunnel (Fix Engaged Tone)
+                </button>
+                <button class="btn" id="copyEngagedDiagBtn" style="background: linear-gradient(135deg, #34495e, #2c3e50); min-width: 180px; display:none;" onclick="copyEngagedToneDiagnostics()">
+                    📋 Copy Report
+                </button>
+            </div>
+
+            <div id="engagedDiagStatus" style="margin-top: 12px; font-size: 13px; opacity: 0.85;"></div>
+
+            <div id="engagedDiagResults" style="display:none; margin-top: 14px; background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; border: 1px solid rgba(255, 255, 255, 0.12);"></div>
+        </div>
+
         <!-- OpenRouter Test Panel -->
-        <div id="section-openrouter" class="panel section-focused">
+        <div id="section-openrouter" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🧪 OpenRouter API Test</h2>
             <p style="margin-bottom: 15px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
                 Test OpenRouter connectivity and verify your API key is working. This will make a minimal API call (uses ~10 tokens).
             </p>
 
-            <div style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
+            <div id="openrouterVoiceModelPanel" style="display: none; background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
                 <div style="font-size: 14px; font-weight: 700; margin-bottom: 10px;">OpenRouter Voice Model (fastest first) — $/1M tokens</div>
                 <select id="openrouterModelSelect" style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: #2c3e50; color: #ecf0f1; font-size: 13px; font-family: 'Courier New', monospace;">
                     <option value="" style="background: #34495e; color: #ecf0f1;">Loading models...</option>
@@ -1159,7 +1259,7 @@
         </div>
 
         <!-- AI Performance Tuning Panel -->
-        <div id="section-performance" class="panel section-focused">
+        <div id="section-performance" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>⚡ AI Performance Tuning</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">
@@ -1476,7 +1576,7 @@
             </div>
         </div>
 
-        <div id="section-brain" class="panel section-focused">
+        <div id="section-brain" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🧠 AI Brain Provider</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">Choose which AI service will handle conversations and decision-making for all accounts.</p>
@@ -1497,7 +1597,7 @@
                         <div class="brain-option-title">Groq</div>
                         <div class="brain-option-desc">GroqCloud low-latency chat (not xAI Grok)</div>
                     </label>
-                    <label class="brain-option" id="brainOpenRouter">
+                    <label class="brain-option" id="brainOpenRouter" style="display:none;">
                         <input type="radio" name="brain" value="openrouter" onclick="selectBrain('openrouter')">
                         <div class="brain-option-title">OpenRouter</div>
                         <div class="brain-option-desc">OpenRouter models (OpenAI-compatible)</div>
@@ -1600,7 +1700,7 @@
             </div>
         </div>
 
-        <div id="section-testing" class="panel section-focused">
+        <div id="section-testing" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🧪 Testing Features</h2>
             <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
@@ -1674,7 +1774,7 @@
             <div id="accountsList" style="max-height: 600px; overflow-y: auto;"></div>
         </div>
 
-        <div id="section-backchannel" class="panel section-focused">
+        <div id="section-backchannel" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>🎛️ Backchannel / Turn-Taking Tuning</h2>
             <p style="margin-bottom: 16px; opacity: 0.8; font-size: 14px;">
@@ -1773,7 +1873,7 @@
             </div>
         </div>
 
-        <div id="section-filler" class="panel section-focused">
+        <div id="section-filler" class="panel section-focused" style="display:none;">
             <button class="back-to-menu" onclick="backToMenu()">⬆️ Menu</button>
             <h2>💬 Filler Words (By Latency)</h2>
             <p style="margin-bottom: 14px; opacity: 0.8; font-size: 14px;">
@@ -1803,7 +1903,7 @@
             </div>
         </div>
 
-        <div class="panel">            <h2>💬 Filler Words (Sarah Voice)</h2>
+        <div class="panel" id="section-filler-sarah" style="display:none;">            <h2>💬 Filler Words (Sarah Voice)</h2>
             <p style="margin-bottom: 20px; opacity: 0.8; font-size: 14px;">10 audio files using Speechmatics Sarah voice. These will be randomly played during pauses to cover latency.</p>
             
             <div style="margin-bottom: 25px;">
@@ -1858,6 +1958,161 @@
         let healthCheckInterval = null;
         let healthData = {};
         let selectedCallUuid = null;
+
+        const defaultTopupPackages = [
+            { credits: 50, price_gbp: 0.30, label: 'Starter' },
+            { credits: 200, price_gbp: 1.00, label: 'Popular' },
+            { credits: 500, price_gbp: 2.00, label: 'Boost' }
+        ];
+
+        function renderTopupPackages(packages) {
+            const container = document.getElementById('topupPackagesContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            const list = Array.isArray(packages) && packages.length ? packages : defaultTopupPackages;
+            list.forEach(pkg => addTopupPackageRow(pkg));
+        }
+
+        function addTopupPackageRow(pkg = {}) {
+            const container = document.getElementById('topupPackagesContainer');
+            if (!container) return;
+            const row = document.createElement('div');
+            row.style.display = 'grid';
+            row.style.gridTemplateColumns = '1.2fr 1fr 1.4fr auto';
+            row.style.gap = '10px';
+            row.style.alignItems = 'center';
+            row.style.background = 'rgba(255,255,255,0.06)';
+            row.style.border = '1px solid rgba(255,255,255,0.12)';
+            row.style.borderRadius = '10px';
+            row.style.padding = '10px';
+
+            row.innerHTML = `
+                <input type="number" min="1" step="1" placeholder="Credits" value="${pkg.credits ?? ''}" data-field="credits" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.18); color: white;">
+                <input type="number" min="0.3" step="0.01" placeholder="Price (GBP)" value="${pkg.price_gbp ?? ''}" data-field="price_gbp" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.18); color: white;">
+                <input type="text" placeholder="Label (optional)" value="${pkg.label ?? ''}" data-field="label" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.18); color: white;">
+                <button class="btn" style="background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.45);" onclick="this.closest('div').remove()">🗑️</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function collectTopupPackages() {
+            const container = document.getElementById('topupPackagesContainer');
+            if (!container) return [];
+            const rows = Array.from(container.children);
+            const packages = [];
+            rows.forEach(row => {
+                const creditsEl = row.querySelector('[data-field="credits"]');
+                const priceEl = row.querySelector('[data-field="price_gbp"]');
+                const labelEl = row.querySelector('[data-field="label"]');
+                const credits = Number((creditsEl?.value || '').trim());
+                const price_gbp = Number((priceEl?.value || '').trim());
+                const label = (labelEl?.value || '').trim();
+                if (!Number.isFinite(credits) || !Number.isFinite(price_gbp)) return;
+                if (credits <= 0 || price_gbp <= 0) return;
+                packages.push({ credits: Math.round(credits), price_gbp: Number(price_gbp.toFixed(2)), label });
+            });
+            return packages;
+        }
+
+        function resetTopupPackagesToDefault() {
+            renderTopupPackages(defaultTopupPackages);
+        }
+
+            async function loadChargesConfig() {
+                const msg = document.getElementById('chargesMessage');
+                const setMsg = (text, ok = true) => {
+                    if (!msg) return;
+                    msg.textContent = text;
+                    msg.style.display = text ? 'block' : 'none';
+                    msg.style.background = ok ? 'rgba(46, 204, 113, 0.18)' : 'rgba(231, 76, 60, 0.18)';
+                    msg.style.border = ok ? '1px solid rgba(46, 204, 113, 0.28)' : '1px solid rgba(231, 76, 60, 0.28)';
+                    msg.style.color = ok ? 'rgba(210, 255, 235, 0.95)' : 'rgba(255, 200, 200, 0.95)';
+                };
+
+                try {
+                    setMsg('Loading current charges…', true);
+                    const resp = await fetch('/api/super-admin/billing-config');
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json().catch(() => ({}));
+
+                    const setVal = (id, v) => {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        el.value = (v === null || v === undefined) ? '' : String(v);
+                    };
+
+                    setVal('chargesPerCall', data.credits_per_connected_call);
+                    setVal('chargesPerMinute', data.credits_per_minute);
+                    setVal('chargesPerBooking', data.credits_per_calendar_booking);
+                    setVal('chargesNumberHireMonthlyGBP', data.number_hire_monthly_gbp);
+                    setVal('chargesPerSmsNotification', data.credits_per_sms_notification);
+                    setVal('chargesPerTranscriptUnlock', data.credits_per_transcript_unlock);
+                    setVal('chargesPerTask', data.credits_per_task);
+                    setVal('chargesPerAdvancedVoice', data.credits_per_advanced_voice);
+                    setVal('chargesPerSalesDetector', data.credits_per_sales_detection);
+                    renderTopupPackages(data.topup_packages || defaultTopupPackages);
+                    setMsg('', true);
+                } catch (e) {
+                    console.error('Failed to load charges config:', e);
+                    setMsg('Failed to load charges. Please refresh or log in again.', false);
+                }
+            }
+
+            async function saveChargesConfig() {
+                const msg = document.getElementById('chargesMessage');
+                const setMsg = (text, ok = true) => {
+                    if (!msg) return;
+                    msg.textContent = text;
+                    msg.style.display = text ? 'block' : 'none';
+                    msg.style.background = ok ? 'rgba(46, 204, 113, 0.18)' : 'rgba(231, 76, 60, 0.18)';
+                    msg.style.border = ok ? '1px solid rgba(46, 204, 113, 0.28)' : '1px solid rgba(231, 76, 60, 0.28)';
+                    msg.style.color = ok ? 'rgba(210, 255, 235, 0.95)' : 'rgba(255, 200, 200, 0.95)';
+                };
+
+                try {
+                    setMsg('Saving…', true);
+                    const getNum = (id) => {
+                        const el = document.getElementById(id);
+                        const raw = (el?.value || '').trim();
+                        const placeholder = (el?.getAttribute('placeholder') || '').trim();
+                        const chosen = raw || placeholder;
+                        const n = Number(chosen);
+                        if (!chosen || Number.isNaN(n)) return null;
+                        return n;
+                    };
+
+                    const topup_packages = collectTopupPackages();
+                    if (!topup_packages.length) {
+                        setMsg('Please add at least one top-up package.', false);
+                        return;
+                    }
+
+                    const payload = {
+                        credits_per_connected_call: getNum('chargesPerCall'),
+                        credits_per_minute: getNum('chargesPerMinute'),
+                        credits_per_calendar_booking: getNum('chargesPerBooking'),
+                        number_hire_monthly_gbp: getNum('chargesNumberHireMonthlyGBP'),
+                        credits_per_sms_notification: getNum('chargesPerSmsNotification'),
+                        credits_per_transcript_unlock: getNum('chargesPerTranscriptUnlock'),
+                        credits_per_task: getNum('chargesPerTask'),
+                        credits_per_advanced_voice: getNum('chargesPerAdvancedVoice'),
+                        credits_per_sales_detection: getNum('chargesPerSalesDetector'),
+                        topup_packages: topup_packages,
+                    };
+
+                    const resp = await fetch('/api/super-admin/billing-config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok) throw new Error(data?.detail || `HTTP ${resp.status}`);
+                    setMsg('Saved. Admin pricing updates immediately.', true);
+                } catch (e) {
+                    console.error('Failed to save charges config:', e);
+                    setMsg(`Save failed: ${String(e.message || e)}`, false);
+                }
+            }
         
         // Navigation functions
         function navigateToSection(sectionName) {
@@ -1908,6 +2163,8 @@
                 // Load data when navigating to specific sections
                 if (sectionName === 'vapi') {
                     loadVapiAssistants();
+                } else if (sectionName === 'charges') {
+                    loadChargesConfig();
                 }
             }
         }
@@ -2321,6 +2578,7 @@
             await safe('loadOpenRouterModels', () => loadOpenRouterModels());
             await safe('loadPerformanceSettings', () => loadPerformanceSettings());
             await safe('loadRacingSettings', () => loadRacingSettings());
+            await safe('loadVapiAssistants', () => loadVapiAssistants());
         }
 
         // ==================== BACKCHANNEL / TURN-TAKING SETTINGS ====================
@@ -2650,6 +2908,13 @@
         }
 
         async function showAccountDetailsModal(userId, userName) {
+            const escapeHtml = (str) => String(str ?? '')
+                .replace(/&/g,'&amp;')
+                .replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;')
+                .replace(/'/g,'&#039;');
+
             // Create modal if it doesn't exist
             let modal = document.getElementById('accountDetailsModal');
             if (!modal) {
@@ -2679,15 +2944,29 @@
             content.innerHTML = '<div style="text-align:center; color: rgba(255,255,255,0.7); padding: 30px;">Loading account details…</div>';
 
             try {
-                const response = await fetch(`/api/super-admin/account-details/${userId}`);
-                const data = await response.json();
-                
-                if (!data || !data.success) {
-                    throw new Error(data?.error || 'Failed to load account details');
+                const response = await fetch(`/api/super-admin/account-details/${userId}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+
+                const rawText = await response.text();
+                let data = null;
+                try {
+                    data = rawText ? JSON.parse(rawText) : null;
+                } catch {
+                    // If we got HTML back (often auth redirect), show a clearer message.
+                    const looksLikeHtml = /^\s*</.test(rawText || '');
+                    throw new Error(looksLikeHtml
+                        ? 'Request returned HTML instead of JSON (likely not logged in as super-admin, or you were redirected).'
+                        : (rawText || 'Failed to load account details'));
+                }
+
+                if (!response.ok || !data || data.success !== true) {
+                    throw new Error(data?.error || data?.detail || `Failed to load account details (HTTP ${response.status})`);
                 }
 
                 const d = data.details || {};
-                const escapeHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 
                 subtitle.textContent = `${userName} (User ID: ${userId})`;
 
@@ -2726,6 +3005,7 @@
                         ${fieldBlock('Business Name', escapeHtml(d.business_name), '🏢')}
                         ${fieldBlock('Website URL', escapeHtml(d.website_url), '🌐')}
                         ${fieldBlock('Full Name', escapeHtml(d.name), '👤')}
+                        ${fieldBlock('Password', '<span style="opacity:0.7;">(stored securely, not viewable)</span>', '🔒')}
                         ${fieldBlock('Assigned Phone Number', escapeHtml(d.phone_number), '☎️')}
                         ${fieldBlock('Account Created', formatDate(d.created_at), '📅')}
                         ${fieldBlock('Account Status', escapeHtml(d.status), '✨')}
@@ -3475,6 +3755,13 @@
         // Vapi Assistants Management
         let globalVapiAssistants = [];
 
+        const _escapeVapiHtml = (str) => String(str ?? '')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#039;');
+
         async function loadVapiAssistants() {
             try {
                 const response = await fetch('/api/super-admin/vapi-assistants');
@@ -3506,14 +3793,28 @@
             container.innerHTML = globalVapiAssistants.map((assistant, index) => `
                 <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="flex: 1;">
-                        <div style="font-weight: 600; margin-bottom: 4px;">${assistant.name}</div>
-                        <div style="font-size: 12px; color: rgba(255,255,255,0.6); font-family: monospace;">${assistant.id}</div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-bottom: 6px;">Name</div>
+                        <input
+                            type="text"
+                            value="${_escapeVapiHtml(assistant?.name || '')}"
+                            oninput="updateVapiAssistantName(${index}, this.value)"
+                            style="width: 100%; max-width: 520px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-size: 14px; margin-bottom: 6px;"
+                        />
+                        <div style="font-size: 12px; opacity: 0.8;">Assistant ID (from Vapi)</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.6); font-family: monospace;">${_escapeVapiHtml(assistant?.id || '')}</div>
                     </div>
                     <button class="btn-save" onclick="removeVapiAssistant(${index})" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.3);">
                         🗑️ Remove
                     </button>
                 </div>
             `).join('');
+        }
+
+        function updateVapiAssistantName(index, newName) {
+            if (!Array.isArray(globalVapiAssistants)) return;
+            if (!globalVapiAssistants[index]) return;
+            globalVapiAssistants[index].name = String(newName ?? '');
+            _setVapiStatus('⚠️ Unsaved changes', false);
         }
 
         function addVapiAssistant() {
@@ -3552,6 +3853,14 @@
         async function saveVapiAssistants() {
             try {
                 _setVapiStatus('Saving…', true);
+
+                // Normalize payload before saving
+                globalVapiAssistants = (globalVapiAssistants || [])
+                    .map(a => ({
+                        name: String(a?.name ?? '').trim(),
+                        id: String(a?.id ?? '').trim(),
+                    }))
+                    .filter(a => a.name && a.id);
                 
                 const response = await fetch('/api/super-admin/vapi-assistants', {
                     method: 'POST',
@@ -5271,7 +5580,7 @@
             const provider = document.getElementById('tunnelProvider').value || 'cloudflare';
             if (!confirm('🛠 This will restart the tunnel and clear active sessions. Continue?')) return;
 
-            showAlert('🛠 Fixing engaged tone (restarting tunnel)...', 'info');
+            showAlert('🛠 Fixing engaged tone (restart tunnel + sync webhooks)...', 'info');
             try {
                 const resp = await fetch('/api/super-admin/fix-engaged', {
                     method: 'POST',
@@ -5280,13 +5589,192 @@
                 });
                 const data = await resp.json();
                 if (data.success) {
-                    showAlert(data.message || '✅ Engaged tone fix complete', 'success');
+                    // After tunnel restart, try syncing Vonage webhooks too.
+                    let syncMsg = '';
+                    try {
+                        const syncResp = await fetch('/api/admin/sync-vonage-webhooks', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                        const syncData = await syncResp.json().catch(() => ({}));
+                        if (syncResp.ok && syncData.success) {
+                            syncMsg = ' + Vonage webhooks synced';
+                        } else {
+                            syncMsg = ' + webhook sync failed';
+                        }
+                    } catch (e) {
+                        syncMsg = ' + webhook sync failed';
+                    }
+
+                    showAlert((data.message || '✅ Engaged tone fix complete') + syncMsg, 'success');
                     await updateTunnelStatus();
+
+                    // Re-run diagnostics so the UI immediately shows what's fixed.
+                    try {
+                        await runEngagedToneDiagnostics({ afterFix: true });
+                    } catch (_) {}
                 } else {
                     showAlert('❌ Fix failed: ' + (data.message || data.error || 'Unknown error'), 'error');
                 }
             } catch (e) {
                 showAlert('❌ Fix failed: ' + e.message, 'error');
+            }
+        }
+
+        // ===== ENGAGED TONE DIAGNOSTICS =====
+        let _lastEngagedDiagText = '';
+
+        function _diagBadge(ok) {
+            if (ok === true) return '<span style="padding: 3px 8px; border-radius: 999px; background: rgba(46, 204, 113, 0.2); border: 1px solid rgba(46, 204, 113, 0.35); color: #aaffc8; font-weight: 800; font-size: 11px;">PASS</span>';
+            if (ok === false) return '<span style="padding: 3px 8px; border-radius: 999px; background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.35); color: #ffb3b3; font-weight: 800; font-size: 11px;">FAIL</span>';
+            return '<span style="padding: 3px 8px; border-radius: 999px; background: rgba(149, 165, 166, 0.2); border: 1px solid rgba(149, 165, 166, 0.35); color: rgba(255,255,255,0.85); font-weight: 800; font-size: 11px;">SKIP</span>';
+        }
+
+        function _fmt(obj) {
+            try { return JSON.stringify(obj, null, 2); } catch (_) { return String(obj); }
+        }
+
+        function _escapeHtml(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function _shortReason(obj) {
+            if (!obj) return '';
+            if (obj.error) return String(obj.error);
+            if (obj.status_code && obj.status_code >= 400) return `HTTP ${obj.status_code}`;
+            return '';
+        }
+
+        async function runEngagedToneDiagnostics(opts = {}) {
+            const btn = document.getElementById('runEngagedDiagBtn');
+            const copyBtn = document.getElementById('copyEngagedDiagBtn');
+            const statusEl = document.getElementById('engagedDiagStatus');
+            const resultsEl = document.getElementById('engagedDiagResults');
+
+            copyBtn.style.display = 'none';
+            resultsEl.style.display = 'none';
+            resultsEl.innerHTML = '';
+            statusEl.textContent = opts.afterFix ? 'Re-checking…' : 'Running diagnostics…';
+
+            btn.disabled = true;
+            btn.textContent = '🔄 Running…';
+
+            try {
+                const resp = await fetch('/api/super-admin/engaged-tone-diagnostics', { method: 'GET', cache: 'no-cache' });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data.success) {
+                    throw new Error(data.error || data.message || `HTTP ${resp.status}`);
+                }
+
+                const tunnel = data.tunnel || {};
+                const vonage = data.vonage_application || {};
+                const checks = data.public_checks || {};
+                const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+
+                const localReadyOk = !!(data.local_ready && data.local_ready.ok);
+                const tunnelRunningOk = (tunnel.process_running === undefined ? null : !!tunnel.process_running);
+
+                const answerMethod = String(((vonage.answer_url || {}).http_method || '')).toUpperCase();
+                const eventMethod = String(((vonage.event_url || {}).http_method || '')).toUpperCase();
+                const vonageWebhooksOk = !!(vonage.ok && answerMethod === 'GET' && eventMethod === 'GET');
+
+                const pubReadyOk = (checks.ready_get && checks.ready_get.ok === true);
+                const pubAnswerGetOk = (checks.answer_get_callish && checks.answer_get_callish.ok === true);
+                const pubEventsGetOk = (checks.events_get && checks.events_get.ok === true);
+
+                // POST checks are only "required" if Vonage is configured to POST.
+                const needPost = (answerMethod === 'POST' || eventMethod === 'POST');
+                const pubAnswerPostOk = (checks.answer_post && checks.answer_post.ok === true);
+                const pubEventsPostOk = (checks.events_post && checks.events_post.ok === true);
+                const postOk = !needPost || (pubAnswerPostOk && pubEventsPostOk);
+
+                const items = [];
+                items.push({ label: 'Local readiness (/ready)', ok: localReadyOk, hint: localReadyOk ? '' : 'Server not ready (DB/keys/tunnel). Fix locally first.' });
+                items.push({ label: 'Tunnel process running', ok: tunnelRunningOk, hint: tunnelRunningOk === false ? 'Tunnel not running. Use Fix or Start Tunnel.' : '' });
+                items.push({ label: `Vonage webhook methods (Answer=${answerMethod || 'Unknown'}, Event=${eventMethod || 'Unknown'})`, ok: vonageWebhooksOk, hint: vonageWebhooksOk ? '' : 'Set Vonage webhooks to GET (Fix will try).'});
+                items.push({ label: 'Public /ready reachable', ok: pubReadyOk, hint: pubReadyOk ? '' : _shortReason(checks.ready_get) || 'Public URL not reachable (tunnel/DNS/cloudflared).'});
+                items.push({ label: 'Public Answer webhook reachable (GET)', ok: pubAnswerGetOk, hint: pubAnswerGetOk ? '' : _shortReason(checks.answer_get_callish) || 'Vonage will give engaged if this fails.' });
+                items.push({ label: 'Public Events webhook reachable (GET)', ok: pubEventsGetOk, hint: pubEventsGetOk ? '' : _shortReason(checks.events_get) || 'Less critical for answering, but should work.' });
+                items.push({ label: needPost ? 'Public webhooks reachable (POST) (required because Vonage=POST)' : 'Public webhooks (POST) (not required)', ok: needPost ? postOk : null, hint: needPost && !postOk ? 'POST is failing through the tunnel. Switch Vonage to GET (Fix will try).' : '' });
+
+                const passed = items.filter(i => i.ok === true).length;
+                const failed = items.filter(i => i.ok === false).length;
+
+                const raw = _fmt(data);
+                const html = `
+                    <div style="display:flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;">
+                        <div style="font-weight: 900;">Engaged Tone Summary</div>
+                        <div style="font-size: 12px; opacity: 0.8;">${_escapeHtml(data.timestamp || '')}</div>
+                    </div>
+
+                    <div style="margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12);">
+                        <div style="font-weight: 800;">${passed} passed • ${failed} failed</div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">Fixable issues usually: tunnel down, stale URL, Vonage methods not GET.</div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr; gap: 10px;">
+                        ${items.map(i => `
+                            <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px;">
+                                <div style="display:flex; justify-content: space-between; gap: 10px; align-items: center;">
+                                    <div style="font-weight: 800;">${_escapeHtml(i.label)}</div>
+                                    <div>${_diagBadge(i.ok)}</div>
+                                </div>
+                                ${i.hint ? `<div style="margin-top: 6px; font-size: 13px; opacity: 0.85;">${_escapeHtml(i.hint)}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div style="margin-top: 14px; padding: 12px; border-radius: 10px; background: rgba(52, 152, 219, 0.12); border: 1px solid rgba(52, 152, 219, 0.22);">
+                        <div style="font-weight: 900; margin-bottom: 8px;">What I can fix automatically</div>
+                        <div style="font-size: 13px; opacity: 0.95; line-height: 1.6;">
+                            • Restart tunnel + clear stuck sessions<br>
+                            • Re-sync Vonage application webhooks (URLs + set methods to GET)<br>
+                            <span style="opacity:0.85;">(If you’re missing Vonage credentials, the fix can’t apply webhooks.)</span>
+                        </div>
+                    </div>
+
+                    ${recs.length ? `
+                    <div style="margin-top: 14px; padding: 12px; border-radius: 10px; background: rgba(241, 196, 15, 0.12); border: 1px solid rgba(241, 196, 15, 0.22);">
+                        <div style="font-weight: 900; margin-bottom: 8px;">Recommendations</div>
+                        <div style="font-size: 13px; opacity: 0.95; line-height: 1.6;">${recs.map(x => `• ${_escapeHtml(x)}`).join('<br>')}</div>
+                    </div>` : ''}
+
+                    <details style="margin-top: 14px;">
+                        <summary style="cursor:pointer; opacity: 0.9; font-weight: 800;">Show technical details</summary>
+                        <pre style="margin-top: 10px; font-size: 12px; opacity: 0.9; white-space: pre-wrap; word-break: break-word; font-family: 'Courier New', monospace; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px;">${_escapeHtml(raw)}</pre>
+                    </details>
+                `;
+
+                resultsEl.innerHTML = html;
+                resultsEl.style.display = 'block';
+                statusEl.textContent = opts.afterFix ? 'Re-check complete.' : 'Done.';
+
+                _lastEngagedDiagText = [
+                    `ENGAGED TONE SUMMARY (${data.timestamp || ''})`,
+                    '',
+                    ...items.map(i => `- ${i.ok === true ? 'PASS' : (i.ok === false ? 'FAIL' : 'SKIP')} | ${i.label}${i.hint ? ` | ${i.hint}` : ''}`),
+                    '',
+                    recs.length ? 'Recommendations:' : 'Recommendations: (none)',
+                    ...(recs.length ? recs.map(r => `- ${r}`) : []),
+                ].join('\n');
+
+                copyBtn.style.display = 'inline-block';
+            } catch (e) {
+                statusEl.textContent = '';
+                showAlert('❌ Engaged tone diagnostics failed: ' + (e.message || e), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Run Engaged Tone Checks';
+            }
+        }
+
+        async function copyEngagedToneDiagnostics() {
+            if (!_lastEngagedDiagText) {
+                showAlert('Nothing to copy yet. Run diagnostics first.', 'warning');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(_lastEngagedDiagText);
+                showAlert('✅ Diagnostics copied to clipboard', 'success');
+            } catch (e) {
+                showAlert('❌ Copy failed: ' + (e.message || e), 'error');
             }
         }
 
